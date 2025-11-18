@@ -1,0 +1,9 @@
+# Agno Implementation - Minimal Dependencies
+agno>=0.1.0
+python-dotenv>=1.0.0
+kubernetes>=28.0.0
+pyyaml>=6.0.0
+
+# Optional but recommended
+rich>=13.0.0
+loguru>=0.7.0

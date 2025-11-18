@@ -49,15 +49,17 @@ binks-ai-orchestrator/
 │   └── scripts/
 │
 ├── orchestrator/                # AI Control Plane (runs on M3 Ultra)
-│   ├── README.md
-│   ├── src/
-│   │   ├── agents/master_agent.py
-│   │   ├── tools/              # kubectl, agent spawner
-│   │   ├── api/server.py
-│   │   └── main.py
-│   ├── requirements/
-│   ├── .env.example
-│   └── tests/
+│   ├── README.md               # ← Comparison of both implementations
+│   ├── BENCHMARKING.md         # How to benchmark both
+│   ├── crewai/                 # CrewAI implementation
+│   │   ├── src/
+│   │   ├── requirements/
+│   │   └── README.md
+│   └── agno/                   # Agno implementation (recommended)
+│       ├── src/
+│       ├── tools/
+│       ├── requirements.txt
+│       └── README.md
 │
 └── client/                      # Client interface (runs on your laptop)
     ├── README.md
@@ -78,7 +80,35 @@ binks-ai-orchestrator/
 
 See `manifests/README.md` for details.
 
+## 🎯 Dual Implementation: CrewAI vs Agno
+
+This project includes **two complete orchestrator implementations**:
+
+### [CrewAI Implementation](./orchestrator/crewai/)
+- **Best for**: Multi-agent collaboration, conversational workflows
+- **Pros**: Rich team dynamics, extensive examples
+- **Cons**: Heavier (~280MB/agent), manual API setup
+
+### [Agno Implementation](./orchestrator/agno/) ⭐ Recommended
+- **Best for**: Infrastructure orchestration, lightweight workers
+- **Pros**: 10x lighter (~32MB/agent), built-in AgentOS, 8x faster startup
+- **Cons**: Newer framework, less community content
+
+**Why both?**
+- Compare performance on your actual Pi cluster hardware
+- Learn two leading agent frameworks
+- Make data-driven decisions
+- Show engineering thoughtfulness in portfolio
+
+See `orchestrator/README.md` for detailed comparison and `orchestrator/BENCHMARKING.md` to run your own tests.
+
+**For this project, we recommend Agno** due to its lightweight design perfect for Pi clusters.
+
 ## Quick Start
+
+**Choose your implementation:**
+- **Agno** (recommended for Pi clusters): `cd orchestrator/agno`
+- **CrewAI** (for learning/comparison): `cd orchestrator/crewai`
 
 ### Phase 1: Crawl (Test Locally)
 
@@ -92,10 +122,13 @@ cd ~
 git clone <your-repo-url> global
 cd binks-ai-orchestrator/orchestrator
 
+# Choose implementation (Agno recommended)
+cd agno  # or cd crewai
+
 # Set up Python environment
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements/base.txt
+pip install -r requirements.txt  # or requirements/base.txt for CrewAI
 
 # Configure environment
 cp .env.example .env
