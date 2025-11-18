@@ -35,7 +35,7 @@ def create_master_agent():
     # Create the agent with toolkits
     agent = Agent(
         name="MasterOrchestrator",
-        model=Ollama(id=ollama_model, base_url=ollama_url),
+        model=Ollama(id=ollama_model, host=ollama_url),
         tools=[
             KubectlToolkit(),
             AgentSpawnerToolkit()
@@ -54,7 +54,6 @@ def create_master_agent():
             "Delegate to worker agents when appropriate."
         ],
         markdown=True,
-        show_tool_calls=True,
         debug_mode=False
     )
 
