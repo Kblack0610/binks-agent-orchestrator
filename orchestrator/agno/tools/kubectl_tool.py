@@ -1,6 +1,6 @@
 """
 Kubectl Tool - Agno Implementation
-Lighter weight version using Agno's toolkit pattern
+Lightweight version using Agno's toolkit pattern
 """
 import subprocess
 from typing import Optional

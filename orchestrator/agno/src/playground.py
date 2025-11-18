@@ -5,7 +5,7 @@ This uses Agno's built-in AgentOS for the API server and UI.
 This is the "Walk" phase - exposing the agent via API.
 """
 import os
-from agno.playground import Playground
+from agno.os import AgentOS
 from agent import create_master_agent
 from dotenv import load_dotenv
 
@@ -25,8 +25,8 @@ def main():
     # Create the master agent
     master_agent = create_master_agent()
 
-    # Create playground with the agent
-    playground = Playground(agents=[master_agent])
+    # Create AgentOS with the agent
+    agent_os = AgentOS(agents=[master_agent])
 
     # Start the server
     host = os.getenv('AGNO_API_HOST', '0.0.0.0')
@@ -36,7 +36,7 @@ def main():
     print(f"API: http://{host}:{port}/api")
     print(f"UI: http://{host}:{port}")
 
-    playground.serve(host=host, port=port)
+    agent_os.serve(host=host, port=port)
 
 
 if __name__ == "__main__":
