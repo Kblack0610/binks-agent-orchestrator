@@ -48,8 +48,8 @@ setup-orchestrator:
 
 setup-cluster:
 	@echo "Setting up Pi Cluster..."
-	kubectl apply -f cluster/k8s-manifests/core/namespace.yaml
-	kubectl apply -f cluster/k8s-manifests/core/ollama-deployment.yaml
+	kubectl apply -f manifests/k8s-manifests/core/namespace.yaml
+	kubectl apply -f manifests/k8s-manifests/core/ollama-deployment.yaml
 	@echo "Waiting for Ollama to be ready..."
 	kubectl wait --for=condition=ready pod -l app=ollama -n ai-services --timeout=300s
 	kubectl exec -n ai-services deployment/ollama -- ollama pull llama3.1:8b
@@ -114,12 +114,12 @@ logs-cluster:
 # Deployment commands
 deploy-cluster:
 	@echo "Deploying all cluster manifests..."
-	kubectl apply -f cluster/k8s-manifests/core/
+	kubectl apply -f manifests/k8s-manifests/core/
 	@echo "✓ Cluster manifests deployed"
 
 deploy-ollama:
 	@echo "Deploying Ollama to cluster..."
-	kubectl apply -f cluster/k8s-manifests/core/ollama-deployment.yaml
+	kubectl apply -f manifests/k8s-manifests/core/ollama-deployment.yaml
 	kubectl wait --for=condition=ready pod -l app=ollama -n ai-services --timeout=300s
 	@echo "✓ Ollama deployed"
 
@@ -134,7 +134,7 @@ clean:
 
 clean-cluster:
 	@echo "Removing cluster deployments..."
-	kubectl delete -f cluster/k8s-manifests/core/ --ignore-not-found=true
+	kubectl delete -f manifests/k8s-manifests/core/ --ignore-not-found=true
 	@echo "✓ Cluster cleaned"
 
 # Git helpers

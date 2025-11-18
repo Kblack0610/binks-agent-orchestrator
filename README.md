@@ -10,7 +10,7 @@ A decoupled, scalable AI orchestration system that separates the "Brain" (AI con
 └─────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────┐         ┌──────────────────┐         ┌──────────────────┐
-│  Binks Client    │────────▶│  Binks           │────────▶│  Pi Cluster      │
+│  Binks Client    │────────▶│  Binks           │────────▶│  existing cluster      │
 │  (Your Laptop)   │  HTTP   │  Orchestrator    │ kubectl │  (Compute Plane) │
 │                  │         │  (M3 Ultra)      │         │                  │
 │  - opencode TUI  │         │  - Ollama 405B   │         │  - K8s Master    │
@@ -25,7 +25,7 @@ A decoupled, scalable AI orchestration system that separates the "Brain" (AI con
 This is **not** a monolithic AI system. It's a **distributed architecture** where:
 
 1. **The Brain (M3 Ultra)** does the heavy AI reasoning with your largest model (405B)
-2. **The Body (Pi Cluster)** executes the actual work and runs your applications
+2. **The Body (existing cluster)** executes the actual work and runs your applications
 3. **The Interface (Client)** provides you with a simple way to communicate with the system
 
 The M3 Ultra is **NOT** part of the cluster - it's a **client** that manages the cluster, just like you would with `kubectl`.
@@ -34,34 +34,49 @@ The M3 Ultra is **NOT** part of the cluster - it's a **client** that manages the
 
 ```
 binks-ai-orchestrator/
-├── cluster/                 # Kubernetes cluster configs (runs on Pis)
+├── README.md                    # This file - complete system docs
+├── GETTING_STARTED.md
+├── SETUP.md
+├── quickstart.sh
+├── Makefile
+│
+├── manifests/                   # K8s manifests (deploy FROM laptop TO cluster)
+│   ├── README.md               # ← Read this! Not cluster setup!
 │   ├── k8s-manifests/
-│   │   ├── core/           # Core services (Ollama, namespaces)
-│   │   ├── apps/           # Your applications
-│   │   └── agents/         # Worker agent job templates
-│   └── README.md
+│   │   ├── core/               # Ollama service, namespaces
+│   │   ├── apps/               # Your applications
+│   │   └── agents/             # Worker agent job templates
+│   └── scripts/
 │
-├── orchestrator/     # AI Control Plane (runs on M3 Ultra)
+├── orchestrator/                # AI Control Plane (runs on M3 Ultra)
+│   ├── README.md
 │   ├── src/
-│   │   ├── agents/         # Master Agent definition
-│   │   ├── tools/          # Custom tools (kubectl, agent spawner)
-│   │   ├── api/            # FastAPI server
-│   │   └── main.py         # Entry point
-│   ├── requirements/       # Python dependencies
-│   ├── .env.example        # Configuration template
-│   └── README.md
+│   │   ├── agents/master_agent.py
+│   │   ├── tools/              # kubectl, agent spawner
+│   │   ├── api/server.py
+│   │   └── main.py
+│   ├── requirements/
+│   ├── .env.example
+│   └── tests/
 │
-├── client/           # Client interface (runs on your laptop)
-│   ├── src/
-│   │   └── simple_client.py  # Python CLI client
-│   ├── config/
-│   │   └── api-endpoints.yaml  # API configuration
-│   ├── scripts/
-│   │   └── start-opencode.sh   # Launch script
-│   └── README.md
-│
-└── README.md              # This file
+└── client/                      # Client interface (runs on your laptop)
+    ├── README.md
+    ├── src/simple_client.py
+    ├── config/api-endpoints.yaml
+    └── scripts/start-opencode.sh
 ```
+
+## Important: About the `manifests/` Directory
+
+⚠️ **`manifests/` is NOT cluster setup!**
+
+- You already have a running Kubernetes cluster ✅
+- You already manage it from your laptop with kubectl ✅
+- `manifests/` contains **application deployments** to add AI services
+- Deploy them FROM your laptop TO your existing cluster
+- They run alongside your other apps (placemyparents, etc.)
+
+See `manifests/README.md` for details.
 
 ## Quick Start
 
@@ -98,7 +113,7 @@ You should see the Master Agent initialize and present an interactive prompt.
 
 Try: `"What is the status of my cluster?"`
 
-**Expected behavior**: The agent will use the `run_kubectl` tool to check your cluster status.
+**Expected behavior**: The agent will use the `run_kubectl` tool to check your existing Kubernetes cluster status.
 
 ### Phase 2: Walk (Run as API)
 
@@ -175,7 +190,7 @@ python src/simple_client.py
 4. **Master Agent** executes tools:
    - `run_kubectl`: To interact with the cluster directly
    - `spawn_worker_agent`: To create Kubernetes Jobs for complex sub-tasks
-5. **Worker Agents** (if spawned) run on the Pi Cluster using the cluster's Ollama service (lightweight model)
+5. **Worker Agents** (if spawned) run on the existing cluster using the cluster's Ollama service (lightweight model)
 6. **Results** flow back to the Master Agent, then to the client, then to you
 
 ### Example: Deploying an App
@@ -196,7 +211,7 @@ Master Agent executes:
   - run_kubectl("set image deployment/placemyparents ...")
   - spawn_worker_agent("deployment-verifier", {...})
   ↓
-Worker Agent (K8s Job) starts on Pi Cluster:
+Worker Agent (K8s Job) starts on existing cluster:
   - Waits for pods to be ready
   - Runs health checks
   - Reports back
@@ -208,16 +223,16 @@ You receive: "✓ Deployment complete! All pods healthy."
 
 ### Hardware
 - **M3 Ultra** (or any powerful machine) for the orchestrator
-- **Kubernetes cluster** (your Pi cluster + other nodes)
+- **Kubernetes cluster** (your existing cluster + other nodes)
 - **Client machine** (laptop, desktop, etc.)
 
 ### Software
 - **On M3 Ultra:**
   - Python 3.11+
   - Ollama
-  - kubectl (configured to access your cluster)
+  - kubectl (configured to access your existing Kubernetes cluster)
 
-- **On Pi Cluster:**
+- **On existing cluster:**
   - Kubernetes (already set up)
   - Network access from M3
 
@@ -230,7 +245,7 @@ You receive: "✓ Deployment complete! All pods healthy."
 
 ### Connecting M3 to Cluster
 
-The M3 needs `kubectl` access to your cluster:
+The M3 needs `kubectl` access to your existing Kubernetes cluster:
 
 ```bash
 # On your master pi
@@ -306,13 +321,13 @@ Monitor a spawned worker agent's progress.
 
 ## Worker Agents
 
-Worker agents are **Kubernetes Jobs** defined in `cluster/k8s-manifests/agents/`.
+Worker agents are **Kubernetes Jobs** defined in `manifests/k8s-manifests/agents/`.
 
 Currently available:
 - `code-reviewer-job.yaml`: Reviews code changes
 
 To add a new worker agent:
-1. Create `cluster/k8s-manifests/agents/<agent-name>-job.yaml`
+1. Create `manifests/k8s-manifests/agents/<agent-name>-job.yaml`
 2. Define the agent's script in a ConfigMap
 3. The Master Agent can now spawn it with `spawn_worker_agent(agent_type="<agent-name>")`
 
@@ -437,7 +452,7 @@ kubectl get namespaces
 kubectl get pods -n ai-services
 
 # Check job template exists
-ls -la cluster/k8s-manifests/agents/
+ls -la manifests/k8s-manifests/agents/
 ```
 
 ## Extending the System
@@ -467,15 +482,15 @@ tools=[..., my_tool]
 
 ### Adding a New Worker Agent
 
-1. Create `cluster/k8s-manifests/agents/my-agent-job.yaml`
+1. Create `manifests/k8s-manifests/agents/my-agent-job.yaml`
 2. Define the agent's script and dependencies
 3. Use `spawn_worker_agent(agent_type="my-agent", ...)`
 
 ### Adding a New Application
 
-1. Create `cluster/k8s-manifests/apps/my-app/`
+1. Create `manifests/k8s-manifests/apps/my-app/`
 2. Add deployment, service, ingress manifests
-3. Deploy with: `kubectl apply -f cluster/k8s-manifests/apps/my-app/`
+3. Deploy with: `kubectl apply -f manifests/k8s-manifests/apps/my-app/`
 
 ## Security Considerations
 
@@ -488,7 +503,7 @@ tools=[..., my_tool]
 
 1. **Model Selection**: Use 405B for complex planning, but consider 70B or smaller for faster responses
 2. **Worker Agents**: Offload long-running tasks to worker agents to keep the Master Agent responsive
-3. **Cluster Resources**: Monitor your Pi cluster's resource usage and scale appropriately
+3. **Cluster Resources**: Monitor your existing cluster's resource usage and scale appropriately
 4. **Caching**: Consider adding response caching in the FastAPI layer for common queries
 
 ## Next Steps
@@ -525,4 +540,4 @@ This is your personal infrastructure, but if you want to share improvements:
 
 ---
 
-**Remember**: The M3 is the CEO. The Pi Cluster is the factory floor. Don't put the CEO on the factory floor.
+**Remember**: The M3 is the CEO. The existing cluster is the factory floor. Don't put the CEO on the factory floor.
