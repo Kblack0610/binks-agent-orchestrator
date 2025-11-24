@@ -2,7 +2,7 @@
 """
 Simple Python Client for Binks Orchestrator
 
-This is a simple alternative to opencode for testing and automation.
+CLI client for interacting with the Binks Orchestrator API.
 """
 import sys
 import argparse

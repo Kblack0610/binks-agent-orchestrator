@@ -1,183 +1,105 @@
 # Binks AI Orchestrator - Repository Summary
 
-## Final Structure
-
-This is now **one cohesive repository** containing all three components of your AI orchestration system.
+## Structure
 
 ```
-binks-ai-orchestrator/                    # ← Rename this directory before creating git repo
+binks/
 │
-├── README.md                             # Complete system architecture & documentation
-├── GETTING_STARTED.md                    # 5-minute quick start guide
-├── SETUP.md                              # Detailed setup instructions
-├── WHAT_YOU_BUILT.md                     # System overview and capabilities
-├── PROJECT_STRUCTURE.md                  # File-by-file reference guide
-├── quickstart.sh                         # Interactive setup script
-├── Makefile                              # Common operations (make help)
-├── .gitignore                            # Git ignore rules
+├── README.md                             # System documentation
+├── Makefile                              # Common operations
+├── quickstart.sh                         # Interactive setup
+├── .gitignore
 │
 ├── orchestrator/                         # AI Control Plane (M3 Ultra)
-│   ├── README.md                         # Orchestrator-specific docs
+│   └── agno/
+│       ├── src/
+│       │   ├── agent.py                  # Master Agent + CLI
+│       │   └── api/server.py             # FastAPI REST interface
+│       ├── tools/
+│       │   ├── kubectl_tool.py           # Cluster management
+│       │   └── agent_spawner.py          # Worker agent spawning
+│       ├── requirements.txt
+│       └── .env
+│
+├── client/                               # Client Interface
 │   ├── src/
-│   │   ├── agents/master_agent.py        # The "Brain"
-│   │   ├── tools/
-│   │   │   ├── kubectl_tool.py           # Cluster management
-│   │   │   └── agent_spawner.py          # Worker agent spawning
-│   │   ├── api/server.py                 # FastAPI REST interface
-│   │   └── main.py                       # Entry point
-│   ├── requirements/base.txt             # Python dependencies
-│   ├── .env.example                      # Configuration template
-│   ├── config/
-│   └── tests/
+│   │   └── simple_client.py              # Python CLI client
+│   └── config/
+│       └── api-endpoints.yaml            # API endpoint config
 │
-├── cluster/                              # Kubernetes Manifests (Pi Cluster)
-│   ├── README.md                         # Cluster manifests docs
-│   ├── k8s-manifests/
-│   │   ├── core/
-│   │   │   ├── namespace.yaml            # ai-services, ai-agents namespaces
-│   │   │   └── ollama-deployment.yaml    # Ollama for worker agents
-│   │   ├── apps/                         # Your applications go here
-│   │   └── agents/
-│   │       └── code-reviewer-job.yaml    # Example worker agent
-│   └── scripts/
+├── manifests/                            # Kubernetes Manifests
+│   └── k8s-manifests/
+│       └── core/
 │
-└── client/                               # Client Interface (Laptop)
-    ├── README.md                         # Client-specific docs
-    ├── src/
-    │   └── simple_client.py              # Python CLI client
-    ├── config/
-    │   └── api-endpoints.yaml            # M3 API endpoint config
-    └── scripts/
-        └── start-opencode.sh             # Launch opencode TUI
+└── docs/                                 # Documentation
+    ├── ARCHITECTURE.md
+    ├── ROADMAP.md
+    ├── PROJECT_STRUCTURE.md
+    └── REPO_SUMMARY.md                   # This file
 ```
 
-## Documentation Hierarchy
+## Components
 
-### Root-Level Docs (System-Wide)
-- **README.md** - "Here's how the whole system works together"
-- **GETTING_STARTED.md** - "Quick start for all three components"
-- **SETUP.md** - "How to deploy the complete system"
-- **WHAT_YOU_BUILT.md** - "What this system is and what it can do"
-- **PROJECT_STRUCTURE.md** - "File-by-file reference"
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Agent CLI | `orchestrator/agno/src/agent.py` | Interactive CLI for direct use |
+| API Server | `orchestrator/agno/src/api/server.py` | REST API for remote clients |
+| Python Client | `client/src/simple_client.py` | Remote CLI client |
+| K8s Tools | `orchestrator/agno/tools/` | Kubectl + Agent spawning |
 
-### Component-Specific Docs
-- **orchestrator/README.md** - "How to use the orchestrator component"
-- **cluster/README.md** - "How to use the K8s manifests"
-- **client/README.md** - "How to use the client"
+## Key Features
 
-## Why One Repo?
+- Agno-powered master agent with tool orchestration
+- Ollama integration for local LLM inference (supports 405B models)
+- Pre-built tools (ShellTools, FileTools) for code editing
+- Custom tools (KubectlToolkit, AgentSpawnerToolkit) for infrastructure
+- REST API interface (FastAPI)
+- Natural language infrastructure management
 
-The three components are **tightly coupled**:
+## Tech Stack
 
-1. **orchestrator/** spawns jobs using templates from **cluster/**
-2. **orchestrator/** expects Ollama service defined in **cluster/**
-3. **client/** is specifically designed for **orchestrator/** API
-4. All three work together as **one system**
+```
+Agent Framework: Agno
+Backend: Python, FastAPI
+LLM: Ollama (Llama 3.1)
+Infrastructure: Kubernetes
+```
 
-## Next Steps
-
-### 1. Rename the Parent Directory
+## Quick Start
 
 ```bash
-cd /home/kblack0610/dev
-mv global binks-ai-orchestrator
+# Run the CLI directly
+cd orchestrator/agno
+python src/agent.py
+
+# Or run the API server
+python src/api/server.py
+
+# Then use the client
+cd client
+python src/simple_client.py
 ```
 
-### 2. Initialize Git Repository
-
-```bash
-cd binks-ai-orchestrator
-git init
-git add .
-git commit -m "Initial commit: Binks AI Orchestrator system"
-```
-
-### 3. Create GitHub Repository
-
-```bash
-# On GitHub, create new repo: binks-ai-orchestrator
-# Then:
-git remote add origin https://github.com/yourusername/binks-ai-orchestrator.git
-git branch -M main
-git push -u origin main
-```
-
-### 4. Add a Great Repository Description
-
-For GitHub:
-```
-🤖 Production-ready AI orchestration system using CrewAI + Ollama.
-Distributed architecture with master AI brain (M3 Ultra) managing
-Kubernetes cluster via natural language. Showcases AI/ML engineering,
-K8s, FastAPI, and distributed systems design.
-```
-
-### 5. Add Topics/Tags
+## Architecture
 
 ```
-ai, kubernetes, crewai, ollama, orchestration, fastapi,
-distributed-systems, llm, infrastructure, raspberry-pi,
-python, devops, automation, portfolio
+┌──────────────────┐     ┌──────────────────┐
+│   agent.py CLI   │     │  simple_client   │
+│   (direct use)   │     │   (via HTTP)     │
+└────────┬─────────┘     └────────┬─────────┘
+         │                        │
+         │ Direct                 │ HTTP
+         │                        │
+         ▼                        ▼
+┌─────────────────────────────────────────────┐
+│              Agno Master Agent              │
+│                                             │
+│  ┌─────────────┐    ┌────────────────────┐ │
+│  │ Pre-built   │    │ Custom             │ │
+│  │ ShellTools  │    │ KubectlToolkit     │ │
+│  │ FileTools   │    │ AgentSpawnerToolkit│ │
+│  └─────────────┘    └────────────────────┘ │
+│                                             │
+│              Ollama (LLM)                   │
+└─────────────────────────────────────────────┘
 ```
-
-## Portfolio Presentation
-
-### Repository Name
-**binks-ai-orchestrator**
-
-### Tagline
-"Production-ready AI orchestration system for infrastructure management"
-
-### Key Features to Highlight
-- ✅ CrewAI-powered master agent with task planning
-- ✅ Ollama integration for local LLM inference (supports 405B models)
-- ✅ Dynamic worker agent spawning as Kubernetes Jobs
-- ✅ REST API interface (FastAPI)
-- ✅ Natural language infrastructure management
-- ✅ Production-tested on Raspberry Pi clusters
-- ✅ Fully decoupled architecture (control plane + compute plane)
-
-### Tech Stack
-```
-Backend: Python, CrewAI, FastAPI, Ollama
-Infrastructure: Kubernetes, Docker
-AI/ML: Llama 3.1 (405B/70B/8B), LangChain
-DevOps: kubectl, systemd, Make
-```
-
-### Demo Ideas
-1. **Video**: Show asking "Deploy my app and verify it works" → system does it
-2. **Screenshots**:
-   - Architecture diagram
-   - Client asking questions
-   - Agent spawning worker jobs
-   - Kubernetes dashboard showing agents
-3. **Live Demo**: Host a small version (8B model) on cloud for demos
-
-## Clean State Verified
-
-✅ No duplicate docs in subdirectories
-✅ No duplicate scripts in subdirectories
-✅ Clean directory names (orchestrator, cluster, client)
-✅ All docs reference correct paths
-✅ Single .gitignore at root
-✅ Component READMEs focus on their component
-✅ Root READMEs explain the full system
-
-## File Count
-
-- **Configuration files**: 5 (YAML, env, gitignore)
-- **Python source files**: 5 (agents, tools, API, client)
-- **Kubernetes manifests**: 3 (namespaces, Ollama, agent template)
-- **Documentation files**: 8 (README, guides, reference)
-- **Scripts**: 2 (quickstart.sh, Makefile)
-- **Total**: One complete, portfolio-ready AI orchestration system
-
----
-
-**You're ready to create your repo!** This is a solid portfolio piece that showcases:
-- AI/ML engineering skills
-- Distributed systems architecture
-- Infrastructure as Code
-- DevOps automation
-- Full-stack development (API + client + infrastructure)

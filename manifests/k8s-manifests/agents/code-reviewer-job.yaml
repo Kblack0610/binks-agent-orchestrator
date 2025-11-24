@@ -23,7 +23,7 @@ spec:
           - -c
           - |
             # Install dependencies
-            pip install --no-cache-dir crewai langchain-community requests
+            pip install --no-cache-dir agno requests
 
             # Run the code reviewer agent
             python /app/code_reviewer_agent.py
@@ -43,7 +43,6 @@ spec:
           name: code-reviewer-agent-script
 ---
 # ConfigMap containing the agent script
-# In a real setup, you'd build a Docker image with the script instead
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -55,10 +54,11 @@ data:
     """
     Code Reviewer Worker Agent
     This agent is spawned by the M3 Orchestrator to review code changes.
+    Uses Agno for lightweight execution on Pi cluster.
     """
     import os
-    from crewai import Agent, Task, Crew
-    from langchain_community.llms import Ollama
+    from agno.agent import Agent
+    from agno.models.ollama import Ollama
 
     # Get configuration from environment
     ollama_url = os.getenv('OLLAMA_API_URL')
@@ -69,39 +69,24 @@ data:
     print(f"Task ID: {task_id}")
     print(f"Repo URL: {repo_url}")
 
-    # Connect to cluster Ollama service
-    ollama_llm = Ollama(
-        model="llama3:8b",
-        base_url=ollama_url
-    )
-
-    # Define the agent
+    # Create the agent with Ollama
     reviewer = Agent(
-        role="Code Reviewer",
-        goal=f"Review code changes in {repo_url}",
-        backstory="You are an expert code reviewer focused on quality and best practices.",
-        llm=ollama_llm,
-        verbose=True
+        name="CodeReviewer",
+        model=Ollama(id="llama3.1:8b", host=ollama_url),
+        instructions=[
+            "You are an expert code reviewer focused on quality and best practices.",
+            f"Review the code changes in {repo_url}",
+            "Focus on: code quality, potential bugs, security issues, and improvements",
+        ],
+        markdown=True
     )
 
-    # Define the task
-    review_task = Task(
-        description=f"Clone {repo_url}, review recent changes, and provide feedback.",
-        expected_output="A summary of code review findings.",
-        agent=reviewer
-    )
-
-    # Execute
-    crew = Crew(
-        agents=[reviewer],
-        tasks=[review_task],
-        verbose=2
-    )
-
-    result = crew.kickoff()
+    # Execute the review task
+    task = f"Clone {repo_url}, review recent changes, and provide feedback."
+    result = reviewer.run(task)
 
     print("\n=== Code Review Complete ===")
-    print(result)
+    print(result.content if hasattr(result, 'content') else str(result))
 
     # In a real setup, you'd send results back to the orchestrator
     # e.g., via an API call or message queue

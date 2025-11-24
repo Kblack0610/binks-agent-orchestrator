@@ -137,13 +137,13 @@ MCP is an emerging standard for tool interoperability. Both Agno and Claude Code
 
 ## Architecture Decision Records
 
-### ADR-001: Agno over CrewAI
-**Decision:** Use Agno as the primary agent framework
+### ADR-001: Agno as Agent Framework
+**Decision:** Use Agno as the agent framework
 **Rationale:**
 - Faster execution (no heavy abstractions)
 - Simpler toolkit pattern
 - Better suited for infrastructure orchestration
-- CrewAI kept for comparison/benchmarking
+- Lightweight and resource-efficient
 
 ### ADR-002: Hybrid Tool Strategy
 **Decision:** Use pre-built tools for common operations, custom tools for domain-specific work
