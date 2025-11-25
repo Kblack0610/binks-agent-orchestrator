@@ -1,126 +1,60 @@
 # Binks Clients
 
-All client interfaces for the Binks Orchestrator.
+Remote clients for the Binks Orchestrator API.
 
 ## Structure
 
 ```
 client/
-├── python/              # Python CLI + library
-│   ├── cli.py           # Command-line interface
-│   └── lib/
-│       └── client.py    # Shared client library
-├── rust/                # (future)
-└── web/                 # (future)
+├── python/
+│   └── cli.py       # Remote CLI (connects to server)
+├── rust/            # (future)
+└── web/             # (future)
 ```
 
-## Python CLI
+**For local/direct usage:** Use `orchestrator/agno/src/agent.py`
 
-### Installation
+## Python CLI (Remote)
 
-```bash
-cd client/python
-pip install requests python-dotenv
-```
+Connects to the Binks Orchestrator API server.
 
 ### Usage
 
-**Local mode** (runs agent directly, no server needed):
 ```bash
-python cli.py --local
-```
-
-**Remote mode** (connects to server):
-```bash
+# Interactive mode
 python cli.py --host 192.168.1.100
-```
 
-**Single command**:
-```bash
-python cli.py "Check cluster status"
-python cli.py --local "List all pods"
-```
+# Single command
+python cli.py --host 192.168.1.100 "Check cluster status"
 
-**Health check**:
-```bash
+# Health check
 python cli.py --health
 ```
 
 ### Configuration
 
-Via environment variables:
 ```bash
+# Via environment variables
 export BINKS_HOST=192.168.1.100
 export BINKS_PORT=8000
 python cli.py
-```
 
-Or via CLI flags:
-```bash
+# Via CLI flags
 python cli.py --host 192.168.1.100 --port 8000
 ```
 
-## Client Library
+## Local CLI
 
-The shared library can be used by any Python code:
+For direct usage without a server, use the agent directly:
 
-```python
-from lib.client import BinksClient, BinksConfig
-
-# Default (localhost:8000)
-client = BinksClient()
-
-# Custom host
-config = BinksConfig(host="192.168.1.100", port=8000)
-client = BinksClient(config)
-
-# Check health
-if client.is_available():
-    health = client.health()
-    print(health)
-
-# Invoke agent
-result = client.invoke("Check cluster status")
-if result['success']:
-    print(result['result'])
-else:
-    print(f"Error: {result['error']}")
-
-# Get cluster status
-status = client.cluster_status()
-
-# Get agent info
-info = client.agent_info()
+```bash
+cd orchestrator/agno
+python src/agent.py
 ```
 
-## Adding New Clients
-
-All clients should use the same HTTP API:
+## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/invoke` | POST | Send task to agent |
-| `/cluster/status` | POST | Get K8s status |
-| `/agent/info` | GET | Agent info |
-
-### Invoke Request
-
-```json
-{
-  "task": "Check cluster status",
-  "context": {
-    "namespace": "default"
-  }
-}
-```
-
-### Invoke Response
-
-```json
-{
-  "success": true,
-  "result": "All pods are running...",
-  "error": null
-}
-```
