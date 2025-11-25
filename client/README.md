@@ -1,176 +1,126 @@
-# Binks Client
+# Binks Clients
 
-Python client library for communicating with the Binks Orchestrator API.
+All client interfaces for the Binks Orchestrator.
 
-## Overview
-
-```
-┌──────────────────────────────────────────────┐
-│         Your Machine (Client)                 │
-│                                              │
-│  ┌────────────────────────────────────────┐ │
-│  │         simple_client.py               │ │
-│  │                                        │ │
-│  │  $ python simple_client.py             │ │
-│  │  You: Check cluster status             │ │
-│  │                                        │ │
-│  └────────────┬───────────────────────────┘ │
-│               │                              │
-└───────────────┼──────────────────────────────┘
-                │
-                │ HTTP Request
-                │
-┌───────────────▼──────────────────────────────┐
-│         M3 Ultra (Binks Orchestrator)        │
-│                                              │
-│  ┌────────────────────────────────────────┐ │
-│  │       FastAPI Server (Port 8000)       │ │
-│  │              ▼                         │ │
-│  │       Agno Master Agent                │ │
-│  │              ▼                         │ │
-│  │       Ollama (405B Model)              │ │
-│  └────────────────────────────────────────┘ │
-│                                              │
-└──────────────────────────────────────────────┘
-```
-
-## Directory Structure
+## Structure
 
 ```
 client/
-├── src/
-│   └── simple_client.py   # Python CLI client
-├── config/
-│   └── api-endpoints.yaml # API endpoint configuration
-└── README.md              # This file
+├── python/              # Python CLI + library
+│   ├── cli.py           # Command-line interface
+│   └── lib/
+│       └── client.py    # Shared client library
+├── rust/                # (future)
+└── web/                 # (future)
 ```
 
-## Prerequisites
+## Python CLI
 
-1. **Python 3.8+** with `requests` and `pyyaml`
-2. **Network access** to your M3 Ultra
-3. **Binks Orchestrator** running on M3
-
-## Installation
+### Installation
 
 ```bash
-cd client
-pip install requests pyyaml
+cd client/python
+pip install requests python-dotenv
 ```
 
-## Configuration
+### Usage
 
-Edit `config/api-endpoints.yaml` with your M3's IP address:
-
-```yaml
-default: local
-
-environments:
-  local:
-    host: "192.168.1.XXX"  # Replace with your M3 IP
-    port: 8000
-    protocol: "http"
-```
-
-## Usage
-
-### Interactive Mode
-
+**Local mode** (runs agent directly, no server needed):
 ```bash
-python src/simple_client.py
+python cli.py --local
 ```
 
-```
-============================================================
-Binks Client - Interactive Mode
-Connected to: http://192.168.1.100:8000
-============================================================
-
-Type your tasks or 'quit' to exit.
-
-You: Check cluster status
-
-Thinking...
-
-Agent:
-All 4 nodes are Ready. 15 pods running across namespaces.
-```
-
-### Single Command Mode
-
+**Remote mode** (connects to server):
 ```bash
-python src/simple_client.py "Get all pods in the default namespace"
+python cli.py --host 192.168.1.100
 ```
 
-### Health Check
-
+**Single command**:
 ```bash
-python src/simple_client.py --health
+python cli.py "Check cluster status"
+python cli.py --local "List all pods"
 ```
 
-### Cluster Status
-
+**Health check**:
 ```bash
-python src/simple_client.py --cluster
+python cli.py --health
 ```
 
-### Different Environment
+### Configuration
 
+Via environment variables:
 ```bash
-python src/simple_client.py --env production "Deploy latest version"
+export BINKS_HOST=192.168.1.100
+export BINKS_PORT=8000
+python cli.py
 ```
 
-## Direct API Calls
-
-You can also call the API directly with curl:
-
+Or via CLI flags:
 ```bash
-# Health check
-curl http://<m3-ip>:8000/health
+python cli.py --host 192.168.1.100 --port 8000
+```
+
+## Client Library
+
+The shared library can be used by any Python code:
+
+```python
+from lib.client import BinksClient, BinksConfig
+
+# Default (localhost:8000)
+client = BinksClient()
+
+# Custom host
+config = BinksConfig(host="192.168.1.100", port=8000)
+client = BinksClient(config)
+
+# Check health
+if client.is_available():
+    health = client.health()
+    print(health)
 
 # Invoke agent
-curl -X POST http://<m3-ip>:8000/invoke \
-  -H "Content-Type: application/json" \
-  -d '{"task": "Get the status of all pods"}'
+result = client.invoke("Check cluster status")
+if result['success']:
+    print(result['result'])
+else:
+    print(f"Error: {result['error']}")
 
-# With context
-curl -X POST http://<m3-ip>:8000/invoke \
-  -H "Content-Type: application/json" \
-  -d '{
-    "task": "Review code changes",
-    "context": {
-      "repo": "placemyparents",
-      "branch": "main"
-    }
-  }'
+# Get cluster status
+status = client.cluster_status()
+
+# Get agent info
+info = client.agent_info()
 ```
 
-## API Endpoints
+## Adding New Clients
+
+All clients should use the same HTTP API:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/invoke` | POST | Send task to agent |
-| `/cluster/status` | POST | Get cluster status |
-| `/agent/info` | GET | Get agent information |
+| `/cluster/status` | POST | Get K8s status |
+| `/agent/info` | GET | Agent info |
 
-## Troubleshooting
+### Invoke Request
 
-### Can't connect to orchestrator
-
-```bash
-# 1. Check network connectivity
-ping <m3-ip>
-
-# 2. Check if orchestrator is running
-curl http://<m3-ip>:8000/health
-
-# 3. Check firewall on M3
-sudo ufw allow 8000/tcp
+```json
+{
+  "task": "Check cluster status",
+  "context": {
+    "namespace": "default"
+  }
+}
 ```
 
-### Slow responses
+### Invoke Response
 
-Normal for 405B model. For faster dev responses:
-1. Use smaller model (8B) on M3
-2. Run agent locally: `python orchestrator/agno/src/agent.py`
+```json
+{
+  "success": true,
+  "result": "All pods are running...",
+  "error": null
+}
+```
