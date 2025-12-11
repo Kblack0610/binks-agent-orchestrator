@@ -29,14 +29,15 @@ from .base import CLIRunner, RunnerResult
 # OpenRouter API configuration
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Popular free models on OpenRouter
+# Popular free models on OpenRouter (updated Dec 2024)
+# Note: Free models change frequently - use list_free_models() for current list
 FREE_MODELS = {
-    "meta-llama/llama-3.1-8b-instruct:free": "Llama 3.1 8B - fast, good quality",
-    "mistralai/mistral-7b-instruct:free": "Mistral 7B - efficient, versatile",
-    "google/gemma-2-9b-it:free": "Gemma 2 9B - Google's open model",
-    "microsoft/phi-3-mini-128k-instruct:free": "Phi-3 Mini - small but capable",
-    "qwen/qwen-2-7b-instruct:free": "Qwen 2 7B - multilingual",
-    "huggingfaceh4/zephyr-7b-beta:free": "Zephyr 7B - chat-optimized",
+    "qwen/qwen3-coder:free": "Qwen3 Coder 480B - coding focused",
+    "nvidia/nemotron-nano-9b-v2:free": "NVIDIA Nemotron Nano 9B - fast, capable",
+    "amazon/nova-2-lite-v1:free": "Amazon Nova 2 Lite - general purpose",
+    "mistralai/devstral-2512:free": "Mistral Devstral - development tasks",
+    "openai/gpt-oss-20b:free": "OpenAI GPT-OSS 20B - open source",
+    "z-ai/glm-4.5-air:free": "GLM 4.5 Air - multilingual",
 }
 
 # Paid models (for reference, require credits)
@@ -46,7 +47,7 @@ PAID_MODELS = {
     "google/gemini-pro-1.5": "Gemini Pro 1.5",
 }
 
-DEFAULT_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+DEFAULT_MODEL = "nvidia/nemotron-nano-9b-v2:free"
 
 
 class OpenRouterRunner(CLIRunner):
@@ -89,7 +90,7 @@ class OpenRouterRunner(CLIRunner):
         )
 
         self.model = model
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        self.api_key = api_key if api_key is not None else os.getenv("OPENROUTER_API_KEY")
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.site_url = site_url or "https://github.com/binks-agent-orchestrator"

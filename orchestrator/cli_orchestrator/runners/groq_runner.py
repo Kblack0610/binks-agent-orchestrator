@@ -77,7 +77,7 @@ class GroqRunner(CLIRunner):
         )
 
         self.model = model
-        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        self.api_key = api_key if api_key is not None else os.getenv("GROQ_API_KEY")
         self.temperature = temperature
         self.max_tokens = max_tokens
 

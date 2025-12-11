@@ -193,9 +193,9 @@ class TestOpenRouterRunner:
 
     def test_openrouter_free_model(self, openrouter_runner):
         """Can use free models."""
-        # Use an explicitly free model
+        # Use an explicitly free model (models change frequently)
         runner = OpenRouterRunner(
-            model="meta-llama/llama-3.1-8b-instruct:free",
+            model="nvidia/nemotron-nano-9b-v2:free",
             debug=True
         )
 
@@ -205,7 +205,7 @@ class TestOpenRouterRunner:
         result = runner.run("Say 'free'")
 
         assert result.success, f"Free model failed: {result.error}"
-        assert ":free" in result.model or "llama" in result.model.lower()
+        assert ":free" in result.model or "nvidia" in result.model.lower()
 
 
 # =============================================================================
