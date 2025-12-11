@@ -188,7 +188,11 @@ class TestCrossBackend:
         assert "result" in response.content.lower()
 
     def test_verdict_parsing_with_real_response(self, any_real_runner):
-        """Verify verdict parsing works with real AI responses."""
+        """Verify verdict parsing works with real AI responses.
+
+        IMPORTANT: This test MUST fail if the AI doesn't return a parseable verdict.
+        We need to ensure our prompts actually produce VERDICT: PASS/FAIL responses.
+        """
         agent = create_agent(
             name="critic-test",
             runner=any_real_runner,
@@ -201,11 +205,14 @@ Review the code and end with exactly: VERDICT: PASS or VERDICT: FAIL"""
 def add(a, b):
     return a + b
 
-Is this function correct?""")
+Is this function correct?
+
+IMPORTANT: End your response with exactly VERDICT: PASS or VERDICT: FAIL""")
 
         assert response.success
-        # Should have a verdict
-        assert response.verdict in ["PASS", "FAIL", None]  # May or may not parse
+        # Verdict MUST be parsed - None means our prompt/parsing is broken!
+        assert response.verdict in ["PASS", "FAIL"], \
+            f"Verdict not parsed! Got None. Response was: {response.content[-200:]}"
 
 
 # =============================================================================
@@ -357,3 +364,43 @@ class TestOrchestratorE2E:
         assert "status" in status
         # Status should be a valid workflow state
         assert status["status"] in ["planning", "coding", "reviewing", "verifying", "completed", "failed", "paused"]
+
+    def test_orchestrator_critic_returns_verdict(self, any_real_runner):
+        """
+        CRITICAL TEST: Verify the orchestrator's critic prompt actually produces
+        a parseable VERDICT.
+
+        This test exists because we shipped a bug where the critic prompt said
+        "end with PASS or FAIL" but the parser looked for "VERDICT: PASS".
+        The original test allowed None as valid, hiding the bug.
+        """
+        from orchestrator import Orchestrator, ConvergenceCriteria
+
+        architect = create_agent("test-arch", any_real_runner, AgentRole.ARCHITECT)
+        executor = create_agent("test-exec", any_real_runner, AgentRole.EXECUTOR)
+        critic = create_agent("test-critic", any_real_runner, AgentRole.CRITIC)
+
+        orch = Orchestrator(debug=True)
+        # Allow 2 iterations so we can see if verdict works
+        convergence = ConvergenceCriteria(max_iterations=2)
+
+        conversation = orch.run_moa_workflow(
+            goal="Write: print('hi')",
+            architect=architect,
+            executor=executor,
+            critic=critic,
+            convergence=convergence
+        )
+
+        # Find the review turn(s) and verify they have verdicts
+        review_turns = [t for t in conversation.turns if t.role == AgentRole.REVIEWER]
+        assert len(review_turns) > 0, "No review turns found in conversation"
+
+        # At least ONE review should have produced a verdict
+        verdicts = [t.response for t in review_turns]
+        has_verdict = any(
+            "VERDICT: PASS" in r.upper() or "VERDICT: FAIL" in r.upper()
+            for r in verdicts if r
+        )
+        assert has_verdict, \
+            f"No review returned VERDICT! Reviews: {[r[-100:] if r else 'None' for r in verdicts]}"
