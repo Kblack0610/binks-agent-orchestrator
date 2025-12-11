@@ -445,7 +445,7 @@ class Orchestrator:
 
             impl_turn = ConversationTurn(
                 agent_name=executor.name,
-                role=AgentRole.CODER,
+                role=AgentRole.IMPLEMENTER,
                 prompt="Implement this design",
                 response=impl_response.content,
                 execution_time=impl_time,
@@ -531,7 +531,7 @@ class Orchestrator:
 
             fix_turn = ConversationTurn(
                 agent_name=executor.name,
-                role=AgentRole.CODER,
+                role=AgentRole.IMPLEMENTER,
                 prompt="Fix based on feedback",
                 response=fix_response.content,
                 execution_time=fix_time,

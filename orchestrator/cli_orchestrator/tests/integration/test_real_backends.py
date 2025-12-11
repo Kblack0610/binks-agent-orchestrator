@@ -288,3 +288,72 @@ Just output the Python code directly."""
         assert review.success
         # Should have substantive review
         assert len(review.content) > 20
+
+
+# =============================================================================
+# Orchestrator E2E Tests - Tests the ACTUAL workflow entry point
+# =============================================================================
+
+@pytest.mark.requires_api
+class TestOrchestratorE2E:
+    """
+    Tests that verify the ACTUAL Orchestrator class works end-to-end.
+    These would have caught the AgentRole.CODER bug.
+    """
+
+    def test_orchestrator_imports_cleanly(self):
+        """Verify orchestrator module imports without errors."""
+        from orchestrator import Orchestrator
+        assert Orchestrator is not None
+
+    def test_orchestrator_moa_workflow_runs(self, any_real_runner):
+        """Test that run_moa_workflow actually executes without crashing."""
+        from orchestrator import Orchestrator, ConvergenceCriteria
+
+        # Create agents from runner
+        architect = create_agent("test-arch", any_real_runner, AgentRole.ARCHITECT)
+        executor = create_agent("test-exec", any_real_runner, AgentRole.EXECUTOR)
+
+        orch = Orchestrator(debug=True)
+
+        # Use convergence criteria to limit to 1 iteration
+        convergence = ConvergenceCriteria(max_iterations=1)
+
+        # This should NOT crash with AttributeError
+        conversation = orch.run_moa_workflow(
+            goal="Write a one-line Python hello world",
+            architect=architect,
+            executor=executor,
+            convergence=convergence
+        )
+
+        assert conversation is not None
+        assert len(conversation.turns) > 0
+        # Should have at least plan and implement phases
+        assert conversation.turns[0].response is not None
+
+    def test_orchestrator_status_tracking(self, any_real_runner):
+        """Test that orchestrator tracks status correctly."""
+        from orchestrator import Orchestrator, ConvergenceCriteria
+
+        # Create agents
+        architect = create_agent("test-arch", any_real_runner, AgentRole.ARCHITECT)
+        executor = create_agent("test-exec", any_real_runner, AgentRole.EXECUTOR)
+
+        orch = Orchestrator(debug=True)
+        convergence = ConvergenceCriteria(max_iterations=1)
+
+        # Run a simple task
+        conversation = orch.run_moa_workflow(
+            goal="Print hello",
+            architect=architect,
+            executor=executor,
+            convergence=convergence
+        )
+
+        # get_status() returns a dict with status info
+        status = orch.get_status()
+        assert isinstance(status, dict)
+        assert "status" in status
+        # Status should be a valid workflow state
+        assert status["status"] in ["planning", "coding", "reviewing", "verifying", "completed", "failed", "paused"]
