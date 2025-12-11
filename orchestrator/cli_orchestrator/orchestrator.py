@@ -391,11 +391,11 @@ class Orchestrator:
         self.memory_bank.initialize(goal)
         iteration = 0
 
-        if self.debug:
-            print(f"\n[MoA] Starting workflow for: {goal}")
-            print(f"[MoA] Architect: {architect.name} ({architect.runner.name})")
-            print(f"[MoA] Executor: {executor.name} ({executor.runner.name})")
-            print(f"[MoA] Critic: {critic.name} ({critic.runner.name})")
+        # Always show workflow info
+        print(f"\n🚀 Starting MoA workflow...")
+        print(f"   Architect: {architect.runner.name}")
+        print(f"   Executor:  {executor.runner.name}")
+        print(f"   Critic:    {critic.runner.name}")
 
         while True:
             iteration += 1
@@ -410,8 +410,7 @@ class Orchestrator:
 
             # Phase 1: PLANNING
             self._current_status = TaskStatus.PLANNING
-            if self.debug:
-                print(f"\n[MoA] Iteration {iteration} - PLANNING")
+            print(f"\n⏳ [{iteration}] Architect planning...", end="", flush=True)
 
             start_time = time.time()
             plan_response = architect.invoke(
@@ -419,6 +418,7 @@ class Orchestrator:
                 context=context
             )
             plan_time = time.time() - start_time
+            print(f" ✓ ({plan_time:.1f}s)")
 
             plan_turn = ConversationTurn(
                 agent_name=architect.name,
@@ -433,8 +433,7 @@ class Orchestrator:
 
             # Phase 2: CODING
             self._current_status = TaskStatus.CODING
-            if self.debug:
-                print(f"[MoA] Iteration {iteration} - CODING")
+            print(f"⏳ [{iteration}] Executor implementing...", end="", flush=True)
 
             start_time = time.time()
             impl_response = executor.invoke(
@@ -442,6 +441,7 @@ class Orchestrator:
                 context=plan_response.content
             )
             impl_time = time.time() - start_time
+            print(f" ✓ ({impl_time:.1f}s)")
 
             impl_turn = ConversationTurn(
                 agent_name=executor.name,
@@ -456,8 +456,7 @@ class Orchestrator:
 
             # Phase 3: REVIEWING
             self._current_status = TaskStatus.REVIEWING
-            if self.debug:
-                print(f"[MoA] Iteration {iteration} - REVIEWING")
+            print(f"⏳ [{iteration}] Critic reviewing...", end="", flush=True)
 
             start_time = time.time()
             review_response = critic.invoke(
@@ -465,6 +464,8 @@ class Orchestrator:
                 context=impl_response.content
             )
             review_time = time.time() - start_time
+            verdict = review_response.verdict or "NO VERDICT"
+            print(f" ✓ ({review_time:.1f}s) → {verdict}")
 
             review_turn = ConversationTurn(
                 agent_name=critic.name,
@@ -509,18 +510,15 @@ class Orchestrator:
                 if reason == "success":
                     self._current_status = TaskStatus.COMPLETED
                     conversation.status = "completed"
-                    if self.debug:
-                        print(f"[MoA] SUCCESS after {iteration} iterations!")
+                    print(f"\n✅ SUCCESS after {iteration} iteration(s)!")
                 else:
                     self._current_status = TaskStatus.FAILED
                     conversation.status = "failed"
-                    if self.debug:
-                        print(f"[MoA] STOPPED: {reason}")
+                    print(f"\n⚠️  STOPPED: {reason}")
                 break
 
             # Phase 5: FIX (if not converged)
-            if self.debug:
-                print(f"[MoA] Iteration {iteration} - FIXING based on feedback")
+            print(f"⏳ [{iteration}] Executor fixing...", end="", flush=True)
 
             start_time = time.time()
             fix_response = executor.invoke(
@@ -528,6 +526,7 @@ class Orchestrator:
                 context=impl_response.content
             )
             fix_time = time.time() - start_time
+            print(f" ✓ ({fix_time:.1f}s)")
 
             fix_turn = ConversationTurn(
                 agent_name=executor.name,
