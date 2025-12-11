@@ -22,9 +22,52 @@ from enum import Enum
 try:
     from .runners.base import CLIRunner, RunnerResult
     from .profiles import AgentProfile, ProfileRegistry, AgentRole
+    from .agent import Agent, AgentResponse, AgentRole as NewAgentRole, create_agent
+    from .memory_bank import MemoryBank
 except ImportError:
     from runners.base import CLIRunner, RunnerResult
     from profiles import AgentProfile, ProfileRegistry, AgentRole
+    from agent import Agent, AgentResponse, AgentRole as NewAgentRole, create_agent
+    from memory_bank import MemoryBank
+
+
+class TaskStatus(Enum):
+    """Status tracking for MoA workflows."""
+    PLANNING = "planning"
+    CODING = "coding"
+    REVIEWING = "reviewing"
+    VERIFYING = "verifying"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    PAUSED = "paused"
+
+
+@dataclass
+class ConvergenceCriteria:
+    """Criteria for determining when MoA workflow should stop."""
+    max_iterations: int = 5
+    require_critic_pass: bool = True
+    require_tests_pass: bool = False
+    context_char_limit: int = 50000  # Trigger compaction (~12k tokens)
+
+    def should_stop(
+        self,
+        iteration: int,
+        critic_verdict: str,
+        test_result: bool = True
+    ) -> tuple[bool, str]:
+        """
+        Check if workflow should stop.
+
+        Returns:
+            (should_stop, reason) tuple
+        """
+        if iteration >= self.max_iterations:
+            return True, "max_iterations_reached"
+        if self.require_critic_pass and critic_verdict == "PASS":
+            if not self.require_tests_pass or test_result:
+                return True, "success"
+        return False, "continue"
 
 
 @dataclass
@@ -106,20 +149,26 @@ class Orchestrator:
     Main orchestrator for multi-agent conversations.
 
     Manages agent profiles, conversation flow, and handoffs.
+    Supports both legacy ProfileRegistry and new agnostic Agent architecture.
     """
 
     def __init__(
         self,
-        registry: ProfileRegistry,
+        registry: ProfileRegistry = None,
         working_dir: Optional[Path] = None,
         max_turns: int = 20,
-        debug: bool = False
+        debug: bool = False,
+        memory_bank: Optional[MemoryBank] = None
     ):
         self.registry = registry
         self.working_dir = working_dir or Path.cwd()
         self.max_turns = max_turns
         self.debug = debug
         self._conversations: Dict[str, Conversation] = {}
+
+        # New agnostic architecture components
+        self.memory_bank = memory_bank or MemoryBank(self.working_dir / ".orchestrator")
+        self._current_status: TaskStatus = TaskStatus.PLANNING
 
     def create_conversation(self, goal: str) -> Conversation:
         """Start a new conversation with a goal."""
@@ -296,6 +345,215 @@ class Orchestrator:
 
         conversation.status = "completed"
         return conversation
+
+    def run_moa_workflow(
+        self,
+        goal: str,
+        architect: Agent,
+        executor: Agent,
+        critic: Agent = None,
+        convergence: ConvergenceCriteria = None
+    ) -> Conversation:
+        """
+        Run a Mixture of Agents (MoA) workflow with convergence checking.
+
+        This is the new agnostic architecture - agents are passed in, NOT
+        hardcoded to specific backends. Any Agent can play any role.
+
+        Args:
+            goal: The task/feature to implement
+            architect: Agent configured for planning (any backend)
+            executor: Agent configured for implementation (any backend)
+            critic: Agent for review (defaults to architect if not provided)
+            convergence: Convergence criteria for stopping
+
+        Returns:
+            Completed Conversation with all turns
+
+        Example:
+            from agent import create_agent, AgentRole
+            from runners import ClaudeRunner, GeminiRunner
+
+            architect = create_agent("arch", GeminiRunner(), AgentRole.ARCHITECT)
+            executor = create_agent("impl", ClaudeRunner(), AgentRole.EXECUTOR)
+
+            result = orchestrator.run_moa_workflow(
+                goal="Build REST API",
+                architect=architect,
+                executor=executor
+            )
+        """
+        convergence = convergence or ConvergenceCriteria()
+        critic = critic or architect  # Reuse architect for critique if not provided
+
+        # Initialize
+        conversation = self.create_conversation(goal)
+        self.memory_bank.initialize(goal)
+        iteration = 0
+
+        if self.debug:
+            print(f"\n[MoA] Starting workflow for: {goal}")
+            print(f"[MoA] Architect: {architect.name} ({architect.runner.name})")
+            print(f"[MoA] Executor: {executor.name} ({executor.runner.name})")
+            print(f"[MoA] Critic: {critic.name} ({critic.runner.name})")
+
+        while True:
+            iteration += 1
+            context = self.memory_bank.read_context()
+
+            # Check context size for compaction
+            if len(context) > convergence.context_char_limit:
+                if self.debug:
+                    print(f"[MoA] Context too large ({len(context)} chars), compacting...")
+                self.memory_bank.compact(architect.runner)
+                context = self.memory_bank.read_context()
+
+            # Phase 1: PLANNING
+            self._current_status = TaskStatus.PLANNING
+            if self.debug:
+                print(f"\n[MoA] Iteration {iteration} - PLANNING")
+
+            start_time = time.time()
+            plan_response = architect.invoke(
+                f"Design solution for: {goal}",
+                context=context
+            )
+            plan_time = time.time() - start_time
+
+            plan_turn = ConversationTurn(
+                agent_name=architect.name,
+                role=AgentRole.ARCHITECT,
+                prompt=f"Design solution for: {goal}",
+                response=plan_response.content,
+                execution_time=plan_time,
+                backend=architect.runner.name,
+                success=plan_response.success
+            )
+            conversation.add_turn(plan_turn)
+
+            # Phase 2: CODING
+            self._current_status = TaskStatus.CODING
+            if self.debug:
+                print(f"[MoA] Iteration {iteration} - CODING")
+
+            start_time = time.time()
+            impl_response = executor.invoke(
+                "Implement this design",
+                context=plan_response.content
+            )
+            impl_time = time.time() - start_time
+
+            impl_turn = ConversationTurn(
+                agent_name=executor.name,
+                role=AgentRole.CODER,
+                prompt="Implement this design",
+                response=impl_response.content,
+                execution_time=impl_time,
+                backend=executor.runner.name,
+                success=impl_response.success
+            )
+            conversation.add_turn(impl_turn)
+
+            # Phase 3: REVIEWING
+            self._current_status = TaskStatus.REVIEWING
+            if self.debug:
+                print(f"[MoA] Iteration {iteration} - REVIEWING")
+
+            start_time = time.time()
+            review_response = critic.invoke(
+                "Review this implementation. End your review with PASS or FAIL verdict.",
+                context=impl_response.content
+            )
+            review_time = time.time() - start_time
+
+            review_turn = ConversationTurn(
+                agent_name=critic.name,
+                role=AgentRole.REVIEWER,
+                prompt="Review implementation",
+                response=review_response.content,
+                execution_time=review_time,
+                backend=critic.runner.name,
+                success=review_response.success
+            )
+            conversation.add_turn(review_turn)
+
+            # Update memory bank with progress
+            self.memory_bank.update_active_context(f"""## Current State
+- Status: ITERATION {iteration}
+- Phase: REVIEWING (just completed)
+- Verdict: {review_response.verdict or 'PENDING'}
+
+## Latest Plan Summary
+{plan_response.content[:500]}...
+
+## Latest Implementation Summary
+{impl_response.content[:500]}...
+
+## Latest Review
+{review_response.content[:500]}...
+
+## Next Steps
+{'Fix issues and iterate' if review_response.verdict != 'PASS' else 'Task complete!'}
+""")
+
+            # Phase 4: Check convergence
+            should_stop, reason = convergence.should_stop(
+                iteration,
+                review_response.verdict or ""
+            )
+
+            if self.debug:
+                print(f"[MoA] Verdict: {review_response.verdict}, Reason: {reason}")
+
+            if should_stop:
+                if reason == "success":
+                    self._current_status = TaskStatus.COMPLETED
+                    conversation.status = "completed"
+                    if self.debug:
+                        print(f"[MoA] SUCCESS after {iteration} iterations!")
+                else:
+                    self._current_status = TaskStatus.FAILED
+                    conversation.status = "failed"
+                    if self.debug:
+                        print(f"[MoA] STOPPED: {reason}")
+                break
+
+            # Phase 5: FIX (if not converged)
+            if self.debug:
+                print(f"[MoA] Iteration {iteration} - FIXING based on feedback")
+
+            start_time = time.time()
+            fix_response = executor.invoke(
+                f"Fix based on this feedback: {review_response.content}",
+                context=impl_response.content
+            )
+            fix_time = time.time() - start_time
+
+            fix_turn = ConversationTurn(
+                agent_name=executor.name,
+                role=AgentRole.CODER,
+                prompt="Fix based on feedback",
+                response=fix_response.content,
+                execution_time=fix_time,
+                backend=executor.runner.name,
+                success=fix_response.success
+            )
+            conversation.add_turn(fix_turn)
+
+        # Final summary
+        conversation.metadata["iterations"] = iteration
+        conversation.metadata["final_status"] = self._current_status.value
+
+        return conversation
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current orchestrator status for CLI."""
+        return {
+            "status": self._current_status.value,
+            "active_conversations": len(self._conversations),
+            "memory_bank_initialized": self.memory_bank.active_context.exists(),
+            "working_dir": str(self.working_dir)
+        }
 
 
 class WorkflowBuilder:
