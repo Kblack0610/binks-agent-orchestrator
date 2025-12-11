@@ -181,59 +181,71 @@ When adding new capabilities:
 |---------|--------|-------|
 | Claude Code | ✅ Ready | Primary backend |
 | Gemini CLI | ✅ Ready | Installed |
+| Groq | ✅ Ready | API runner, ultra-fast inference |
+| OpenRouter | ✅ Ready | API runner, 20+ free models |
 | Ollama Local | 🔧 Setup | Requires `ollama serve` |
 | Ollama Home | 🔧 Setup | Remote at 192.168.1.4 |
 
 ### Active Service Projects
 
-1. **Email Scoring LLM** (HIGH Priority)
+1. **Email Scoring LLM** ✅ COMPLETE
    - Score and categorize job application emails
+   - Location: `services/email_scorer/`
    - See: `docs/projects/email-scoring-llm.md`
 
-2. **JobScan AI Integration** (MEDIUM Priority)
+2. **JobScan AI Integration** ✅ COMPLETE
    - ATS scoring for LinkedIn job descriptions
+   - Location: `services/jobscan/`
    - See: `docs/projects/jobscan-ai-integration.md`
 
 ### Phase: Free LLM Providers (After Services Built)
 
-#### OpenRouter (Best for Variety)
+#### OpenRouter (Best for Variety) ✅ DONE
 **20+ free models via single API**
 
 ```python
-from agno.models.openai import OpenAI
+from runners import OpenRouterRunner
 
-model = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key="sk-or-...",
-    id="meta-llama/llama-3.1-8b-instruct:free",
-)
+runner = OpenRouterRunner()  # Uses OPENROUTER_API_KEY env var
+result = runner.run("Hello!")
+
+# With specific model
+runner = OpenRouterRunner(model="meta-llama/llama-3.1-8b-instruct:free")
 ```
 
 Free models:
 - `meta-llama/llama-3.1-8b-instruct:free`
 - `mistralai/mistral-7b-instruct:free`
 - `google/gemma-2-9b-it:free`
+- `microsoft/phi-3-mini-128k-instruct:free`
+- `qwen/qwen-2-7b-instruct:free`
 
 **Tasks:**
-- [ ] Create `OpenRouterRunner` class
-- [ ] Add model selection for free tier
-- [ ] Handle rate limits gracefully
+- [x] Create `OpenRouterRunner` class
+- [x] Add model selection for free tier
+- [x] Handle rate limits gracefully
+- [x] Integration tests added
 
-#### Groq (Best for Speed)
+#### Groq (Best for Speed) ✅ DONE
 **Fast inference, generous free tier**
 
 ```python
-from agno.models.groq import Groq
+from runners import GroqRunner
 
-model = Groq(id="llama-3.3-70b-versatile")
+runner = GroqRunner()  # Uses GROQ_API_KEY env var
+result = runner.run("Hello!")
+
+# With specific model
+runner = GroqRunner(model="llama-3.1-8b-instant")
 ```
 
-Models: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`
+Models: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `gemma2-9b-it`
 
 **Tasks:**
-- [ ] Create `GroqRunner` class
-- [ ] Excellent for multi-step agents (speed)
-- [ ] Benchmark against Claude/Gemini
+- [x] Create `GroqRunner` class
+- [x] Optimized for multi-step agents (speed)
+- [x] Integration tests added
+- [ ] Benchmark against Claude/Gemini (future)
 
 #### Google Gemini Free Tier (Best for Context)
 **Already integrated - optimize for free tier**
@@ -259,10 +271,10 @@ model = Gemini(id="gemini-1.5-flash")
 
 ### Implementation Order
 
-1. **Now**: Use Claude + Gemini to build Email Scoring and JobScan services
-2. **Next**: Add Groq for speed improvements
-3. **Then**: Add OpenRouter for model variety
-4. **Later**: Multi-provider fallback and cost tracking
+1. ~~**Now**: Use Claude + Gemini to build Email Scoring and JobScan services~~ ✅ DONE
+2. ~~**Next**: Add Groq for speed improvements~~ ✅ DONE
+3. ~~**Then**: Add OpenRouter for model variety~~ ✅ DONE
+4. **Now**: Multi-provider fallback and cost tracking
 
 ### API Keys Required
 
