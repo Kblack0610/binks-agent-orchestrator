@@ -28,9 +28,12 @@ try:
         WorkflowBuilder,
         design_implement_review,
         research_design_implement,
-        debug_fix_test
+        debug_fix_test,
+        ConvergenceCriteria
     )
     from .benchmark import Benchmarker, quality_indicators_scorer
+    from .agent import Agent, AgentRole, create_agent
+    from .memory_bank import MemoryBank
 except ImportError:
     from runners import ClaudeRunner, GeminiRunner, CustomRunner
     from runners.custom_runner import OllamaRunner
@@ -40,9 +43,12 @@ except ImportError:
         WorkflowBuilder,
         design_implement_review,
         research_design_implement,
-        debug_fix_test
+        debug_fix_test,
+        ConvergenceCriteria
     )
     from benchmark import Benchmarker, quality_indicators_scorer
+    from agent import Agent, AgentRole, create_agent
+    from memory_bank import MemoryBank
 
 
 def check_available_backends() -> dict:
@@ -222,25 +228,255 @@ def run_benchmark(prompt: str, debug: bool = False):
             print(result.response[:300] + "..." if len(result.response) > 300 else result.response)
 
 
+def run_moa_workflow(
+    task: str,
+    architect_backend: str = "gemini",
+    executor_backend: str = "claude",
+    max_iterations: int = 5,
+    debug: bool = False
+):
+    """
+    Run a Mixture of Agents (MoA) workflow.
+
+    Uses agnostic Agent architecture - any backend can play any role.
+    """
+    print("=" * 60)
+    print("MoA Workflow - Mixture of Agents")
+    print("=" * 60)
+
+    # Check available backends
+    available = check_available_backends()
+
+    # Create runners based on selection
+    runners = {}
+
+    if available.get("claude"):
+        runners["claude"] = ClaudeRunner(debug=debug)
+    if available.get("gemini-api"):
+        try:
+            runners["gemini"] = GeminiRunner(backend="api")
+        except Exception:
+            pass
+    if available.get("ollama"):
+        runners["ollama"] = OllamaRunner(model="llama3.1:8b")
+
+    # Fallback logic
+    if architect_backend not in runners:
+        architect_backend = next(iter(runners.keys())) if runners else None
+    if executor_backend not in runners:
+        executor_backend = next(iter(runners.keys())) if runners else None
+
+    if not runners:
+        print("Error: No backends available!")
+        sys.exit(1)
+
+    print(f"\nArchitect: {architect_backend}")
+    print(f"Executor: {executor_backend}")
+    print(f"Task: {task}")
+    print()
+
+    # Create agnostic agents
+    architect = create_agent(
+        name="architect",
+        runner=runners[architect_backend],
+        role=AgentRole.ARCHITECT
+    )
+
+    executor = create_agent(
+        name="executor",
+        runner=runners[executor_backend],
+        role=AgentRole.EXECUTOR
+    )
+
+    # Create orchestrator and run
+    orchestrator = Orchestrator(debug=debug)
+    convergence = ConvergenceCriteria(max_iterations=max_iterations)
+
+    conversation = orchestrator.run_moa_workflow(
+        goal=task,
+        architect=architect,
+        executor=executor,
+        convergence=convergence
+    )
+
+    # Print results
+    print("\n" + "=" * 60)
+    print(f"WORKFLOW {'COMPLETE' if conversation.status == 'completed' else 'FAILED'}")
+    print(f"Iterations: {conversation.metadata.get('iterations', 'N/A')}")
+    print("=" * 60)
+
+    for i, turn in enumerate(conversation.turns):
+        print(f"\n[{i+1}. {turn.agent_name}] ({turn.execution_time:.1f}s)")
+        print("-" * 40)
+        print(turn.response[:500] + "..." if len(turn.response) > 500 else turn.response)
+
+
+def show_status(debug: bool = False):
+    """Show current orchestrator status."""
+    print("=" * 60)
+    print("CLI Orchestrator Status")
+    print("=" * 60)
+
+    # Check backends
+    print("\nAvailable Backends:")
+    available = check_available_backends()
+    for backend, is_available in available.items():
+        status = "✓" if is_available else "✗"
+        print(f"  {status} {backend}")
+
+    # Check memory bank
+    memory_bank = MemoryBank()
+    print("\nMemory Bank:")
+    if memory_bank.active_context.exists():
+        print("  ✓ Active context found")
+        context = memory_bank.read_context()
+        print(f"  Context size: {len(context)} chars (~{len(context)//4} tokens)")
+
+        # Show snippet of active context
+        if memory_bank.active_context.exists():
+            active = memory_bank.active_context.read_text()
+            lines = active.split('\n')[:10]
+            print("\n  Recent context:")
+            for line in lines:
+                print(f"    {line[:60]}")
+    else:
+        print("  ✗ No active context (start with --moa)")
+
+    print()
+
+
+def resume_workflow(debug: bool = False):
+    """Resume a paused/failed workflow from memory bank state."""
+    memory_bank = MemoryBank()
+
+    if not memory_bank.active_context.exists():
+        print("Error: No workflow to resume. Start with --moa first.")
+        sys.exit(1)
+
+    print("=" * 60)
+    print("Resuming Workflow from Memory Bank")
+    print("=" * 60)
+
+    # Read current context
+    context = memory_bank.read_context()
+    print(f"\nLoaded context: {len(context)} chars")
+
+    # Extract goal from product context
+    goal = "Continue previous task"  # Default
+    if memory_bank.product_context.exists():
+        product = memory_bank.product_context.read_text()
+        for line in product.split('\n'):
+            if line.strip() and not line.startswith('#'):
+                goal = line.strip()
+                break
+
+    print(f"Goal: {goal}")
+    print()
+
+    # Create agents with available backends
+    available = check_available_backends()
+    runners = {}
+    if available.get("claude"):
+        runners["claude"] = ClaudeRunner(debug=debug)
+    if available.get("gemini-api"):
+        try:
+            runners["gemini"] = GeminiRunner(backend="api")
+        except Exception:
+            pass
+
+    if not runners:
+        print("Error: No backends available!")
+        sys.exit(1)
+
+    # Use first available for both (user can customize)
+    backend = next(iter(runners.keys()))
+    architect = create_agent("architect", runners[backend], AgentRole.ARCHITECT)
+    executor = create_agent("executor", runners[backend], AgentRole.EXECUTOR)
+
+    # Run with existing context injected
+    orchestrator = Orchestrator(debug=debug, memory_bank=memory_bank)
+
+    conversation = orchestrator.run_moa_workflow(
+        goal=goal,
+        architect=architect,
+        executor=executor
+    )
+
+    print(f"\nWorkflow {'completed' if conversation.status == 'completed' else 'stopped'}")
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="CLI Orchestrator - Multi-Agent Workflow Orchestration"
+        description="CLI Orchestrator - Multi-Agent Workflow Orchestration",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run MoA workflow (Plan → Execute → Review loop)
+  python main.py --moa "Build a REST API for user management"
+
+  # Resume interrupted workflow
+  python main.py --resume
+
+  # Check status
+  python main.py --status
+
+  # Specify backends
+  python main.py --moa "Build API" --architect gemini --executor claude
+        """
     )
-    parser.add_argument(
+
+    # Mode selection (mutually exclusive)
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
         "--workflow", "-w",
         choices=["design-implement-review", "research-design-implement", "debug-fix-test"],
-        help="Run a predefined workflow"
+        help="Run a predefined workflow (legacy)"
     )
-    parser.add_argument(
+    mode_group.add_argument(
+        "--moa",
+        action="store_true",
+        help="Run Mixture of Agents workflow (Plan→Execute→Review loop)"
+    )
+    mode_group.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume interrupted workflow from memory bank"
+    )
+    mode_group.add_argument(
+        "--status",
+        action="store_true",
+        help="Show orchestrator status and memory bank state"
+    )
+    mode_group.add_argument(
         "--benchmark", "-b",
         action="store_true",
         help="Run benchmark mode"
     )
-    parser.add_argument(
+    mode_group.add_argument(
         "--check",
         action="store_true",
         help="Check available backends"
     )
+
+    # MoA configuration
+    parser.add_argument(
+        "--architect",
+        default="gemini",
+        help="Backend for architect agent (default: gemini)"
+    )
+    parser.add_argument(
+        "--executor",
+        default="claude",
+        help="Backend for executor agent (default: claude)"
+    )
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=5,
+        help="Maximum MoA iterations (default: 5)"
+    )
+
+    # Common options
     parser.add_argument(
         "--debug", "-d",
         action="store_true",
@@ -254,12 +490,35 @@ def main():
 
     args = parser.parse_args()
 
+    # Handle modes
     if args.check:
         print("Checking available backends...")
         available = check_available_backends()
         for backend, is_available in available.items():
             status = "✓ Available" if is_available else "✗ Not available"
             print(f"  {backend}: {status}")
+        return
+
+    if args.status:
+        show_status(args.debug)
+        return
+
+    if args.resume:
+        resume_workflow(args.debug)
+        return
+
+    if args.moa:
+        if not args.task:
+            print("Error: --moa requires a task description")
+            print("Usage: python main.py --moa \"Your task here\"")
+            sys.exit(1)
+        run_moa_workflow(
+            task=args.task,
+            architect_backend=args.architect,
+            executor_backend=args.executor,
+            max_iterations=args.max_iterations,
+            debug=args.debug
+        )
         return
 
     if args.benchmark:
