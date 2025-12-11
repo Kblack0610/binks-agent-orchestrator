@@ -182,7 +182,7 @@ def run_workflow(workflow_name: str, task: str, debug: bool = False):
         print(turn.response[:500] + "..." if len(turn.response) > 500 else turn.response)
 
 
-def run_benchmark(prompt: str, debug: bool = False):
+def run_benchmark(prompt: str, ollama_model: str = "llama3.1:8b", debug: bool = False):
     """Run a benchmark across available backends."""
     print("Checking available backends...")
     available = check_available_backends()
@@ -202,7 +202,7 @@ def run_benchmark(prompt: str, debug: bool = False):
         benchmarker.add_runner(GeminiRunner(backend="api"))
 
     if available.get("ollama"):
-        benchmarker.add_runner(OllamaRunner(model="llama3.1:8b"))
+        benchmarker.add_runner(OllamaRunner(model=ollama_model))
 
     if not benchmarker.runners:
         print("\nNo backends available for benchmarking!")
@@ -233,6 +233,7 @@ def run_moa_workflow(
     architect_backend: str = "gemini",
     executor_backend: str = "claude",
     max_iterations: int = 5,
+    ollama_model: str = "llama3.1:8b",
     debug: bool = False
 ):
     """
@@ -258,7 +259,7 @@ def run_moa_workflow(
         except Exception:
             pass
     if available.get("ollama"):
-        runners["ollama"] = OllamaRunner(model="llama3.1:8b")
+        runners["ollama"] = OllamaRunner(model=ollama_model)
 
     # Fallback logic
     if architect_backend not in runners:
@@ -422,6 +423,10 @@ Examples:
 
   # Specify backends
   python main.py --moa "Build API" --architect gemini --executor claude
+
+  # Use Ollama (requires `ollama serve` running)
+  python main.py --moa "Explain Python" --architect ollama --executor ollama
+  python main.py --moa "Task" --executor ollama --model mistral
         """
     )
 
@@ -475,6 +480,11 @@ Examples:
         default=5,
         help="Maximum MoA iterations (default: 5)"
     )
+    parser.add_argument(
+        "--model",
+        default="llama3.1:8b",
+        help="Ollama model to use when backend=ollama (default: llama3.1:8b)"
+    )
 
     # Common options
     parser.add_argument(
@@ -517,6 +527,7 @@ Examples:
             architect_backend=args.architect,
             executor_backend=args.executor,
             max_iterations=args.max_iterations,
+            ollama_model=args.model,
             debug=args.debug
         )
         return
@@ -525,7 +536,7 @@ Examples:
         if not args.task:
             print("Error: --benchmark requires a prompt")
             sys.exit(1)
-        run_benchmark(args.task, args.debug)
+        run_benchmark(args.task, ollama_model=args.model, debug=args.debug)
         return
 
     if args.workflow:
