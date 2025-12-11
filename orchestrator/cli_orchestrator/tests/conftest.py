@@ -22,9 +22,16 @@ def _check_claude():
         return False
 
 
-def _check_gemini():
+def _check_gemini_api():
     try:
         return GeminiRunner(backend="api").is_available()
+    except:
+        return False
+
+
+def _check_gemini_cli():
+    try:
+        return GeminiRunner(backend="gemini").is_available()
     except:
         return False
 
@@ -52,7 +59,8 @@ def get_status():
     if not _STATUS:
         _STATUS = {
             "claude": _check_claude(),
-            "gemini": _check_gemini(),
+            "gemini-api": _check_gemini_api(),
+            "gemini-cli": _check_gemini_cli(),
             "ollama-local": _check_ollama_local(),
             "ollama-home": _check_ollama_home(),
         }
@@ -61,15 +69,37 @@ def get_status():
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "requires_api: needs real backend")
+    config.addinivalue_line("markers", "requires_claude: needs Claude backend")
+    config.addinivalue_line("markers", "requires_gemini: needs Gemini backend (API or CLI)")
+    config.addinivalue_line("markers", "requires_gemini_cli: needs Gemini CLI specifically")
+    config.addinivalue_line("markers", "requires_ollama: needs Ollama backend")
 
 
 def pytest_collection_modifyitems(config, items):
     status = get_status()
-    skip = pytest.mark.skip(reason="No backends available")
 
     for item in items:
+        # Skip if no backends available at all
         if "requires_api" in item.keywords and not any(status.values()):
-            item.add_marker(skip)
+            item.add_marker(pytest.mark.skip(reason="No backends available"))
+
+        # Skip Claude-specific tests
+        if "requires_claude" in item.keywords and not status["claude"]:
+            item.add_marker(pytest.mark.skip(reason="Claude not available"))
+
+        # Skip Gemini-specific tests (either API or CLI)
+        if "requires_gemini" in item.keywords:
+            if not status["gemini-api"] and not status["gemini-cli"]:
+                item.add_marker(pytest.mark.skip(reason="Gemini not available"))
+
+        # Skip Gemini CLI-specific tests
+        if "requires_gemini_cli" in item.keywords and not status["gemini-cli"]:
+            item.add_marker(pytest.mark.skip(reason="Gemini CLI not available"))
+
+        # Skip Ollama-specific tests
+        if "requires_ollama" in item.keywords:
+            if not status["ollama-local"] and not status["ollama-home"]:
+                item.add_marker(pytest.mark.skip(reason="Ollama not available"))
 
 
 def pytest_report_header(config):
@@ -86,10 +116,47 @@ def any_real_runner():
     status = get_status()
     if status["claude"]:
         return ClaudeRunner()
-    if status["gemini"]:
+    if status["gemini-cli"]:
+        return GeminiRunner(backend="gemini")
+    if status["gemini-api"]:
         return GeminiRunner(backend="api")
     if status["ollama-local"]:
         return OllamaRunner(host=OLLAMA_LOCAL)
     if status["ollama-home"]:
         return OllamaRunner(host=OLLAMA_HOME)
     pytest.skip("No backends available")
+
+
+@pytest.fixture
+def claude_runner():
+    """Returns Claude runner if available."""
+    if not _check_claude():
+        pytest.skip("Claude not available")
+    return ClaudeRunner()
+
+
+@pytest.fixture
+def gemini_cli_runner():
+    """Returns Gemini CLI runner if available."""
+    if not _check_gemini_cli():
+        pytest.skip("Gemini CLI not available")
+    return GeminiRunner(backend="gemini")
+
+
+@pytest.fixture
+def gemini_api_runner():
+    """Returns Gemini API runner if available."""
+    if not _check_gemini_api():
+        pytest.skip("Gemini API not available")
+    return GeminiRunner(backend="api")
+
+
+@pytest.fixture
+def ollama_runner():
+    """Returns first available Ollama runner."""
+    status = get_status()
+    if status["ollama-local"]:
+        return OllamaRunner(host=OLLAMA_LOCAL)
+    if status["ollama-home"]:
+        return OllamaRunner(host=OLLAMA_HOME)
+    pytest.skip("Ollama not available")

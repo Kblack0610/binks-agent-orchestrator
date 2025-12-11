@@ -116,3 +116,72 @@ class TestMoAWorkflow:
 
         assert has_verdict, \
             f"Critic didn't return VERDICT! Got: ...{conversation.turns[2].response[-150:]}"
+
+
+# =============================================================================
+# Gemini CLI Tests - Verify Gemini CLI specifically works
+# =============================================================================
+
+@pytest.mark.requires_gemini_cli
+class TestGeminiCLI:
+    """Tests that verify Gemini CLI backend works correctly."""
+
+    def test_gemini_cli_responds(self, gemini_cli_runner):
+        """Does Gemini CLI return a response?"""
+        result = gemini_cli_runner.run("Say 'hello' in one word")
+
+        assert result.success, f"Gemini CLI failed: {result.error}"
+        assert result.content, "Empty response from Gemini CLI"
+        assert len(result.content) > 0
+
+    def test_gemini_cli_simple_math(self, gemini_cli_runner):
+        """Can Gemini CLI do simple reasoning?"""
+        result = gemini_cli_runner.run("What is 5 + 7? Reply with just the number.")
+
+        assert result.success, f"Gemini CLI failed: {result.error}"
+        assert "12" in result.content, f"Expected '12' in response: {result.content}"
+
+    def test_gemini_cli_as_agent(self, gemini_cli_runner):
+        """Can Gemini CLI power an Agent?"""
+        agent = create_agent("gemini-test", gemini_cli_runner, AgentRole.EXECUTOR)
+
+        response = agent.invoke("What color is the sky? Reply in one word.")
+
+        assert response.success
+        assert response.content
+        # Sky is typically blue
+        assert any(word in response.content.lower() for word in ["blue", "gray", "grey"])
+
+    def test_gemini_cli_verdict_parsing(self, gemini_cli_runner):
+        """Can Gemini CLI return parseable verdicts?"""
+        agent = create_agent(
+            name="gemini-critic",
+            runner=gemini_cli_runner,
+            role=AgentRole.CRITIC
+        )
+
+        response = agent.invoke(
+            "Is the statement 'Python is a programming language' correct? "
+            "Reply with VERDICT: PASS or VERDICT: FAIL"
+        )
+
+        assert response.success, f"Failed: {response.error}"
+        assert response.verdict in ["PASS", "FAIL"], \
+            f"Verdict not parsed from Gemini! Response: {response.content[-100:]}"
+
+
+# =============================================================================
+# Backend Comparison Tests - Verify multiple backends work similarly
+# =============================================================================
+
+@pytest.mark.requires_api
+class TestBackendParity:
+    """Tests that verify different backends produce comparable results."""
+
+    def test_all_available_backends_respond(self, any_real_runner):
+        """Whatever backend is available should respond."""
+        result = any_real_runner.run("Say 'test' in one word")
+
+        assert result.success, f"Backend {any_real_runner.name} failed: {result.error}"
+        assert result.content, f"Backend {any_real_runner.name} returned empty"
+        assert result.backend, "Backend name not set in result"
