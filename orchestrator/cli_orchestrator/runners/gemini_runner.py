@@ -32,7 +32,16 @@ class GeminiRunner(CLIRunner):
         result = runner.run("Analyze this code for security issues")
     """
 
-    SUPPORTED_BACKENDS = ["gemini", "aichat", "sgpt", "api"]
+    SUPPORTED_BACKENDS = ["gemini", "cli", "aichat", "sgpt", "api"]
+
+    # Map backend names to actual executable names
+    BACKEND_EXECUTABLES = {
+        "gemini": "gemini",
+        "cli": "gemini",  # "cli" is an alias for "gemini"
+        "aichat": "aichat",
+        "sgpt": "sgpt",
+        "api": "python"
+    }
 
     def __init__(
         self,
@@ -43,8 +52,12 @@ class GeminiRunner(CLIRunner):
         debug: bool = False,
         api_key: Optional[str] = None
     ):
+        # Normalize backend name
+        if backend == "cli":
+            backend = "gemini"
+
         # Determine executable based on backend
-        executable = backend if backend != "api" else "python"
+        executable = self.BACKEND_EXECUTABLES.get(backend, backend)
 
         super().__init__(
             name=f"gemini-{backend}",
@@ -70,7 +83,9 @@ class GeminiRunner(CLIRunner):
             except ImportError:
                 return False
         else:
-            return shutil.which(self.backend) is not None
+            # Use the executable mapping to check the right binary
+            executable = self.BACKEND_EXECUTABLES.get(self.backend, self.backend)
+            return shutil.which(executable) is not None
 
     def run(self, prompt: str, **kwargs) -> RunnerResult:
         """
@@ -177,23 +192,35 @@ class GeminiRunner(CLIRunner):
         )
 
     def _run_gemini_cli(self, prompt: str, **kwargs) -> RunnerResult:
-        """Run using official Gemini CLI (when available)."""
-        # This is a placeholder for the official Google Gemini CLI
-        # Update this method when the official CLI is released
-        cmd = [
-            "gemini",
-            "chat",
-            "--model", self.model,
-            prompt
-        ]
+        """Run using official Google Gemini CLI.
+
+        The Gemini CLI (https://github.com/google-gemini/gemini-cli) uses:
+        - `gemini "prompt"` for one-shot queries
+        - `gemini -m model "prompt"` for specific model
+        """
+        import time
+
+        start_time = time.time()
+
+        # Build command - Gemini CLI takes prompt as positional argument
+        cmd = ["gemini"]
+
+        # Add model if specified (not default)
+        if self.model and self.model != "gemini-1.5-pro":
+            cmd.extend(["-m", self.model])
+
+        # Add the prompt as positional argument
+        cmd.append(prompt)
 
         stdout, stderr, returncode = self._execute_subprocess(cmd)
+        execution_time = time.time() - start_time
 
         if returncode != 0:
             return RunnerResult(
                 content="",
                 backend="gemini-cli",
                 model=self.model,
+                execution_time=execution_time,
                 success=False,
                 error=stderr or f"Exit code: {returncode}"
             )
@@ -202,6 +229,7 @@ class GeminiRunner(CLIRunner):
             content=stdout.strip(),
             backend="gemini-cli",
             model=self.model,
+            execution_time=execution_time,
             success=True,
             raw_output=stdout
         )
