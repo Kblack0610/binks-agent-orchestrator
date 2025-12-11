@@ -1,7 +1,7 @@
 # Product Context
 
 ## Goal
-Write: print('hi')
+Say hello world
 
 ## Project Info
 
