@@ -193,11 +193,19 @@ class Agent:
         """
         verdict = None
 
-        # Check for explicit verdict markers
+        # Check for explicit verdict markers (flexible matching)
         content_upper = content.upper()
-        if "VERDICT: PASS" in content_upper or content_upper.endswith("PASS"):
+        # Check last 100 chars for verdict (often at the end)
+        tail = content_upper[-100:] if len(content_upper) > 100 else content_upper
+
+        if "VERDICT: PASS" in content_upper or "VERDICT:PASS" in content_upper:
             verdict = "PASS"
-        elif "VERDICT: FAIL" in content_upper or content_upper.endswith("FAIL"):
+        elif "VERDICT: FAIL" in content_upper or "VERDICT:FAIL" in content_upper:
+            verdict = "FAIL"
+        # Also check for PASS/FAIL on its own line at the end
+        elif tail.strip().endswith("PASS") or "\nPASS" in tail:
+            verdict = "PASS"
+        elif tail.strip().endswith("FAIL") or "\nFAIL" in tail:
             verdict = "FAIL"
         elif "NEEDS_REVISION" in content_upper:
             verdict = "NEEDS_REVISION"

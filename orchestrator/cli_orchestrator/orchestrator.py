@@ -418,7 +418,9 @@ class Orchestrator:
                 context=context
             )
             plan_time = time.time() - start_time
+            summary = plan_response.content[:80].replace('\n', ' ').strip()
             print(f" ✓ ({plan_time:.1f}s)")
+            print(f"   → {summary}...")
 
             plan_turn = ConversationTurn(
                 agent_name=architect.name,
@@ -441,7 +443,9 @@ class Orchestrator:
                 context=plan_response.content
             )
             impl_time = time.time() - start_time
+            summary = impl_response.content[:80].replace('\n', ' ').strip()
             print(f" ✓ ({impl_time:.1f}s)")
+            print(f"   → {summary}...")
 
             impl_turn = ConversationTurn(
                 agent_name=executor.name,
@@ -460,12 +464,20 @@ class Orchestrator:
 
             start_time = time.time()
             review_response = critic.invoke(
-                "Review this implementation. End your review with PASS or FAIL verdict.",
+                """Review this implementation briefly.
+Is it correct and complete for the task?
+
+You MUST end your response with exactly one of:
+VERDICT: PASS
+or
+VERDICT: FAIL""",
                 context=impl_response.content
             )
             review_time = time.time() - start_time
             verdict = review_response.verdict or "NO VERDICT"
+            summary = review_response.content[:80].replace('\n', ' ').strip()
             print(f" ✓ ({review_time:.1f}s) → {verdict}")
+            print(f"   → {summary}...")
 
             review_turn = ConversationTurn(
                 agent_name=critic.name,
@@ -526,7 +538,9 @@ class Orchestrator:
                 context=impl_response.content
             )
             fix_time = time.time() - start_time
+            summary = fix_response.content[:80].replace('\n', ' ').strip()
             print(f" ✓ ({fix_time:.1f}s)")
+            print(f"   → {summary}...")
 
             fix_turn = ConversationTurn(
                 agent_name=executor.name,
