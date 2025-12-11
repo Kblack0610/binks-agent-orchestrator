@@ -220,9 +220,18 @@ class CustomRunner(CLIRunner):
 
 class OllamaRunner(CustomRunner):
     """
-    Specialized runner for local Ollama models.
+    Specialized runner for Ollama models (local or remote).
 
-    Useful for running local models as part of the orchestration.
+    Supports two modes:
+    - Local: Uses `ollama` CLI (requires ollama installed)
+    - Remote: Uses HTTP API (for remote Ollama servers)
+
+    Usage:
+        # Local (default)
+        runner = OllamaRunner(model="llama3.1:8b")
+
+        # Remote (e.g., ollama-home on 192.168.1.4)
+        runner = OllamaRunner(model="llama3.1:8b", host="http://192.168.1.4:11434")
     """
 
     def __init__(
@@ -230,6 +239,7 @@ class OllamaRunner(CustomRunner):
         model: str = "llama3.1:8b",
         host: str = "http://localhost:11434",
         name: Optional[str] = None,
+        use_api: bool = None,  # Auto-detect if None
         **kwargs
     ):
         super().__init__(
@@ -238,22 +248,34 @@ class OllamaRunner(CustomRunner):
             **kwargs
         )
         self.model = model
-        self.host = host
+        self.host = host.rstrip('/')
+
+        # Auto-detect: use API for remote hosts, CLI for localhost
+        if use_api is None:
+            self.use_api = "localhost" not in host and "127.0.0.1" not in host
+        else:
+            self.use_api = use_api
 
     def is_available(self) -> bool:
         """Check if Ollama is running."""
         import urllib.request
         try:
-            urllib.request.urlopen(f"{self.host}/api/tags", timeout=2)
+            urllib.request.urlopen(f"{self.host}/api/tags", timeout=3)
             return True
         except:
             return False
 
     def run(self, prompt: str, **kwargs) -> RunnerResult:
-        """Run a prompt through Ollama."""
+        """Run a prompt through Ollama (CLI or API)."""
+        if self.use_api:
+            return self._run_api(prompt, **kwargs)
+        else:
+            return self._run_cli(prompt, **kwargs)
+
+    def _run_cli(self, prompt: str, **kwargs) -> RunnerResult:
+        """Run via ollama CLI (local only)."""
         import time
 
-        # Use ollama CLI
         cmd = ["ollama", "run", self.model, prompt]
 
         start_time = time.time()
@@ -277,3 +299,61 @@ class OllamaRunner(CustomRunner):
             execution_time=execution_time,
             success=True
         )
+
+    def _run_api(self, prompt: str, **kwargs) -> RunnerResult:
+        """Run via Ollama HTTP API (works for remote servers)."""
+        import time
+        import json
+        import urllib.request
+        import urllib.error
+
+        start_time = time.time()
+
+        try:
+            data = json.dumps({
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False
+            }).encode('utf-8')
+
+            req = urllib.request.Request(
+                f"{self.host}/api/generate",
+                data=data,
+                headers={"Content-Type": "application/json"}
+            )
+
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                execution_time = time.time() - start_time
+
+                return RunnerResult(
+                    content=result.get("response", "").strip(),
+                    backend=self.name,
+                    model=self.model,
+                    execution_time=execution_time,
+                    success=True
+                )
+
+        except urllib.error.URLError as e:
+            return RunnerResult(
+                content="",
+                backend=self.name,
+                model=self.model,
+                execution_time=time.time() - start_time,
+                success=False,
+                error=f"Connection error: {e.reason}"
+            )
+        except Exception as e:
+            return RunnerResult(
+                content="",
+                backend=self.name,
+                model=self.model,
+                execution_time=time.time() - start_time,
+                success=False,
+                error=str(e)
+            )
+
+
+# Convenience constants for common Ollama hosts
+OLLAMA_LOCAL = "http://localhost:11434"
+OLLAMA_HOME = "http://192.168.1.4:11434"

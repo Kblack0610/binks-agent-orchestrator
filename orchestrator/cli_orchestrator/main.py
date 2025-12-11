@@ -53,6 +53,8 @@ except ImportError:
 
 def check_available_backends() -> dict:
     """Check which backends are available."""
+    from .runners.custom_runner import OLLAMA_LOCAL, OLLAMA_HOME
+
     available = {}
 
     # Claude CLI
@@ -65,9 +67,12 @@ def check_available_backends() -> dict:
     available["gemini-api"] = gemini_status.get("api", False)
     available["gemini-cli"] = gemini_status.get("gemini", False)
 
-    # Ollama
-    ollama = OllamaRunner()
-    available["ollama"] = ollama.is_available()
+    # Ollama - check both local and home
+    ollama_local = OllamaRunner(host=OLLAMA_LOCAL)
+    available["ollama-local"] = ollama_local.is_available()
+
+    ollama_home = OllamaRunner(host=OLLAMA_HOME)
+    available["ollama-home"] = ollama_home.is_available()
 
     return available
 
@@ -194,6 +199,8 @@ def run_benchmark(prompt: str, ollama_model: str = "llama3.1:8b", debug: bool = 
     benchmarker = Benchmarker(debug=debug)
 
     # Add available runners
+    from .runners.custom_runner import OLLAMA_LOCAL, OLLAMA_HOME
+
     if available.get("claude"):
         benchmarker.add_runner(ClaudeRunner(output_format="text"))
 
@@ -201,8 +208,11 @@ def run_benchmark(prompt: str, ollama_model: str = "llama3.1:8b", debug: bool = 
         from .runners import GeminiRunner
         benchmarker.add_runner(GeminiRunner(backend="api"))
 
-    if available.get("ollama"):
-        benchmarker.add_runner(OllamaRunner(model=ollama_model))
+    if available.get("ollama-local"):
+        benchmarker.add_runner(OllamaRunner(model=ollama_model, host=OLLAMA_LOCAL, name="ollama-local"))
+
+    if available.get("ollama-home"):
+        benchmarker.add_runner(OllamaRunner(model=ollama_model, host=OLLAMA_HOME, name="ollama-home"))
 
     if not benchmarker.runners:
         print("\nNo backends available for benchmarking!")
@@ -249,6 +259,8 @@ def run_moa_workflow(
     available = check_available_backends()
 
     # Create runners based on selection
+    from .runners.custom_runner import OLLAMA_LOCAL, OLLAMA_HOME
+
     runners = {}
 
     if available.get("claude"):
@@ -258,8 +270,11 @@ def run_moa_workflow(
             runners["gemini"] = GeminiRunner(backend="api")
         except Exception:
             pass
-    if available.get("ollama"):
-        runners["ollama"] = OllamaRunner(model=ollama_model)
+    if available.get("ollama-local"):
+        runners["ollama-local"] = OllamaRunner(model=ollama_model, host=OLLAMA_LOCAL)
+        runners["ollama"] = runners["ollama-local"]  # Alias for convenience
+    if available.get("ollama-home"):
+        runners["ollama-home"] = OllamaRunner(model=ollama_model, host=OLLAMA_HOME)
 
     # Fallback logic
     if architect_backend not in runners:
@@ -424,9 +439,11 @@ Examples:
   # Specify backends
   python main.py --moa "Build API" --architect gemini --executor claude
 
-  # Use Ollama (requires `ollama serve` running)
-  python main.py --moa "Explain Python" --architect ollama --executor ollama
-  python main.py --moa "Task" --executor ollama --model mistral
+  # Use Ollama local (requires `ollama serve` running locally)
+  python main.py --moa "Explain Python" --executor ollama-local --model mistral
+
+  # Use Ollama home (remote server at 192.168.1.4)
+  python main.py --moa "Task" --executor ollama-home --model llama3.1:8b
         """
     )
 

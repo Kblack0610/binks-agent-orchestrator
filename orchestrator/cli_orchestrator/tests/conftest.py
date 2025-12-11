@@ -12,7 +12,7 @@ PACKAGE_DIR = TEST_DIR.parent
 sys.path.insert(0, str(PACKAGE_DIR))
 
 from runners import ClaudeRunner, GeminiRunner
-from runners.custom_runner import OllamaRunner
+from runners.custom_runner import OllamaRunner, OLLAMA_LOCAL, OLLAMA_HOME
 
 
 def _check_claude():
@@ -29,9 +29,16 @@ def _check_gemini():
         return False
 
 
-def _check_ollama():
+def _check_ollama_local():
     try:
-        return OllamaRunner().is_available()
+        return OllamaRunner(host=OLLAMA_LOCAL).is_available()
+    except:
+        return False
+
+
+def _check_ollama_home():
+    try:
+        return OllamaRunner(host=OLLAMA_HOME).is_available()
     except:
         return False
 
@@ -46,7 +53,8 @@ def get_status():
         _STATUS = {
             "claude": _check_claude(),
             "gemini": _check_gemini(),
-            "ollama": _check_ollama(),
+            "ollama-local": _check_ollama_local(),
+            "ollama-home": _check_ollama_home(),
         }
     return _STATUS
 
@@ -80,6 +88,8 @@ def any_real_runner():
         return ClaudeRunner()
     if status["gemini"]:
         return GeminiRunner(backend="api")
-    if status["ollama"]:
-        return OllamaRunner()
+    if status["ollama-local"]:
+        return OllamaRunner(host=OLLAMA_LOCAL)
+    if status["ollama-home"]:
+        return OllamaRunner(host=OLLAMA_HOME)
     pytest.skip("No backends available")
