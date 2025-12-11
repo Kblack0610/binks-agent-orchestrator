@@ -173,6 +173,108 @@ When adding new capabilities:
 
 ---
 
+## CLI Orchestrator - Backend Providers
+
+### Current Backends (December 2024)
+
+| Backend | Status | Notes |
+|---------|--------|-------|
+| Claude Code | ✅ Ready | Primary backend |
+| Gemini CLI | ✅ Ready | Installed |
+| Ollama Local | 🔧 Setup | Requires `ollama serve` |
+| Ollama Home | 🔧 Setup | Remote at 192.168.1.4 |
+
+### Active Service Projects
+
+1. **Email Scoring LLM** (HIGH Priority)
+   - Score and categorize job application emails
+   - See: `docs/projects/email-scoring-llm.md`
+
+2. **JobScan AI Integration** (MEDIUM Priority)
+   - ATS scoring for LinkedIn job descriptions
+   - See: `docs/projects/jobscan-ai-integration.md`
+
+### Phase: Free LLM Providers (After Services Built)
+
+#### OpenRouter (Best for Variety)
+**20+ free models via single API**
+
+```python
+from agno.models.openai import OpenAI
+
+model = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key="sk-or-...",
+    id="meta-llama/llama-3.1-8b-instruct:free",
+)
+```
+
+Free models:
+- `meta-llama/llama-3.1-8b-instruct:free`
+- `mistralai/mistral-7b-instruct:free`
+- `google/gemma-2-9b-it:free`
+
+**Tasks:**
+- [ ] Create `OpenRouterRunner` class
+- [ ] Add model selection for free tier
+- [ ] Handle rate limits gracefully
+
+#### Groq (Best for Speed)
+**Fast inference, generous free tier**
+
+```python
+from agno.models.groq import Groq
+
+model = Groq(id="llama-3.3-70b-versatile")
+```
+
+Models: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`
+
+**Tasks:**
+- [ ] Create `GroqRunner` class
+- [ ] Excellent for multi-step agents (speed)
+- [ ] Benchmark against Claude/Gemini
+
+#### Google Gemini Free Tier (Best for Context)
+**Already integrated - optimize for free tier**
+
+```python
+from agno.models.google import Gemini
+
+model = Gemini(id="gemini-1.5-flash")
+```
+
+- 1M+ token context window
+- Generous free rate limits
+
+### Provider Comparison
+
+| Provider | Speed | Free Models | Context | Best For |
+|----------|-------|-------------|---------|----------|
+| OpenRouter | Medium | 20+ | Varies | Experimentation |
+| Groq | ⚡ Fast | 3-5 | 32K-128K | Multi-step agents |
+| Gemini | Fast | 2-3 | 1M+ | Large documents |
+| Claude | Medium | 0 | 200K | Quality/reasoning |
+| Ollama | Varies | All local | Varies | Privacy/offline |
+
+### Implementation Order
+
+1. **Now**: Use Claude + Gemini to build Email Scoring and JobScan services
+2. **Next**: Add Groq for speed improvements
+3. **Then**: Add OpenRouter for model variety
+4. **Later**: Multi-provider fallback and cost tracking
+
+### API Keys Required
+
+| Provider | Environment Variable | Get Key From |
+|----------|---------------------|--------------|
+| Anthropic | `ANTHROPIC_API_KEY` | console.anthropic.com |
+| Google | `GEMINI_API_KEY` | aistudio.google.com/apikey |
+| Groq | `GROQ_API_KEY` | console.groq.com |
+| OpenRouter | `OPENROUTER_API_KEY` | openrouter.ai/keys |
+
+---
+
 ## References
 
 - [Agno Documentation](https://docs.agno.com)
