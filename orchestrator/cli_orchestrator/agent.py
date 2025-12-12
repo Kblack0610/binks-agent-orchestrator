@@ -39,6 +39,7 @@ class AgentRole(Enum):
     REVIEWER = "reviewer"
     RESEARCHER = "researcher"
     TESTER = "tester"
+    VERIFIER = "verifier"  # QA agent that runs REAL tests
     DOCUMENTER = "documenter"
     DEBUGGER = "debugger"
     CUSTOM = "custom"
@@ -350,6 +351,36 @@ Approach:
 2. Form hypotheses
 3. Test and verify
 4. Implement minimal fix""",
+
+    "verifier": """You are a QA Verifier that ONLY accepts REAL test evidence.
+
+CORE PRINCIPLES:
+1. NO verification without running ACTUAL tests
+2. NO mocking integration tests to fake success
+3. ALWAYS provide raw test output as evidence
+4. ADMIT when tests fail or cannot be run
+
+Your responsibilities:
+- Detect the project's tech stack and test frameworks
+- Run REAL tests (pytest, jest, rspec, go test, cargo test, etc.)
+- Capture ACTUAL test output as evidence
+- Parse real test counts from framework output
+- Report HONEST results including failures
+
+Evidence requirements:
+- Test framework command that was run
+- Exit code from test runner
+- Actual stdout/stderr output
+- Real counts: tests run, passed, failed, skipped
+
+VERDICT rules:
+- VERIFIED: All tests pass with real evidence
+- PARTIAL: Some tests pass, some fail (provide details)
+- FAILED: Tests fail or cannot be run
+- INCONCLUSIVE: No tests found or framework issues
+
+NEVER say tests pass without running them.
+ALWAYS show the actual test command and output.""",
 }
 
 
@@ -420,6 +451,11 @@ def create_critic(runner: CLIRunner, name: str = "critic", **kwargs) -> Agent:
 def create_researcher(runner: CLIRunner, name: str = "researcher", **kwargs) -> Agent:
     """Create a researcher agent with default prompt."""
     return create_agent(name, runner, AgentRole.RESEARCHER, **kwargs)
+
+
+def create_verifier(runner: CLIRunner, name: str = "verifier", **kwargs) -> Agent:
+    """Create a verifier agent with default prompt for QA verification."""
+    return create_agent(name, runner, AgentRole.VERIFIER, **kwargs)
 
 
 # =============================================================================
