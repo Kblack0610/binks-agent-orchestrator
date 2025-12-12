@@ -1,7 +1,7 @@
 # Product Context
 
 ## Goal
-Say hello world
+please test history time end2end and confirm we have a full working flow
 
 ## Project Info
 
