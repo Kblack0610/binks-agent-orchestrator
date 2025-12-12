@@ -32,6 +32,22 @@ from .benchmark import (
     BenchmarkComparison,
 )
 
+from . import config
+from .config import (
+    ConfigManager,
+    FeatureFlag,
+    get_config,
+    is_enabled,
+    enable,
+    disable,
+    toggle,
+    use_meritocratic_selection,
+    use_cost_tracking,
+    is_debug,
+    get_role_model,
+    set_role_model,
+)
+
 __all__ = [
     # Agent
     "Agent",
@@ -58,4 +74,18 @@ __all__ = [
     "Benchmarker",
     "BenchmarkResult",
     "BenchmarkComparison",
+    # Config
+    "config",
+    "ConfigManager",
+    "FeatureFlag",
+    "get_config",
+    "is_enabled",
+    "enable",
+    "disable",
+    "toggle",
+    "use_meritocratic_selection",
+    "use_cost_tracking",
+    "is_debug",
+    "get_role_model",
+    "set_role_model",
 ]
