@@ -11,7 +11,13 @@ from .agent import (
     create_critic,
     create_researcher,
     create_verifier,
+    create_triage,
+    create_planner,
+    create_gatekeeper,
+    create_judge,
     PROMPTS,
+    WORKFLOWS,
+    ROLE_DESCRIPTIONS,
 )
 
 from .model_evaluator import (
@@ -41,6 +47,7 @@ from .config import (
     enable,
     disable,
     toggle,
+    use_response_scoring,
     use_meritocratic_selection,
     use_cost_tracking,
     is_debug,
@@ -59,7 +66,13 @@ __all__ = [
     "create_critic",
     "create_researcher",
     "create_verifier",
+    "create_triage",
+    "create_planner",
+    "create_gatekeeper",
+    "create_judge",
     "PROMPTS",
+    "WORKFLOWS",
+    "ROLE_DESCRIPTIONS",
     # Model Evaluator
     "ModelEvaluator",
     "Gatekeeper",
@@ -83,6 +96,7 @@ __all__ = [
     "enable",
     "disable",
     "toggle",
+    "use_response_scoring",
     "use_meritocratic_selection",
     "use_cost_tracking",
     "is_debug",

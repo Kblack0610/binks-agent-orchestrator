@@ -322,6 +322,127 @@ Be thorough but practical.""",
             "actionable_plan": "Is the implementation plan clear and ordered?",
         }
     },
+
+    "triage": {
+        "prompt": """You are a workflow router. For each task below, select the appropriate workflow.
+
+AVAILABLE WORKFLOWS:
+- QUICK: No agents needed. Direct answer for simple questions.
+- SIMPLE: executor only. Small, well-defined tasks.
+- STANDARD: architect → executor → critic. Features that need design.
+- FULL: planner → architect → executor → critic → gatekeeper → judge. Complex/unclear requirements.
+- DEBUG: debugger → executor → verifier. Bug reports, errors.
+- RESEARCH: researcher → documenter. Information gathering, documentation.
+- REVIEW: critic → gatekeeper → judge. PR reviews, code audits.
+- TEST: tester → executor → verifier. Test creation, coverage.
+
+TASKS TO ROUTE:
+1. "What is 2+2?"
+2. "Build authentication system with OAuth, JWT, and role-based access control"
+3. "Add a print statement to debug this function"
+4. "Why is this test failing? Here's the stack trace: TypeError..."
+5. "How does the React useEffect hook work? When should I use it?"
+
+For EACH task, respond with a JSON object:
+{
+  "task": 1,
+  "workflow": "WORKFLOW_NAME",
+  "roles": ["role1", "role2"],
+  "reasoning": "Brief explanation"
+}
+
+Expected routing:
+- Task 1: QUICK (simple math)
+- Task 2: FULL (complex system, needs planning)
+- Task 3: SIMPLE (small change)
+- Task 4: DEBUG (bug investigation)
+- Task 5: RESEARCH (information gathering)""",
+        "requirements": {
+            "min_length": 400,
+            "must_contain": ["workflow", "roles", "reasoning"],
+            "valid_json_objects": 5,  # Should output 5 JSON objects
+            "correct_workflow_mapping": {
+                1: "QUICK",
+                2: "FULL",
+                3: "SIMPLE",
+                4: "DEBUG",
+                5: "RESEARCH",
+            }
+        },
+        "rubric": {
+            "workflow_accuracy": "Does it select the correct workflow for each task?",
+            "role_accuracy": "Are the role sequences correct for each workflow?",
+            "reasoning_quality": "Is the reasoning logical and explains the choice?",
+            "json_format": "Does it output valid JSON as specified?",
+        }
+    },
+
+    "gatekeeper": {
+        "prompt": """You are validating a response against these requirements:
+- Minimum 200 characters
+- Must contain: "function", "return", "parameter"
+- Must have at least one code block
+
+Response to validate:
+'''
+Here's a simple function:
+
+```python
+def add(a, b):
+    return a + b
+```
+
+This function takes two parameters and returns their sum.
+'''
+
+Provide your validation result.""",
+        "requirements": {
+            "min_length": 100,
+            "must_contain": ["GATE", "PASS", "check"],
+            "has_validation_output": True,
+        },
+        "rubric": {
+            "accuracy": "Does it correctly identify what passes/fails?",
+            "specificity": "Does it list specific checks performed?",
+            "format": "Does it follow the expected output format?",
+            "completeness": "Does it check all requirements?",
+        }
+    },
+
+    "judge": {
+        "prompt": """Evaluate this code review response using these criteria:
+- Bug detection: Did it find issues?
+- Actionable feedback: Are suggestions specific?
+- Professionalism: Is the tone appropriate?
+
+Response to evaluate:
+'''
+This code has several issues:
+1. Using eval() is a security vulnerability
+2. The file is never closed (should use context manager)
+3. .contains() should be "in" operator
+
+Recommendations:
+- Replace eval() with json.loads()
+- Use "with open(...) as f:"
+- Change to: if '@' in email
+
+VERDICT: FAIL
+'''
+
+Score each criterion 1-10 and provide overall assessment.""",
+        "requirements": {
+            "min_length": 200,
+            "must_contain": ["score", "OVERALL", "/10"],
+            "has_per_criterion_scores": True,
+        },
+        "rubric": {
+            "objectivity": "Are scores fair and justified?",
+            "consistency": "Do scores align with the feedback given?",
+            "format_adherence": "Does it follow the scoring format?",
+            "actionable_feedback": "Does it provide useful meta-feedback?",
+        }
+    },
 }
 
 

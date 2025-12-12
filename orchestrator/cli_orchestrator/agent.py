@@ -31,18 +31,118 @@ class AgentRole(Enum):
 
     These are purely for organization and filtering - the actual behavior
     is defined by the system_prompt, not the role.
+
+    See docs/ROLES.md for comprehensive role documentation.
     """
-    ARCHITECT = "architect"
-    EXECUTOR = "executor"
-    IMPLEMENTER = "implementer"
-    CRITIC = "critic"
-    REVIEWER = "reviewer"
+    # Workflow Roles
+    TRIAGE = "triage"        # Entry point: routes simple vs complex tasks
+    PLANNER = "planner"      # Requirements gathering and clarification
+    ARCHITECT = "architect"  # Solution design
+    EXECUTOR = "executor"    # Implementation
+    IMPLEMENTER = "implementer"  # Alias for executor
+    CRITIC = "critic"        # Code review
+    REVIEWER = "reviewer"    # Alias for critic
+
+    # Evaluation Roles
+    GATEKEEPER = "gatekeeper"  # Fast heuristic validation
+    JUDGE = "judge"            # LLM-based quality scoring
+
+    # Utility Roles
     RESEARCHER = "researcher"
     TESTER = "tester"
-    VERIFIER = "verifier"  # QA agent that runs REAL tests
+    VERIFIER = "verifier"    # QA agent that runs REAL tests
     DOCUMENTER = "documenter"
     DEBUGGER = "debugger"
     CUSTOM = "custom"
+
+
+# =============================================================================
+# WORKFLOWS - Predefined role sequences for common task patterns
+# =============================================================================
+# Each workflow is a list of role names that will be executed in order.
+# Triage uses these to route tasks to the appropriate workflow.
+# =============================================================================
+
+WORKFLOWS = {
+    # Direct answer - no agents needed
+    "quick": {
+        "description": "Direct answer, no agent workflow needed",
+        "roles": [],
+        "use_when": "Simple questions, math, definitions, one-line answers",
+        "examples": ["What is 2+2?", "Convert 5km to miles", "What does 'async' mean?"]
+    },
+
+    # Simple implementation - just execute
+    "simple": {
+        "description": "Quick implementation without design phase",
+        "roles": ["executor"],
+        "use_when": "Small, well-defined tasks with clear requirements",
+        "examples": ["Add a print statement", "Rename this variable", "Fix this typo"]
+    },
+
+    # Standard development - design, implement, review
+    "standard": {
+        "description": "Standard development workflow with design and review",
+        "roles": ["architect", "executor", "critic"],
+        "use_when": "Features that need design but aren't massive",
+        "examples": ["Add a new API endpoint", "Implement a caching layer", "Create a config system"]
+    },
+
+    # Full workflow - planning through evaluation
+    "full": {
+        "description": "Complete workflow with planning, implementation, and evaluation",
+        "roles": ["planner", "architect", "executor", "critic", "gatekeeper", "judge"],
+        "use_when": "Complex features, unclear requirements, critical systems",
+        "examples": ["Build authentication system", "Design a plugin architecture", "Implement payment processing"]
+    },
+
+    # Debug workflow - diagnose and fix
+    "debug": {
+        "description": "Debugging workflow for investigating and fixing issues",
+        "roles": ["debugger", "executor", "verifier"],
+        "use_when": "Bug reports, errors, unexpected behavior",
+        "examples": ["Fix this stack trace", "Why is this test failing?", "Debug memory leak"]
+    },
+
+    # Research workflow - investigate and document
+    "research": {
+        "description": "Research and documentation workflow",
+        "roles": ["researcher", "documenter"],
+        "use_when": "Information gathering, documentation, analysis",
+        "examples": ["How does X library work?", "Document this codebase", "Compare these approaches"]
+    },
+
+    # Review workflow - critic + evaluation
+    "review": {
+        "description": "Code review and quality assessment",
+        "roles": ["critic", "gatekeeper", "judge"],
+        "use_when": "PR reviews, code audits, quality checks",
+        "examples": ["Review this PR", "Audit security of this module", "Assess code quality"]
+    },
+
+    # Test workflow - create and run tests
+    "test": {
+        "description": "Testing workflow for creating and verifying tests",
+        "roles": ["tester", "executor", "verifier"],
+        "use_when": "Test creation, test fixes, coverage improvements",
+        "examples": ["Write tests for this function", "Fix failing tests", "Improve test coverage"]
+    },
+}
+
+# Role descriptions for triage to understand what each role does
+ROLE_DESCRIPTIONS = {
+    "planner": "Gathers requirements, asks clarifying questions, defines specifications",
+    "architect": "Designs solutions, defines structure, plans implementation approach",
+    "executor": "Implements code, writes the actual solution",
+    "critic": "Reviews code for quality, bugs, and improvements",
+    "gatekeeper": "Fast validation checks - syntax, requirements met, basic quality",
+    "judge": "Deep quality scoring against rubric criteria",
+    "researcher": "Gathers information, investigates libraries, explores options",
+    "debugger": "Diagnoses issues, traces errors, identifies root causes",
+    "tester": "Writes test cases, designs test strategies",
+    "verifier": "Runs actual tests, validates implementations work",
+    "documenter": "Writes documentation, explains code, creates guides",
+}
 
 
 @dataclass
@@ -381,6 +481,119 @@ VERDICT rules:
 
 NEVER say tests pass without running them.
 ALWAYS show the actual test command and output.""",
+
+    "triage": """You are a workflow router. Given a task, select the appropriate workflow.
+
+AVAILABLE ROLES:
+- planner: Gathers requirements, asks clarifying questions, defines specifications
+- architect: Designs solutions, defines structure, plans implementation approach
+- executor: Implements code, writes the actual solution
+- critic: Reviews code for quality, bugs, and improvements
+- gatekeeper: Fast validation checks - syntax, requirements met, basic quality
+- judge: Deep quality scoring against rubric criteria
+- researcher: Gathers information, investigates libraries, explores options
+- debugger: Diagnoses issues, traces errors, identifies root causes
+- tester: Writes test cases, designs test strategies
+- verifier: Runs actual tests, validates implementations work
+- documenter: Writes documentation, explains code, creates guides
+
+PREDEFINED WORKFLOWS:
+- QUICK: No agents needed. Direct answer for simple questions, math, definitions.
+  Examples: "What is 2+2?", "Convert 5km to miles", "What does 'async' mean?"
+
+- SIMPLE: executor only. Small, well-defined tasks with clear requirements.
+  Examples: "Add a print statement", "Rename this variable", "Fix this typo"
+
+- STANDARD: architect → executor → critic. Features that need design but aren't massive.
+  Examples: "Add a new API endpoint", "Implement a caching layer", "Create a config system"
+
+- FULL: planner → architect → executor → critic → gatekeeper → judge. Complex features, unclear requirements.
+  Examples: "Build authentication system", "Design a plugin architecture", "Implement payment processing"
+
+- DEBUG: debugger → executor → verifier. Bug reports, errors, unexpected behavior.
+  Examples: "Fix this stack trace", "Why is this test failing?", "Debug memory leak"
+
+- RESEARCH: researcher → documenter. Information gathering, documentation, analysis.
+  Examples: "How does X library work?", "Document this codebase", "Compare these approaches"
+
+- REVIEW: critic → gatekeeper → judge. PR reviews, code audits, quality checks.
+  Examples: "Review this PR", "Audit security of this module", "Assess code quality"
+
+- TEST: tester → executor → verifier. Test creation, test fixes, coverage improvements.
+  Examples: "Write tests for this function", "Fix failing tests", "Improve test coverage"
+
+YOUR RESPONSE FORMAT:
+You MUST respond with a JSON object:
+
+{
+  "workflow": "<WORKFLOW_NAME or CUSTOM>",
+  "roles": ["role1", "role2", ...],
+  "reasoning": "Brief explanation of why this workflow fits the task",
+  "answer": "If QUICK workflow, provide the direct answer here. Otherwise null."
+}
+
+RULES:
+1. For predefined workflows, set "workflow" to the name and "roles" to its role sequence
+2. For custom workflows, set "workflow" to "CUSTOM" and specify your own "roles" array
+3. For QUICK workflow, "roles" should be [] and provide "answer" directly
+4. Always explain your reasoning
+5. When in doubt, prefer simpler workflows - don't over-engineer""",
+
+    "planner": """You are a requirements analyst and planner.
+
+Your responsibilities:
+- Identify missing or unclear requirements
+- Ask targeted clarifying questions
+- Map out key technical decisions
+- Propose implementation order
+
+Before any implementation:
+1. What requirements need to be gathered?
+2. What questions would you ask the user?
+3. What are the key implementation decisions?
+4. What's the proposed implementation order?
+
+Be thorough but practical. Focus on what's needed to proceed, not perfection.""",
+
+    "gatekeeper": """You are a quality gatekeeper performing fast validation.
+
+Your responsibilities:
+- Check responses meet minimum requirements
+- Verify required elements are present
+- Validate structure and format
+- Provide quick pass/fail with specific failures
+
+Check for:
+- Minimum length/content
+- Required keywords or concepts
+- Proper structure (headers, code blocks, etc.)
+- Completeness of the response
+
+Output format:
+GATE: PASS or GATE: FAIL
+Checks: [list of checks performed]
+Failures: [list of specific failures if any]""",
+
+    "judge": """You are an expert evaluator assessing response quality.
+
+For each rubric criterion, provide:
+1. A score from 1-10
+2. Brief justification
+
+Be objective and consistent. A score of:
+- 1-3: Poor, major issues
+- 4-5: Below average, needs improvement
+- 6-7: Acceptable, meets basic requirements
+- 8-9: Good, exceeds expectations
+- 10: Excellent, exceptional quality
+
+Provide your evaluation as:
+SCORES:
+- [criterion]: [score]/10 - [justification]
+OVERALL: [average]/10
+STRENGTHS: [list strengths]
+WEAKNESSES: [list weaknesses]
+SUMMARY: [brief overall assessment]""",
 }
 
 
@@ -456,6 +669,26 @@ def create_researcher(runner: CLIRunner, name: str = "researcher", **kwargs) -> 
 def create_verifier(runner: CLIRunner, name: str = "verifier", **kwargs) -> Agent:
     """Create a verifier agent with default prompt for QA verification."""
     return create_agent(name, runner, AgentRole.VERIFIER, **kwargs)
+
+
+def create_triage(runner: CLIRunner, name: str = "triage", **kwargs) -> Agent:
+    """Create a triage agent that routes simple vs complex tasks."""
+    return create_agent(name, runner, AgentRole.TRIAGE, **kwargs)
+
+
+def create_planner(runner: CLIRunner, name: str = "planner", **kwargs) -> Agent:
+    """Create a planner agent for requirements gathering."""
+    return create_agent(name, runner, AgentRole.PLANNER, **kwargs)
+
+
+def create_gatekeeper(runner: CLIRunner, name: str = "gatekeeper", **kwargs) -> Agent:
+    """Create a gatekeeper agent for fast validation."""
+    return create_agent(name, runner, AgentRole.GATEKEEPER, **kwargs)
+
+
+def create_judge(runner: CLIRunner, name: str = "judge", **kwargs) -> Agent:
+    """Create a judge agent for LLM-based quality scoring."""
+    return create_agent(name, runner, AgentRole.JUDGE, **kwargs)
 
 
 # =============================================================================

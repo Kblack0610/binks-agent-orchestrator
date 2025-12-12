@@ -36,19 +36,20 @@ from enum import Enum
 class FeatureFlag(Enum):
     """Available feature flags."""
 
-    # Model Selection
-    MERITOCRATIC_SELECTION = "meritocratic_selection"
-    COST_TRACKING = "cost_tracking"
-    AUTO_FALLBACK = "auto_fallback"
+    # Scoring & Evaluation (separate from selection!)
+    RESPONSE_SCORING = "response_scoring"      # Score every response (Gatekeeper + Judge)
+    AUTO_BENCHMARK = "auto_benchmark"          # Run benchmarks automatically
+    STRICT_GATEKEEPER = "strict_gatekeeper"    # Stricter heuristic validation
+
+    # Model Selection (uses scores, but separate concern)
+    MERITOCRATIC_SELECTION = "meritocratic_selection"  # Select models based on scores
+    COST_TRACKING = "cost_tracking"            # Track costs per model
+    AUTO_FALLBACK = "auto_fallback"            # Auto fallback on failure
 
     # Debugging & Logging
     DEBUG_MODE = "debug_mode"
     VERBOSE_LOGGING = "verbose_logging"
     LOG_RESPONSES = "log_responses"
-
-    # Evaluation
-    AUTO_BENCHMARK = "auto_benchmark"
-    STRICT_GATEKEEPER = "strict_gatekeeper"
 
     # Agent Behavior
     MULTI_AGENT_MODE = "multi_agent_mode"
@@ -60,19 +61,20 @@ class FeatureFlag(Enum):
 
 # Default values for all flags
 DEFAULT_FLAGS: Dict[str, bool] = {
+    # Scoring & Evaluation - OFF by default (enable to score responses)
+    "response_scoring": False,      # Score every response with Gatekeeper + Judge
+    "auto_benchmark": False,        # Run benchmarks automatically
+    "strict_gatekeeper": False,     # Stricter heuristic validation
+
     # Model Selection - OFF by default until benchmarks are run
-    "meritocratic_selection": False,
-    "cost_tracking": True,
-    "auto_fallback": False,
+    "meritocratic_selection": False,  # Select models based on scores
+    "cost_tracking": True,            # Track costs per model
+    "auto_fallback": False,           # Auto fallback on failure
 
     # Debugging - OFF by default
     "debug_mode": False,
     "verbose_logging": False,
     "log_responses": False,
-
-    # Evaluation
-    "auto_benchmark": False,
-    "strict_gatekeeper": False,
 
     # Agent Behavior
     "multi_agent_mode": True,
@@ -452,8 +454,13 @@ def list_flags() -> Dict[str, bool]:
 # Feature-Specific Helpers
 # =============================================================================
 
+def use_response_scoring() -> bool:
+    """Check if response scoring is enabled (Gatekeeper + Judge evaluation)."""
+    return is_enabled("response_scoring")
+
+
 def use_meritocratic_selection() -> bool:
-    """Check if meritocratic model selection is enabled."""
+    """Check if meritocratic model selection is enabled (uses scores to pick models)."""
     return is_enabled("meritocratic_selection")
 
 
