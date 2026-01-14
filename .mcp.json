@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "kubernetes": {
+      "command": "npx",
+      "args": ["-y", "kubernetes-mcp-server@latest"],
+      "env": {
+        "KUBECONFIG": "${HOME}/.kube/config"
+      }
+    },
+    "ssh": {
+      "command": "npx",
+      "args": ["@aiondadotcom/mcp-ssh"]
+    }
+  }
+}

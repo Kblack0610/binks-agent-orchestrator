@@ -46,11 +46,14 @@ class GeminiRunner(CLIRunner):
     def __init__(
         self,
         backend: str = "api",
-        model: str = "gemini-1.5-pro",
+        model: Optional[str] = None,  # None = use CLI default, or specify e.g. "gemini-2.5-pro"
         working_dir: Optional[Path] = None,
         timeout: int = 300,
         debug: bool = False,
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        yolo_mode: bool = True,  # Skip permission prompts for automated runs
+        allowed_mcp_servers: Optional[List[str]] = None,  # MCP server names to enable
+        output_format: str = "text",  # text, json, stream-json (text works better with CLI)
     ):
         # Normalize backend name
         if backend == "cli":
@@ -70,6 +73,9 @@ class GeminiRunner(CLIRunner):
         self.backend = backend
         self.model = model
         self.api_key = api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        self.yolo_mode = yolo_mode
+        self.allowed_mcp_servers = allowed_mcp_servers
+        self.output_format = output_format
 
     def is_available(self) -> bool:
         """Check if the configured Gemini backend is available."""
@@ -122,7 +128,9 @@ class GeminiRunner(CLIRunner):
             start_time = time.time()
 
             genai.configure(api_key=self.api_key)
-            model = genai.GenerativeModel(self.model)
+            # Use the configured model, fall back to gemini-1.5-pro for API
+            model_name = self.model or "gemini-1.5-pro"
+            model = genai.GenerativeModel(model_name)
 
             response = model.generate_content(prompt)
 
@@ -197,6 +205,8 @@ class GeminiRunner(CLIRunner):
         The Gemini CLI (https://github.com/google-gemini/gemini-cli) uses:
         - `gemini "prompt"` for one-shot queries
         - `gemini -m model "prompt"` for specific model
+        - `--yolo` to skip permission prompts
+        - `--allowed-mcp-server-names` for MCP support
         """
         import time
 
@@ -205,9 +215,22 @@ class GeminiRunner(CLIRunner):
         # Build command - Gemini CLI takes prompt as positional argument
         cmd = ["gemini"]
 
-        # Add model if specified (not default)
-        if self.model and self.model != "gemini-1.5-pro":
+        # Add model if specified
+        if self.model:
             cmd.extend(["-m", self.model])
+
+        # Add output format
+        if self.output_format:
+            cmd.extend(["-o", self.output_format])
+
+        # Skip permission prompts for automated execution
+        if self.yolo_mode:
+            cmd.append("--yolo")
+
+        # Add MCP servers if specified
+        if self.allowed_mcp_servers:
+            for server in self.allowed_mcp_servers:
+                cmd.extend(["--allowed-mcp-server-names", server])
 
         # Add the prompt as positional argument
         cmd.append(prompt)
@@ -225,6 +248,10 @@ class GeminiRunner(CLIRunner):
                 error=stderr or f"Exit code: {returncode}"
             )
 
+        # Parse JSON output if that's the format
+        if self.output_format == "json":
+            return self._parse_json_output(stdout, execution_time)
+
         return RunnerResult(
             content=stdout.strip(),
             backend="gemini-cli",
@@ -233,6 +260,39 @@ class GeminiRunner(CLIRunner):
             success=True,
             raw_output=stdout
         )
+
+    def _parse_json_output(self, stdout: str, execution_time: float) -> RunnerResult:
+        """Parse JSON output from Gemini CLI."""
+        import json as json_module
+        try:
+            data = json_module.loads(stdout)
+
+            # Extract content from response structure
+            content = ""
+            if isinstance(data, dict):
+                content = data.get("result", data.get("content", data.get("message", "")))
+            elif isinstance(data, str):
+                content = data
+
+            return RunnerResult(
+                content=content,
+                backend="gemini-cli",
+                model=self.model,
+                execution_time=execution_time,
+                success=True,
+                raw_output=stdout,
+                metadata=data if isinstance(data, dict) else {}
+            )
+        except json_module.JSONDecodeError:
+            # Fallback to plain text
+            return RunnerResult(
+                content=stdout.strip(),
+                backend="gemini-cli",
+                model=self.model,
+                execution_time=execution_time,
+                success=True,
+                raw_output=stdout
+            )
 
 
 def check_gemini_availability() -> dict:

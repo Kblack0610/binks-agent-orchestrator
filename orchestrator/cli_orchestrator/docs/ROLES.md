@@ -37,12 +37,12 @@ Workflows are defined in `WORKFLOWS` constant in `agent.py`.
 **Examples**: "Add a print statement", "Rename this variable", "Fix this typo"
 
 ### STANDARD
-**Roles**: `["architect", "executor", "critic"]`
+**Roles**: `["architect", "executor", "verifier", "critic"]`
 **Use When**: Features that need design but aren't massive
 **Examples**: "Add a new API endpoint", "Implement a caching layer", "Create a config system"
 
 ### FULL
-**Roles**: `["planner", "architect", "executor", "critic", "gatekeeper", "judge"]`
+**Roles**: `["planner", "architect", "executor", "verifier", "critic", "gatekeeper", "judge"]`
 **Use When**: Complex features, unclear requirements, critical systems
 **Examples**: "Build authentication system", "Design a plugin architecture", "Implement payment processing"
 
@@ -74,7 +74,7 @@ Triage can also create custom workflows by specifying any sequence of roles.
 from cli_orchestrator import WORKFLOWS
 
 standard = WORKFLOWS["standard"]
-print(standard["roles"])  # ["architect", "executor", "critic"]
+print(standard["roles"])  # ["architect", "executor", "verifier", "critic"]
 print(standard["description"])  # "Standard development workflow..."
 ```
 
@@ -108,8 +108,8 @@ AVAILABLE ROLES:
 PREDEFINED WORKFLOWS:
 - QUICK: No agents needed. Direct answer for simple questions, math, definitions.
 - SIMPLE: executor only. Small, well-defined tasks with clear requirements.
-- STANDARD: architect → executor → critic. Features that need design but aren't massive.
-- FULL: planner → architect → executor → critic → gatekeeper → judge. Complex features.
+- STANDARD: architect → executor → verifier → critic. Features that need design but aren't massive.
+- FULL: planner → architect → executor → verifier → critic → gatekeeper → judge. Complex features.
 - DEBUG: debugger → executor → verifier. Bug reports, errors, unexpected behavior.
 - RESEARCH: researcher → documenter. Information gathering, documentation, analysis.
 - REVIEW: critic → gatekeeper → judge. PR reviews, code audits, quality checks.
@@ -628,8 +628,8 @@ def create_new_role(name: str, runner: CLIRunner) -> Agent:
 |-----------|----------|-------|
 | Quick question/math | QUICK | `[]` (direct answer) |
 | Small code change | SIMPLE | `executor` |
-| New feature | STANDARD | `architect → executor → critic` |
-| Complex system | FULL | `planner → architect → executor → critic → gatekeeper → judge` |
+| New feature | STANDARD | `architect → executor → verifier → critic` |
+| Complex system | FULL | `planner → architect → executor → verifier → critic → gatekeeper → judge` |
 | Bug investigation | DEBUG | `debugger → executor → verifier` |
 | Information gathering | RESEARCH | `researcher → documenter` |
 | Code review/audit | REVIEW | `critic → gatekeeper → judge` |

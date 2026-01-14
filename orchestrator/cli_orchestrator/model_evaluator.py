@@ -329,8 +329,8 @@ Be thorough but practical.""",
 AVAILABLE WORKFLOWS:
 - QUICK: No agents needed. Direct answer for simple questions.
 - SIMPLE: executor only. Small, well-defined tasks.
-- STANDARD: architect → executor → critic. Features that need design.
-- FULL: planner → architect → executor → critic → gatekeeper → judge. Complex/unclear requirements.
+- STANDARD: architect → executor → verifier → critic. Features that need design.
+- FULL: planner → architect → executor → verifier → critic → gatekeeper → judge. Complex/unclear requirements.
 - DEBUG: debugger → executor → verifier. Bug reports, errors.
 - RESEARCH: researcher → documenter. Information gathering, documentation.
 - REVIEW: critic → gatekeeper → judge. PR reviews, code audits.

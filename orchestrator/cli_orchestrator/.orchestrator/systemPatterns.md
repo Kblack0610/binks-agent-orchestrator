@@ -34,8 +34,8 @@ User Request
 |----------|-------|----------|
 | **QUICK** | `[]` | Simple questions, math, definitions |
 | **SIMPLE** | `executor` | Small, well-defined code changes |
-| **STANDARD** | `architect → executor → critic` | Features needing design |
-| **FULL** | `planner → architect → executor → critic → gatekeeper → judge` | Complex systems |
+| **STANDARD** | `architect → executor → verifier → critic` | Features needing design |
+| **FULL** | `planner → architect → executor → verifier → critic → gatekeeper → judge` | Complex systems |
 | **DEBUG** | `debugger → executor → verifier` | Bug investigation |
 | **RESEARCH** | `researcher → documenter` | Information gathering |
 | **REVIEW** | `critic → gatekeeper → judge` | Code reviews/audits |
@@ -59,7 +59,7 @@ The Triage role routes requests by selecting a workflow:
 Task arrives → Triage analyzes → Outputs JSON:
 {
   "workflow": "STANDARD",
-  "roles": ["architect", "executor", "critic"],
+  "roles": ["architect", "executor", "verifier", "critic"],
   "reasoning": "Feature needs design but isn't complex enough for full workflow",
   "answer": null
 }

@@ -80,18 +80,18 @@ WORKFLOWS = {
         "examples": ["Add a print statement", "Rename this variable", "Fix this typo"]
     },
 
-    # Standard development - design, implement, review
+    # Standard development - design, implement, test, review
     "standard": {
-        "description": "Standard development workflow with design and review",
-        "roles": ["architect", "executor", "critic"],
+        "description": "Standard development workflow with design, testing, and review",
+        "roles": ["architect", "executor", "verifier", "critic"],
         "use_when": "Features that need design but aren't massive",
         "examples": ["Add a new API endpoint", "Implement a caching layer", "Create a config system"]
     },
 
     # Full workflow - planning through evaluation
     "full": {
-        "description": "Complete workflow with planning, implementation, and evaluation",
-        "roles": ["planner", "architect", "executor", "critic", "gatekeeper", "judge"],
+        "description": "Complete workflow with planning, implementation, testing, and evaluation",
+        "roles": ["planner", "architect", "executor", "verifier", "critic", "gatekeeper", "judge"],
         "use_when": "Complex features, unclear requirements, critical systems",
         "examples": ["Build authentication system", "Design a plugin architecture", "Implement payment processing"]
     },
@@ -400,7 +400,21 @@ Your responsibilities:
 Focus on:
 - Correctness first, optimization second
 - Consistent style with the existing codebase
-- Minimal, focused changes that accomplish the task""",
+- Minimal, focused changes that accomplish the task
+
+OUTPUT FORMAT (CRITICAL):
+- Output your code directly in markdown code blocks
+- Do NOT ask for permission or confirmation
+- Do NOT describe what the code does - just output the code
+- Start your response with the code block immediately
+- Use brief inline comments only where logic isn't obvious
+
+Example response:
+```python
+def example_function(param):
+    result = do_something(param)
+    return result
+```""",
 
     "critic": """You are a thorough code reviewer.
 
@@ -504,10 +518,10 @@ PREDEFINED WORKFLOWS:
 - SIMPLE: executor only. Small, well-defined tasks with clear requirements.
   Examples: "Add a print statement", "Rename this variable", "Fix this typo"
 
-- STANDARD: architect → executor → critic. Features that need design but aren't massive.
+- STANDARD: architect → executor → verifier → critic. Features that need design but aren't massive.
   Examples: "Add a new API endpoint", "Implement a caching layer", "Create a config system"
 
-- FULL: planner → architect → executor → critic → gatekeeper → judge. Complex features, unclear requirements.
+- FULL: planner → architect → executor → verifier → critic → gatekeeper → judge. Complex features, unclear requirements.
   Examples: "Build authentication system", "Design a plugin architecture", "Implement payment processing"
 
 - DEBUG: debugger → executor → verifier. Bug reports, errors, unexpected behavior.

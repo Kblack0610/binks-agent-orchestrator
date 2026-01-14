@@ -84,6 +84,37 @@ DEFAULT_FLAGS: Dict[str, bool] = {
     "experimental_features": False,
 }
 
+# =============================================================================
+# Default Role-to-Model Mapping
+# =============================================================================
+# Each role has a default model/runner assignment based on task complexity.
+# Priority: role_overrides > meritocratic_selection > DEFAULT_ROLE_MODELS
+#
+# Available runners: claude, gemini, groq, openrouter
+# =============================================================================
+
+DEFAULT_ROLE_MODELS: Dict[str, str] = {
+    # High-complexity roles - need best models
+    "judge": "claude",          # Quality evaluation requires highest capability
+    "architect": "claude",      # Complex design work needs strong reasoning
+    "gatekeeper": "claude",     # Quality gating needs good judgment
+
+    # Medium-complexity roles - good free models work well
+    "critic": "gemini",         # Code review - Gemini is good and free via CLI
+    "planner": "gemini",        # Requirements gathering
+    "executor": "gemini",       # Implementation - Gemini is fast and free
+    "researcher": "gemini",     # Information gathering - Gemini excels here
+
+    # Lower-complexity roles - fast/free models preferred
+    # Note: Using gemini for now since groq requires API key setup
+    "triage": "gemini",         # Simple routing decision
+    "debugger": "gemini",       # Pattern matching, fast iteration
+    "tester": "gemini",         # Test generation
+    "verifier": "gemini",       # Running checks
+    "documenter": "gemini",     # Documentation writing
+}
+
+
 # Default config values (non-boolean settings)
 DEFAULT_CONFIG: Dict[str, Any] = {
     # Model defaults
@@ -100,7 +131,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "gatekeeper_weight": 0.3,
     "judge_weight": 0.7,
 
-    # Role overrides (explicit model assignments)
+    # Role-to-model mapping (uses DEFAULT_ROLE_MODELS, can be overridden)
+    "role_models": DEFAULT_ROLE_MODELS.copy(),
+
+    # Role overrides (explicit assignments that override everything)
     "role_overrides": {},
 
     # Cost tracking
@@ -482,3 +516,74 @@ def get_role_model(role: str) -> Optional[str]:
 def set_role_model(role: str, model: str) -> None:
     """Set the model to use for a specific role."""
     get_config().set_role_override(role, model)
+
+
+def get_model_for_role(role: str) -> str:
+    """
+    Get the model name to use for a role.
+
+    Priority:
+    1. Explicit role overrides
+    2. DEFAULT_ROLE_MODELS
+    3. Falls back to default_model config
+
+    Note: meritocratic_selection can override this at the agent level,
+    but this function returns the default/configured model.
+
+    Args:
+        role: Role name (e.g., "executor", "architect", "judge")
+
+    Returns:
+        Model name (e.g., "claude", "gemini", "groq", "openrouter")
+    """
+    # Check explicit override first
+    override = get_config().get_role_override(role)
+    if override:
+        return override
+
+    # Check default role models
+    role_models = get_config().get("role_models", DEFAULT_ROLE_MODELS)
+    if role in role_models:
+        return role_models[role]
+
+    # Fall back to default model
+    return get_config().get("default_model", "claude")
+
+
+def get_runner_for_role(role: str):
+    """
+    Get a runner instance for the specified role.
+
+    This creates the appropriate CLIRunner based on the role-to-model mapping.
+
+    Args:
+        role: Role name (e.g., "executor", "architect", "judge")
+
+    Returns:
+        CLIRunner instance (ClaudeRunner, GeminiRunner, GroqRunner, OpenRouterRunner, or FactoryRunner)
+    """
+    # Import here to avoid circular imports
+    from cli_orchestrator.runners import (
+        ClaudeRunner, GeminiRunner, GroqRunner, OpenRouterRunner, FactoryRunner
+    )
+    import shutil
+
+    model = get_model_for_role(role)
+
+    if model == "claude":
+        return ClaudeRunner()
+    elif model == "gemini":
+        # Prefer CLI if available, fall back to API
+        if shutil.which("gemini"):
+            return GeminiRunner(backend="gemini")  # Use CLI
+        else:
+            return GeminiRunner(backend="api")  # Fall back to API
+    elif model == "groq":
+        return GroqRunner()
+    elif model == "openrouter":
+        return OpenRouterRunner()
+    elif model == "factory":
+        return FactoryRunner()
+    else:
+        # Default to Claude for unknown models
+        return ClaudeRunner()

@@ -20,7 +20,7 @@ from pathlib import Path
 
 # Handle imports for both module and standalone usage
 try:
-    from .runners import ClaudeRunner, GeminiRunner, CustomRunner
+    from .runners import ClaudeRunner, GeminiRunner, CustomRunner, FactoryRunner
     from .runners.custom_runner import OllamaRunner
     from .profiles import ProfileRegistry, create_default_registry
     from .orchestrator import (
@@ -35,7 +35,7 @@ try:
     from .agent import Agent, AgentRole, create_agent
     from .memory_bank import MemoryBank
 except ImportError:
-    from runners import ClaudeRunner, GeminiRunner, CustomRunner
+    from runners import ClaudeRunner, GeminiRunner, CustomRunner, FactoryRunner
     from runners.custom_runner import OllamaRunner
     from profiles import ProfileRegistry, create_default_registry
     from orchestrator import (
@@ -73,6 +73,10 @@ def check_available_backends() -> dict:
 
     ollama_home = OllamaRunner(host=OLLAMA_HOME)
     available["ollama-home"] = ollama_home.is_available()
+
+    # Factory Droid CLI
+    factory = FactoryRunner()
+    available["factory"] = factory.is_available()
 
     return available
 
@@ -275,6 +279,8 @@ def run_moa_workflow(
         runners["ollama"] = runners["ollama-local"]  # Alias for convenience
     if available.get("ollama-home"):
         runners["ollama-home"] = OllamaRunner(model=ollama_model, host=OLLAMA_HOME)
+    if available.get("factory"):
+        runners["factory"] = FactoryRunner(debug=debug)
 
     # Fallback logic
     if architect_backend not in runners:

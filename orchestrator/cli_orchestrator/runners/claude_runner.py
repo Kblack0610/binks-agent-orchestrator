@@ -31,7 +31,9 @@ class ClaudeRunner(CLIRunner):
         model: str = "sonnet",  # sonnet, opus, haiku
         output_format: str = "json",  # text, json, stream-json
         timeout: int = 600,
-        debug: bool = False
+        debug: bool = False,
+        skip_permissions: bool = True,  # Skip permission prompts for automated runs
+        mcp_config: Optional[str] = None,  # Path to MCP config JSON
     ):
         super().__init__(
             name="claude",
@@ -42,6 +44,8 @@ class ClaudeRunner(CLIRunner):
         )
         self.model = model
         self.output_format = output_format
+        self.skip_permissions = skip_permissions
+        self.mcp_config = mcp_config
 
     def is_available(self) -> bool:
         """Check if claude CLI is installed and accessible."""
@@ -79,6 +83,14 @@ class ClaudeRunner(CLIRunner):
             "-p",  # Print mode (headless)
             "--output-format", self.output_format,
         ]
+
+        # Skip permission prompts for automated execution
+        if self.skip_permissions:
+            cmd.append("--dangerously-skip-permissions")
+
+        # Add MCP config if specified
+        if self.mcp_config:
+            cmd.extend(["--mcp-config", self.mcp_config])
 
         # Resume session if requested and we have a session ID
         if resume_session and self._session_id:

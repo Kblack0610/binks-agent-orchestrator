@@ -1,7 +1,7 @@
 # Product Context
 
 ## Goal
-Write: print('hi')
+describe this repo
 
 ## Project Info
 
