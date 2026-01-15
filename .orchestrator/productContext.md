@@ -1,7 +1,7 @@
 # Product Context
 
 ## Goal
-describe this repo
+Say hello and confirm you can see this message
 
 ## Project Info
 
