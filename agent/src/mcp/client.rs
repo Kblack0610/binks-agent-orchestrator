@@ -148,9 +148,14 @@ impl McpClientPool {
         }
     }
 
-    /// Get list of configured server names
+    /// Get list of configured server names (excludes "agent" to prevent recursion)
     pub fn server_names(&self) -> Vec<String> {
-        self.config.mcp_servers.keys().cloned().collect()
+        self.config
+            .mcp_servers
+            .keys()
+            .filter(|name| *name != "agent") // Don't connect to ourselves
+            .cloned()
+            .collect()
     }
 
     /// List tools from a specific server
