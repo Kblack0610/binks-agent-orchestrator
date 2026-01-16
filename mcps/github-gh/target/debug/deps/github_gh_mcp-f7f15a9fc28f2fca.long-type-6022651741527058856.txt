@@ -1,0 +1,2 @@
+(Tool, for<'a> fn(&'a GitHubMcpServer, PrViewParams) -> Pin<Box<(dyn Future<Output = Result<rmcp::model::CallToolResult, ErrorData>> + Send + 'a)>> {GitHubMcpServer::gh_pr_view})
+(Tool, for<'a> fn(&'a GitHubMcpServer, PrViewParams) -> Pin<Box<(dyn Future<Output = Result<rmcp::model::CallToolResult, ErrorData>> + Send + 'a)>> {GitHubMcpServer::gh_pr_view}): IntoToolRoute<GitHubMcpServer, _>

@@ -10,6 +10,13 @@
     "ssh": {
       "command": "npx",
       "args": ["@aiondadotcom/mcp-ssh"]
+    },
+    "github-gh": {
+      "command": "./mcps/github-gh/target/release/github-gh-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      }
     }
   }
 }

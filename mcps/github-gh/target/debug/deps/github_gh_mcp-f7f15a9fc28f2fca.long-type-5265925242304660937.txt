@@ -1,0 +1,2 @@
+(Tool, for<'a> fn(&'a GitHubMcpServer, WorkflowListParams) -> Pin<Box<(dyn Future<Output = Result<rmcp::model::CallToolResult, ErrorData>> + Send + 'a)>> {GitHubMcpServer::gh_workflow_list})
+(Tool, for<'a> fn(&'a GitHubMcpServer, WorkflowListParams) -> Pin<Box<(dyn Future<Output = Result<rmcp::model::CallToolResult, ErrorData>> + Send + 'a)>> {GitHubMcpServer::gh_workflow_list}): IntoToolRoute<GitHubMcpServer, _>

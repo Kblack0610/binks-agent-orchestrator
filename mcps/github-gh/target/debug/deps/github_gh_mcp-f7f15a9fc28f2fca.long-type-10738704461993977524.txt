@@ -1,0 +1,2 @@
+(Tool, for<'a> fn(&'a GitHubMcpServer, RunCancelParams) -> Pin<Box<(dyn Future<Output = Result<rmcp::model::CallToolResult, ErrorData>> + Send + 'a)>> {GitHubMcpServer::gh_run_cancel})
+(Tool, for<'a> fn(&'a GitHubMcpServer, RunCancelParams) -> Pin<Box<(dyn Future<Output = Result<rmcp::model::CallToolResult, ErrorData>> + Send + 'a)>> {GitHubMcpServer::gh_run_cancel}): IntoToolRoute<GitHubMcpServer, _>
