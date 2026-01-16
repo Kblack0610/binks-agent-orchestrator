@@ -9,7 +9,7 @@ description = "Minimal Rust agent with Ollama and MCP support"
 ollama-rs = { version = "0.3", features = ["stream"] }
 
 # MCP (client + server) - same version as github-gh MCP
-rmcp = { version = "0.13", features = ["server", "client", "macros", "transport-io"] }
+rmcp = { version = "0.13", features = ["server", "client", "macros", "transport-io", "transport-child-process"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "io-std"] }
@@ -17,6 +17,9 @@ async-trait = "0.1"
 
 # URL parsing
 url = "2"
+
+# Environment variable expansion
+shellexpand = "3"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

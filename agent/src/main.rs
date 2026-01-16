@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use agent::llm::{Llm, OllamaClient};
+use agent::mcp::McpClientPool;
 
 #[derive(Parser)]
 #[command(name = "agent")]
@@ -29,8 +30,20 @@ enum Commands {
     },
     /// Interactive chat session
     Interactive,
-    /// List available tools (future: from MCP servers)
-    Tools,
+    /// List available tools from MCP servers
+    Tools {
+        /// Only list tools from a specific server
+        #[arg(long)]
+        server: Option<String>,
+    },
+    /// Call a tool directly
+    Call {
+        /// Tool name
+        tool: String,
+        /// Arguments as JSON
+        #[arg(long, short)]
+        args: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -43,19 +56,21 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    // Create Ollama client
-    let llm = OllamaClient::new(&cli.ollama_url, &cli.model);
-
     match cli.command {
         Commands::Chat { message } => {
+            let llm = OllamaClient::new(&cli.ollama_url, &cli.model);
             let response = llm.chat(&message).await?;
             println!("{}", response);
         }
         Commands::Interactive => {
+            let llm = OllamaClient::new(&cli.ollama_url, &cli.model);
             run_interactive(llm).await?;
         }
-        Commands::Tools => {
-            println!("Tool listing not yet implemented (Phase 2)");
+        Commands::Tools { server } => {
+            run_tools(server).await?;
+        }
+        Commands::Call { tool, args } => {
+            run_call_tool(&tool, args).await?;
         }
     }
 
@@ -96,6 +111,95 @@ async fn run_interactive(llm: OllamaClient) -> Result<()> {
             }
             Err(e) => {
                 eprintln!("Error: {}", e);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_tools(server_filter: Option<String>) -> Result<()> {
+    let pool = McpClientPool::load()?;
+
+    match pool {
+        Some(mut pool) => {
+            println!("Loading MCP servers from .mcp.json...\n");
+
+            let servers = pool.server_names();
+            println!("Configured servers: {}\n", servers.join(", "));
+
+            let tools = pool.list_all_tools().await?;
+
+            if tools.is_empty() {
+                println!("No tools found.");
+                return Ok(());
+            }
+
+            // Filter by server if specified
+            let tools: Vec<_> = match &server_filter {
+                Some(s) => tools.into_iter().filter(|t| &t.server == s).collect(),
+                None => tools,
+            };
+
+            // Group by server
+            let mut by_server: std::collections::HashMap<String, Vec<_>> =
+                std::collections::HashMap::new();
+            for tool in tools {
+                by_server
+                    .entry(tool.server.clone())
+                    .or_default()
+                    .push(tool);
+            }
+
+            for (server, tools) in by_server {
+                println!("=== {} ({} tools) ===", server, tools.len());
+                for tool in tools {
+                    let desc = tool
+                        .description
+                        .as_deref()
+                        .unwrap_or("No description")
+                        .lines()
+                        .next()
+                        .unwrap_or("");
+                    println!("  {} - {}", tool.name, desc);
+                }
+                println!();
+            }
+        }
+        None => {
+            println!("No .mcp.json found in current directory or parents.");
+            println!("Create one to configure MCP servers.");
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_call_tool(tool_name: &str, args: Option<String>) -> Result<()> {
+    let mut pool = McpClientPool::load()?
+        .ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
+
+    let arguments = match args {
+        Some(json) => Some(serde_json::from_str(&json)?),
+        None => None,
+    };
+
+    println!("Calling tool: {}", tool_name);
+    if let Some(ref a) = arguments {
+        println!("Arguments: {}", serde_json::to_string_pretty(a)?);
+    }
+    println!();
+
+    let result = pool.call_tool(tool_name, arguments).await?;
+
+    println!("Result:");
+    for content in &result.content {
+        match &content.raw {
+            rmcp::model::RawContent::Text(text) => {
+                println!("{}", text.text);
+            }
+            _ => {
+                println!("{:?}", content);
             }
         }
     }
