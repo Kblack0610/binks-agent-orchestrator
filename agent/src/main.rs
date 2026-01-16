@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use agent::agent::Agent;
 use agent::llm::{Llm, OllamaClient};
 use agent::mcp::McpClientPool;
 
@@ -30,6 +31,14 @@ enum Commands {
     },
     /// Interactive chat session
     Interactive,
+    /// Run the tool-using agent (LLM decides when to call tools)
+    Agent {
+        /// Initial message (optional, starts interactive if not provided)
+        message: Option<String>,
+        /// System prompt for the agent
+        #[arg(long, short)]
+        system: Option<String>,
+    },
     /// List available tools from MCP servers
     Tools {
         /// Only list tools from a specific server
@@ -65,6 +74,9 @@ async fn main() -> Result<()> {
         Commands::Interactive => {
             let llm = OllamaClient::new(&cli.ollama_url, &cli.model);
             run_interactive(llm).await?;
+        }
+        Commands::Agent { message, system } => {
+            run_agent(&cli.ollama_url, &cli.model, message, system).await?;
         }
         Commands::Tools { server } => {
             run_tools(server).await?;
@@ -200,6 +212,100 @@ async fn run_call_tool(tool_name: &str, args: Option<String>) -> Result<()> {
             }
             _ => {
                 println!("{:?}", content);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_agent(
+    ollama_url: &str,
+    model: &str,
+    message: Option<String>,
+    system: Option<String>,
+) -> Result<()> {
+    let pool = McpClientPool::load()?
+        .ok_or_else(|| anyhow::anyhow!("No .mcp.json found - agent needs MCP tools"))?;
+
+    let mut agent = Agent::new(ollama_url, model, pool);
+
+    if let Some(sys) = system {
+        agent = agent.with_system_prompt(&sys);
+    }
+
+    // Get available tools for display
+    let tool_names = agent.tool_names().await?;
+    println!("Agent mode with {} tools available", tool_names.len());
+    println!("Model: {}", model);
+    println!();
+
+    if let Some(msg) = message {
+        // Single message mode
+        println!("> {}\n", msg);
+        match agent.chat(&msg).await {
+            Ok(response) => {
+                println!("{}", response);
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+            }
+        }
+    } else {
+        // Interactive mode
+        use std::io::{self, BufRead, Write};
+
+        println!("Interactive agent mode. Type 'quit' to exit, 'tools' to list tools.");
+        println!();
+
+        let stdin = io::stdin();
+        let mut stdout = io::stdout();
+
+        loop {
+            print!("agent> ");
+            stdout.flush()?;
+
+            let mut input = String::new();
+            stdin.lock().read_line(&mut input)?;
+            let input = input.trim();
+
+            if input.is_empty() {
+                continue;
+            }
+
+            if input == "quit" || input == "exit" {
+                break;
+            }
+
+            if input == "tools" {
+                match agent.tool_names().await {
+                    Ok(names) => {
+                        println!("\nAvailable tools ({}):", names.len());
+                        for name in names {
+                            println!("  - {}", name);
+                        }
+                        println!();
+                    }
+                    Err(e) => {
+                        eprintln!("Error listing tools: {}", e);
+                    }
+                }
+                continue;
+            }
+
+            if input == "clear" {
+                agent.clear_history();
+                println!("History cleared.\n");
+                continue;
+            }
+
+            match agent.chat(input).await {
+                Ok(response) => {
+                    println!("\n{}\n", response);
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                }
             }
         }
     }

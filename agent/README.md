@@ -34,6 +34,8 @@ cargo run -- call <tool_name> --args '{"key": "value"}'
 |---------|-------------|
 | `chat <message>` | Send a single message to the LLM |
 | `interactive` | Start an interactive chat session |
+| `agent [message]` | Run tool-using agent (LLM decides when to call tools) |
+| `agent -s "prompt"` | Agent with custom system prompt |
 | `tools` | List all available tools from MCP servers |
 | `tools --server <name>` | List tools from a specific MCP server |
 | `call <tool> [--args <json>]` | Call a tool directly |
@@ -79,6 +81,8 @@ agent/
 │   ├── main.rs          # CLI entry point (clap)
 │   ├── lib.rs           # Module exports
 │   ├── config.rs        # .mcp.json configuration loader
+│   ├── agent/
+│   │   └── mod.rs       # Tool-using agent loop
 │   ├── llm/
 │   │   ├── mod.rs       # Llm trait abstraction
 │   │   └── ollama.rs    # Ollama implementation
@@ -113,11 +117,25 @@ cargo build --release
 RUST_LOG=debug cargo run -- tools
 ```
 
+## Tool-Calling Models
+
+For the `agent` command to work properly, you need an Ollama model that supports tool calling. Recommended models:
+
+```bash
+# Pull a model with good tool support
+ollama pull qwen2.5:7b
+ollama pull llama3.2:3b
+ollama pull mistral:7b
+
+# Use it
+cargo run -- --model qwen2.5:7b agent "List my kubernetes namespaces"
+```
+
 ## Roadmap
 
 - [x] Phase 1: Ollama chat integration
 - [x] Phase 2: MCP client (connect to servers, list tools)
-- [ ] Phase 3: Tool-using agent loop (LLM decides when to use tools)
+- [x] Phase 3: Tool-using agent loop (LLM decides when to use tools)
 - [ ] Phase 4: MCP server mode (expose agent as MCP server)
 
 ## License
