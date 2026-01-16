@@ -15,7 +15,7 @@ struct Cli {
     command: Commands,
 
     /// Ollama server URL
-    #[arg(long, env = "OLLAMA_URL", default_value = "http://localhost:11434")]
+    #[arg(long, env = "OLLAMA_URL", default_value = "http://192.168.1.4:11434")]
     ollama_url: String,
 
     /// Model to use
