@@ -1,0 +1,14 @@
+/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/debug/deps/serde-f3530a4d2fa14f07.d: /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/debug/build/serde-a4ceae42d15d99aa/out/private.rs
+
+/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/debug/deps/libserde-f3530a4d2fa14f07.rlib: /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/debug/build/serde-a4ceae42d15d99aa/out/private.rs
+
+/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/debug/deps/libserde-f3530a4d2fa14f07.rmeta: /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/debug/build/serde-a4ceae42d15d99aa/out/private.rs
+
+/home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/kblack0610/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/debug/build/serde-a4ceae42d15d99aa/out/private.rs:
+
+# env-dep:OUT_DIR=/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/debug/build/serde-a4ceae42d15d99aa/out
