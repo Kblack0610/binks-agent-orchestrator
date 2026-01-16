@@ -142,22 +142,43 @@ impl AgentMcpServer {
         Ok(CallToolResult::success(vec![Content::text(response)]))
     }
 
-    #[tool(description = "Send a message to the AI agent with access to MCP tools. The agent can use tools like kubernetes, ssh, github to accomplish tasks.")]
+    /// Lazily initialize the agent on first use
+    async fn ensure_agent(&self) -> Result<(), McpError> {
+        let mut guard = self.agent.lock().await;
+        if guard.is_none() {
+            tracing::info!("Lazily initializing agent with MCP tools...");
+
+            let pool = McpClientPool::load()
+                .map_err(|e| McpError::internal_error(format!("Failed to load MCP config: {}", e), None))?
+                .ok_or_else(|| McpError::internal_error("No .mcp.json found".to_string(), None))?;
+
+            let mut agent = Agent::new(&self.config.ollama_url, &self.config.model, pool);
+
+            if let Some(ref prompt) = self.config.system_prompt {
+                agent = agent.with_system_prompt(prompt);
+            }
+
+            *guard = Some(agent);
+            tracing::info!("Agent initialized successfully");
+        }
+        Ok(())
+    }
+
+    #[tool(description = "Send a message to the AI agent with access to MCP tools. The agent can use tools like kubernetes, ssh, github to accomplish tasks. Note: First call may take a few seconds to initialize connections.")]
     async fn agent_chat(
         &self,
         Parameters(params): Parameters<AgentChatParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!("agent_chat: {}", params.message);
 
+        // Lazily initialize agent on first call
+        self.ensure_agent().await?;
+
         let mut guard = self.agent.lock().await;
-        let agent = guard.as_mut().ok_or_else(|| {
-            McpError::internal_error("Agent not initialized. No .mcp.json found?".to_string(), None)
-        })?;
+        let agent = guard.as_mut().unwrap(); // Safe: ensure_agent guarantees it's Some
 
         // Update system prompt if provided
         if let Some(ref prompt) = params.system_prompt {
-            // Note: This modifies the agent's system prompt for this request
-            // In a production system, you might want a different approach
             tracing::info!("Setting system prompt: {}", prompt);
         }
 
@@ -169,17 +190,18 @@ impl AgentMcpServer {
         Ok(CallToolResult::success(vec![Content::text(response)]))
     }
 
-    #[tool(description = "List all available MCP tools that the agent can use")]
+    #[tool(description = "List all available MCP tools that the agent can use. Note: First call may take a few seconds to initialize connections.")]
     async fn list_tools(
         &self,
         Parameters(params): Parameters<ListToolsParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!("list_tools: server={:?}", params.server);
 
+        // Lazily initialize agent on first call
+        self.ensure_agent().await?;
+
         let mut guard = self.agent.lock().await;
-        let agent = guard.as_mut().ok_or_else(|| {
-            McpError::internal_error("Agent not initialized. No .mcp.json found?".to_string(), None)
-        })?;
+        let agent = guard.as_mut().unwrap(); // Safe: ensure_agent guarantees it's Some
 
         let tools = agent
             .tool_names()
@@ -226,20 +248,12 @@ pub async fn serve(config: ServerConfig) -> anyhow::Result<()> {
     tracing::info!("Starting Agent MCP Server");
     tracing::info!("Model: {}", config.model);
 
-    // Create the server
+    // Create the server - agent initialization is now lazy
+    // (happens on first agent_chat call, not at startup)
     let server = AgentMcpServer::new(config);
 
-    // Try to initialize agent (may fail if no .mcp.json)
-    match server.init_agent().await {
-        Ok(_) => {
-            tracing::info!("Agent initialized with MCP tools");
-        }
-        Err(e) => {
-            tracing::warn!("Agent initialization failed: {}. Only 'chat' will work.", e);
-        }
-    }
-
-    // Create stdio transport and serve
+    // Create stdio transport and serve immediately
+    // Don't block on MCP server connections - that would timeout Claude
     let service = server.serve(stdio()).await?;
 
     tracing::info!("Server running on stdio, waiting for requests...");

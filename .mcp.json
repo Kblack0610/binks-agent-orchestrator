@@ -2,20 +2,42 @@
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest"],
+      "args": [
+        "-y",
+        "kubernetes-mcp-server@latest"
+      ],
       "env": {
         "KUBECONFIG": "${HOME}/.kube/config"
       }
     },
     "ssh": {
       "command": "npx",
-      "args": ["@aiondadotcom/mcp-ssh"]
+      "args": [
+        "@aiondadotcom/mcp-ssh"
+      ]
     },
     "github-gh": {
       "command": "./mcps/github-gh/target/release/github-gh-mcp",
       "args": [],
       "env": {
         "RUST_LOG": "info"
+      }
+    },
+    "sysinfo": {
+      "command": "./mcps/sysinfo-mcp/target/release/sysinfo-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    },
+    "agent": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/release/agent",
+      "args": [
+        "serve"
+      ],
+      "env": {
+        "OLLAMA_URL": "http://192.168.1.4:11434",
+        "OLLAMA_MODEL": "llama3.1:8b"
       }
     }
   }
