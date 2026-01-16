@@ -1,2 +1,0 @@
-(Tool, for<'a> fn(&'a GitHubMcpServer, server::IssueCloseParams) -> Pin<Box<(dyn Future<Output = Result<rmcp::model::CallToolResult, ErrorData>> + Send + 'a)>> {GitHubMcpServer::gh_issue_close})
-(Tool, for<'a> fn(&'a GitHubMcpServer, server::IssueCloseParams) -> Pin<Box<(dyn Future<Output = Result<rmcp::model::CallToolResult, ErrorData>> + Send + 'a)>> {GitHubMcpServer::gh_issue_close}): IntoToolRoute<GitHubMcpServer, _>
