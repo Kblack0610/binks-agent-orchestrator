@@ -1,1 +1,0 @@
-"""JobScan AI tests."""

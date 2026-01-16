@@ -3,19 +3,8 @@ target/
 **/*.rs.bk
 Cargo.lock
 
-# Node.js
+# Node.js (for npm-based MCP servers)
 node_modules/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-ENV/
-.venv
 
 # Environment files
 .env
@@ -46,8 +35,9 @@ kubeconfig
 temp/
 tmp/
 
-# Distribution / packaging
+# Build artifacts
 dist/
 build/
-*.egg-info/
+
+# Tool-specific
 .aider*
