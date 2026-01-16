@@ -39,6 +39,8 @@ cargo run -- call <tool_name> --args '{"key": "value"}'
 | `tools` | List all available tools from MCP servers |
 | `tools --server <name>` | List tools from a specific MCP server |
 | `call <tool> [--args <json>]` | Call a tool directly |
+| `serve` | Run as an MCP server (expose agent as tools) |
+| `serve -s "prompt"` | MCP server with custom system prompt |
 
 ## Configuration
 
@@ -86,9 +88,46 @@ agent/
 │   ├── llm/
 │   │   ├── mod.rs       # Llm trait abstraction
 │   │   └── ollama.rs    # Ollama implementation
-│   └── mcp/
-│       ├── mod.rs       # MCP module exports
-│       └── client.rs    # MCP client pool
+│   ├── mcp/
+│   │   ├── mod.rs       # MCP module exports
+│   │   └── client.rs    # MCP client pool
+│   └── server/
+│       └── mod.rs       # MCP server implementation
+```
+
+## MCP Server Mode
+
+Run the agent as an MCP server to expose its capabilities to other tools:
+
+```bash
+# Start MCP server on stdio
+cargo run -- serve
+
+# With custom system prompt
+cargo run -- serve -s "You are a helpful assistant focused on kubernetes tasks"
+```
+
+### Exposed Tools
+
+| Tool | Description |
+|------|-------------|
+| `chat` | Simple LLM chat (no tool access) |
+| `agent_chat` | Full agent with MCP tool access |
+| `list_tools` | List available MCP tools |
+
+### Using with Claude Code
+
+Add to your `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "binks-agent": {
+      "command": "/path/to/agent",
+      "args": ["serve", "-s", "You are a helpful assistant"]
+    }
+  }
+}
 ```
 
 ## Dependencies
@@ -136,7 +175,7 @@ cargo run -- --model qwen2.5:7b agent "List my kubernetes namespaces"
 - [x] Phase 1: Ollama chat integration
 - [x] Phase 2: MCP client (connect to servers, list tools)
 - [x] Phase 3: Tool-using agent loop (LLM decides when to use tools)
-- [ ] Phase 4: MCP server mode (expose agent as MCP server)
+- [x] Phase 4: MCP server mode (expose agent as MCP server)
 
 ## License
 

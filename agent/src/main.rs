@@ -5,6 +5,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use agent::agent::Agent;
 use agent::llm::{Llm, OllamaClient};
 use agent::mcp::McpClientPool;
+use agent::server::{self, ServerConfig};
 
 #[derive(Parser)]
 #[command(name = "agent")]
@@ -53,6 +54,12 @@ enum Commands {
         #[arg(long, short)]
         args: Option<String>,
     },
+    /// Run as an MCP server (expose agent as MCP tools)
+    Serve {
+        /// System prompt for the agent
+        #[arg(long, short)]
+        system: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -83,6 +90,14 @@ async fn main() -> Result<()> {
         }
         Commands::Call { tool, args } => {
             run_call_tool(&tool, args).await?;
+        }
+        Commands::Serve { system } => {
+            let config = ServerConfig {
+                ollama_url: cli.ollama_url,
+                model: cli.model,
+                system_prompt: system,
+            };
+            server::serve(config).await?;
         }
     }
 
