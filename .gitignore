@@ -1,3 +1,11 @@
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Node.js
+node_modules/
+
 # Python
 __pycache__/
 *.py[cod]
