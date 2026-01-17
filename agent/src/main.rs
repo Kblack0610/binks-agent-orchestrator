@@ -5,6 +5,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use agent::agent::Agent;
 use agent::llm::{Llm, OllamaClient};
 use agent::mcp::McpClientPool;
+use agent::monitor::{self, MonitorConfig};
 use agent::server::{self, ServerConfig};
 
 #[derive(Parser)]
@@ -64,6 +65,21 @@ enum Commands {
         #[arg(long, short)]
         system: Option<String>,
     },
+    /// Run the monitoring agent (poll repos, write to inbox, send notifications)
+    Monitor {
+        /// Run once instead of continuously
+        #[arg(long)]
+        once: bool,
+        /// Polling interval in seconds (for continuous mode)
+        #[arg(long, default_value = "300")]
+        interval: u64,
+        /// Repositories to monitor (comma-separated, e.g., "owner/repo1,owner/repo2")
+        #[arg(long)]
+        repos: Option<String>,
+        /// System prompt for the agent
+        #[arg(long, short)]
+        system: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -103,6 +119,27 @@ async fn main() -> Result<()> {
                 system_prompt: system,
             };
             server::serve(config).await?;
+        }
+        Commands::Monitor { once, interval, repos, system } => {
+            let repos = repos
+                .map(|r| r.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_else(Vec::new);
+
+            if repos.is_empty() {
+                eprintln!("Error: No repositories specified. Use --repos to specify repos to monitor.");
+                eprintln!("Example: agent monitor --once --repos owner/repo1,owner/repo2");
+                std::process::exit(1);
+            }
+
+            let config = MonitorConfig {
+                ollama_url: cli.ollama_url,
+                model: cli.model,
+                repos,
+                once,
+                interval,
+                system_prompt: system,
+            };
+            monitor::run_monitor(config).await?;
         }
     }
 
