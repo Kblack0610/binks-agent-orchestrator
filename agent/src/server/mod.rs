@@ -71,6 +71,8 @@ pub struct AgentChatParams {
     pub message: String,
     #[schemars(description = "Optional system prompt for the agent")]
     pub system_prompt: Option<String>,
+    #[schemars(description = "Optional list of MCP server names to filter tools (e.g., ['sysinfo', 'kubernetes']). Recommended for smaller models that struggle with many tools.")]
+    pub servers: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -164,12 +166,12 @@ impl AgentMcpServer {
         Ok(())
     }
 
-    #[tool(description = "Send a message to the AI agent with access to MCP tools. The agent can use tools like kubernetes, ssh, github to accomplish tasks. Note: First call may take a few seconds to initialize connections.")]
+    #[tool(description = "Send a message to the AI agent with access to MCP tools. The agent can use tools like kubernetes, ssh, github, sysinfo to accomplish tasks. Use 'servers' to filter to specific tool sets (recommended for smaller models). Note: First call may take a few seconds to initialize connections.")]
     async fn agent_chat(
         &self,
         Parameters(params): Parameters<AgentChatParams>,
     ) -> Result<CallToolResult, McpError> {
-        tracing::info!("agent_chat: {}", params.message);
+        tracing::info!("agent_chat: {} (servers: {:?})", params.message, params.servers);
 
         // Lazily initialize agent on first call
         self.ensure_agent().await?;
@@ -182,10 +184,17 @@ impl AgentMcpServer {
             tracing::info!("Setting system prompt: {}", prompt);
         }
 
-        let response = agent
-            .chat(&params.message)
-            .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        // Use filtered servers if provided, otherwise use all tools
+        let response = if let Some(ref servers) = params.servers {
+            let server_refs: Vec<&str> = servers.iter().map(|s| s.as_str()).collect();
+            agent
+                .chat_with_servers(&params.message, &server_refs)
+                .await
+        } else {
+            agent.chat(&params.message).await
+        };
+
+        let response = response.map_err(|e| McpError::internal_error(e.to_string(), None))?;
 
         Ok(CallToolResult::success(vec![Content::text(response)]))
     }

@@ -39,6 +39,10 @@ enum Commands {
         /// System prompt for the agent
         #[arg(long, short)]
         system: Option<String>,
+        /// Filter tools to specific MCP servers (comma-separated, e.g., "sysinfo,kubernetes")
+        /// Recommended for smaller models that struggle with many tools
+        #[arg(long)]
+        servers: Option<String>,
     },
     /// List available tools from MCP servers
     Tools {
@@ -82,8 +86,9 @@ async fn main() -> Result<()> {
             let llm = OllamaClient::new(&cli.ollama_url, &cli.model);
             run_interactive(llm).await?;
         }
-        Commands::Agent { message, system } => {
-            run_agent(&cli.ollama_url, &cli.model, message, system).await?;
+        Commands::Agent { message, system, servers } => {
+            let server_list = servers.map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
+            run_agent(&cli.ollama_url, &cli.model, message, system, server_list).await?;
         }
         Commands::Tools { server } => {
             run_tools(server).await?;
@@ -239,6 +244,7 @@ async fn run_agent(
     model: &str,
     message: Option<String>,
     system: Option<String>,
+    servers: Option<Vec<String>>,
 ) -> Result<()> {
     let pool = McpClientPool::load()?
         .ok_or_else(|| anyhow::anyhow!("No .mcp.json found - agent needs MCP tools"))?;
@@ -251,14 +257,29 @@ async fn run_agent(
 
     // Get available tools for display
     let tool_names = agent.tool_names().await?;
-    println!("Agent mode with {} tools available", tool_names.len());
+    let server_names = agent.server_names().await?;
+
+    println!("Agent mode with {} tools from {} servers", tool_names.len(), server_names.len());
+    println!("Servers: {}", server_names.join(", "));
+    if let Some(ref filter) = servers {
+        println!("Filtered to: {}", filter.join(", "));
+    }
     println!("Model: {}", model);
     println!();
+
+    // Create server filter as string slices
+    let server_refs: Option<Vec<&str>> = servers.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
 
     if let Some(msg) = message {
         // Single message mode
         println!("> {}\n", msg);
-        match agent.chat(&msg).await {
+        let result = if let Some(ref srvs) = server_refs {
+            agent.chat_with_servers(&msg, srvs).await
+        } else {
+            agent.chat(&msg).await
+        };
+
+        match result {
             Ok(response) => {
                 println!("{}", response);
             }
@@ -270,7 +291,7 @@ async fn run_agent(
         // Interactive mode
         use std::io::{self, BufRead, Write};
 
-        println!("Interactive agent mode. Type 'quit' to exit, 'tools' to list tools.");
+        println!("Interactive agent mode. Type 'quit' to exit, 'tools' to list tools, 'servers' to list servers.");
         println!();
 
         let stdin = io::stdin();
@@ -308,13 +329,35 @@ async fn run_agent(
                 continue;
             }
 
+            if input == "servers" {
+                match agent.server_names().await {
+                    Ok(names) => {
+                        println!("\nAvailable servers ({}):", names.len());
+                        for name in names {
+                            println!("  - {}", name);
+                        }
+                        println!();
+                    }
+                    Err(e) => {
+                        eprintln!("Error listing servers: {}", e);
+                    }
+                }
+                continue;
+            }
+
             if input == "clear" {
                 agent.clear_history();
                 println!("History cleared.\n");
                 continue;
             }
 
-            match agent.chat(input).await {
+            let result = if let Some(ref srvs) = server_refs {
+                agent.chat_with_servers(input, srvs).await
+            } else {
+                agent.chat(input).await
+            };
+
+            match result {
                 Ok(response) => {
                     println!("\n{}\n", response);
                 }

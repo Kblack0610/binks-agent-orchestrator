@@ -8,16 +8,69 @@
 //! 5. Loop continues until LLM responds without tool calls
 
 use anyhow::{Context, Result};
-use ollama_rs::{
-    generation::{
-        chat::{request::ChatMessageRequest, ChatMessage},
-        tools::{ToolCall, ToolFunctionInfo, ToolInfo, ToolType},
-    },
-    Ollama,
-};
-use schemars::Schema;
+use ollama_rs::Ollama;
+use serde::{Deserialize, Serialize};
 
 use crate::mcp::{McpClientPool, McpTool};
+
+// Direct HTTP API types for Ollama (bypass ollama-rs for tool calls)
+#[derive(Debug, Serialize)]
+struct DirectChatRequest {
+    model: String,
+    messages: Vec<DirectMessage>,
+    tools: Vec<DirectTool>,
+    stream: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct DirectMessage {
+    role: String,
+    content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<DirectToolCall>>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct DirectTool {
+    #[serde(rename = "type")]
+    tool_type: String,
+    function: DirectToolFunction,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct DirectToolFunction {
+    name: String,
+    description: String,
+    parameters: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct DirectChatResponse {
+    message: DirectResponseMessage,
+}
+
+#[derive(Debug, Deserialize)]
+struct DirectResponseMessage {
+    role: String,
+    content: String,
+    #[serde(default)]
+    tool_calls: Vec<DirectToolCall>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct DirectToolCall {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    function: DirectToolCallFunction,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct DirectToolCallFunction {
+    #[serde(default)]
+    index: Option<i32>,
+    name: String,
+    arguments: serde_json::Value,
+}
 
 /// Maximum number of tool-calling iterations to prevent infinite loops
 const MAX_ITERATIONS: usize = 10;
@@ -25,10 +78,12 @@ const MAX_ITERATIONS: usize = 10;
 /// An agent that can use tools via MCP
 pub struct Agent {
     ollama: Ollama,
+    ollama_url: String,
+    http_client: reqwest::Client,
     model: String,
     mcp_pool: McpClientPool,
     system_prompt: Option<String>,
-    history: Vec<ChatMessage>,
+    history: Vec<DirectMessage>,
 }
 
 impl Agent {
@@ -40,9 +95,12 @@ impl Agent {
 
         let host = url.host_str().unwrap_or("localhost").to_string();
         let port = url.port().unwrap_or(11434);
+        let base_url = format!("http://{}:{}", host, port);
 
         Self {
             ollama: Ollama::new(format!("http://{}", host), port),
+            ollama_url: base_url,
+            http_client: reqwest::Client::new(),
             model: model.to_string(),
             mcp_pool,
             system_prompt: None,
@@ -56,37 +114,43 @@ impl Agent {
         self
     }
 
-    /// Convert MCP tools to Ollama ToolInfo format
-    fn mcp_tools_to_ollama(tools: &[McpTool]) -> Vec<ToolInfo> {
+    /// Clean up a JSON schema for Ollama compatibility
+    /// Removes $schema, title, and other fields that confuse Ollama
+    fn clean_schema_for_ollama(schema: &serde_json::Value) -> serde_json::Value {
+        match schema {
+            serde_json::Value::Object(obj) => {
+                let mut cleaned = serde_json::Map::new();
+                for (key, value) in obj {
+                    // Skip fields that Ollama doesn't expect
+                    if key == "$schema" || key == "title" || key == "additionalProperties" {
+                        continue;
+                    }
+                    // Recursively clean nested objects (like properties)
+                    cleaned.insert(key.clone(), Self::clean_schema_for_ollama(value));
+                }
+                serde_json::Value::Object(cleaned)
+            }
+            serde_json::Value::Array(arr) => {
+                serde_json::Value::Array(arr.iter().map(Self::clean_schema_for_ollama).collect())
+            }
+            other => other.clone(),
+        }
+    }
+
+    /// Convert MCP tools to direct API format
+    fn mcp_tools_to_direct(tools: &[McpTool]) -> Vec<DirectTool> {
         tools
             .iter()
             .map(|tool| {
-                // Convert the JSON schema to schemars Schema
                 let parameters = tool
                     .input_schema
                     .clone()
-                    .map(|schema| {
-                        // Try to deserialize the JSON value into a Schema
-                        serde_json::from_value::<Schema>(schema).unwrap_or_else(|_| {
-                            // Fallback to empty object schema
-                            serde_json::from_value(serde_json::json!({
-                                "type": "object",
-                                "properties": {}
-                            }))
-                            .unwrap()
-                        })
-                    })
-                    .unwrap_or_else(|| {
-                        serde_json::from_value(serde_json::json!({
-                            "type": "object",
-                            "properties": {}
-                        }))
-                        .unwrap()
-                    });
+                    .map(|schema| Self::clean_schema_for_ollama(&schema))
+                    .unwrap_or_else(|| serde_json::json!({"type": "object", "properties": {}}));
 
-                ToolInfo {
-                    tool_type: ToolType::Function,
-                    function: ToolFunctionInfo {
+                DirectTool {
+                    tool_type: "function".to_string(),
+                    function: DirectToolFunction {
                         name: tool.name.clone(),
                         description: tool.description.clone().unwrap_or_default(),
                         parameters,
@@ -96,8 +160,8 @@ impl Agent {
             .collect()
     }
 
-    /// Execute a tool call via MCP
-    async fn execute_tool_call(&mut self, tool_call: &ToolCall) -> Result<String> {
+    /// Execute a tool call via MCP (using direct tool call format)
+    async fn execute_direct_tool_call(&mut self, tool_call: &DirectToolCall) -> Result<String> {
         let name = &tool_call.function.name;
         let args = &tool_call.function.arguments;
 
@@ -136,26 +200,86 @@ impl Agent {
     }
 
     /// Run a single message through the agent, handling tool calls
+    /// Uses direct HTTP to Ollama API (bypasses ollama-rs for better tool calling support)
+    /// NOTE: With many tools (>20), smaller models may not use tool calling reliably.
+    /// Use chat_with_servers() to filter to specific MCP servers.
     pub async fn chat(&mut self, user_message: &str) -> Result<String> {
         // Get available tools from MCP
         let mcp_tools = self.mcp_pool.list_all_tools().await?;
-        let tools = Self::mcp_tools_to_ollama(&mcp_tools);
+        let tools = Self::mcp_tools_to_direct(&mcp_tools);
 
         tracing::info!("Agent has {} tools available", tools.len());
 
+        // Warn if too many tools for smaller models
+        if tools.len() > 20 {
+            tracing::warn!(
+                "Many tools ({}) may cause issues with smaller models. Consider using chat_with_servers() to filter.",
+                tools.len()
+            );
+        }
+
+        self.chat_with_tools(user_message, tools).await
+    }
+
+    /// Clear conversation history
+    pub fn clear_history(&mut self) {
+        self.history.clear();
+    }
+
+    /// Get available tool names
+    pub async fn tool_names(&mut self) -> Result<Vec<String>> {
+        let tools = self.mcp_pool.list_all_tools().await?;
+        Ok(tools.into_iter().map(|t| t.name).collect())
+    }
+
+    /// Get list of available MCP server names
+    pub async fn server_names(&mut self) -> Result<Vec<String>> {
+        let tools = self.mcp_pool.list_all_tools().await?;
+        let mut servers: Vec<String> = tools.iter().map(|t| t.server.clone()).collect();
+        servers.sort();
+        servers.dedup();
+        Ok(servers)
+    }
+
+    /// Run a chat with tools filtered to specific MCP servers
+    /// This is useful when you have many tools but only need a subset
+    pub async fn chat_with_servers(&mut self, user_message: &str, servers: &[&str]) -> Result<String> {
+        // Get tools filtered by server
+        let all_tools = self.mcp_pool.list_all_tools().await?;
+        let filtered_tools: Vec<_> = all_tools
+            .into_iter()
+            .filter(|t| servers.contains(&t.server.as_str()))
+            .collect();
+
+        let tools = Self::mcp_tools_to_direct(&filtered_tools);
+        tracing::info!("Agent has {} tools available (filtered from servers: {:?})", tools.len(), servers);
+
+        self.chat_with_tools(user_message, tools).await
+    }
+
+    /// Internal method to run chat with a specific set of tools
+    async fn chat_with_tools(&mut self, user_message: &str, tools: Vec<DirectTool>) -> Result<String> {
         // Build initial messages
-        let mut messages = Vec::new();
+        let mut messages: Vec<DirectMessage> = Vec::new();
 
         // Add system prompt if set
         if let Some(ref system) = self.system_prompt {
-            messages.push(ChatMessage::system(system.clone()));
+            messages.push(DirectMessage {
+                role: "system".to_string(),
+                content: system.clone(),
+                tool_calls: None,
+            });
         }
 
         // Add history
         messages.extend(self.history.clone());
 
         // Add new user message
-        messages.push(ChatMessage::user(user_message.to_string()));
+        messages.push(DirectMessage {
+            role: "user".to_string(),
+            content: user_message.to_string(),
+            tool_calls: None,
+        });
 
         // Tool-calling loop
         let mut iterations = 0;
@@ -168,31 +292,69 @@ impl Agent {
 
             tracing::debug!("Agent iteration {}", iterations);
 
-            // Create chat request with tools
-            let request = ChatMessageRequest::new(self.model.clone(), messages.clone())
-                .tools(tools.clone());
+            // Create direct HTTP request
+            let request = DirectChatRequest {
+                model: self.model.clone(),
+                messages: messages.clone(),
+                tools: tools.clone(),
+                stream: false,
+            };
 
-            // Send to LLM
+            // Log request info
+            tracing::info!("=== OLLAMA REQUEST (Direct HTTP) ===");
+            tracing::info!("Model: {}", self.model);
+            tracing::info!("Messages count: {}", messages.len());
+            tracing::info!("Tools count: {}", tools.len());
+
+            // Send direct HTTP request
+            let url = format!("{}/api/chat", self.ollama_url);
             let response = self
-                .ollama
-                .send_chat_messages(request)
+                .http_client
+                .post(&url)
+                .json(&request)
+                .send()
                 .await
-                .map_err(|e| {
-                    tracing::error!("Ollama error: {:?}", e);
-                    e
-                })
-                .context("Failed to send chat request")?;
+                .context("Failed to send HTTP request to Ollama")?;
 
-            let assistant_msg = response.message;
+            if !response.status().is_success() {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                return Err(anyhow::anyhow!("Ollama API error {}: {}", status, body));
+            }
+
+            let raw_body = response.text().await.context("Failed to get response text")?;
+            let response_body: DirectChatResponse = serde_json::from_str(&raw_body)
+                .context("Failed to parse Ollama response")?;
+
+            let assistant_msg = response_body.message;
+
+            // Log response
+            tracing::info!("=== OLLAMA RESPONSE ===");
+            tracing::info!("Content length: {}", assistant_msg.content.len());
+            if !assistant_msg.content.is_empty() {
+                tracing::info!("Content preview: {}", &assistant_msg.content[..assistant_msg.content.len().min(200)]);
+            }
+            tracing::info!("Tool calls count: {}", assistant_msg.tool_calls.len());
+            for (i, tc) in assistant_msg.tool_calls.iter().enumerate() {
+                tracing::info!("Tool call {}: {} args={:?}", i, tc.function.name, tc.function.arguments);
+            }
 
             // Check if there are tool calls
             if assistant_msg.tool_calls.is_empty() {
                 // No tool calls - we're done
                 tracing::info!("Agent responding without tool calls");
 
-                // Add assistant response to history
-                self.history.push(ChatMessage::user(user_message.to_string()));
-                self.history.push(ChatMessage::assistant(assistant_msg.content.clone()));
+                // Add to history
+                self.history.push(DirectMessage {
+                    role: "user".to_string(),
+                    content: user_message.to_string(),
+                    tool_calls: None,
+                });
+                self.history.push(DirectMessage {
+                    role: "assistant".to_string(),
+                    content: assistant_msg.content.clone(),
+                    tool_calls: None,
+                });
 
                 return Ok(assistant_msg.content);
             }
@@ -204,40 +366,32 @@ impl Agent {
             );
 
             // Add assistant message with tool calls to messages
-            messages.push(assistant_msg.clone());
+            messages.push(DirectMessage {
+                role: "assistant".to_string(),
+                content: assistant_msg.content.clone(),
+                tool_calls: Some(assistant_msg.tool_calls.clone()),
+            });
 
             // Execute each tool call and add results
             for tool_call in &assistant_msg.tool_calls {
-                let result = match self.execute_tool_call(tool_call).await {
+                let result = match self.execute_direct_tool_call(tool_call).await {
                     Ok(r) => r,
                     Err(e) => {
-                        // Return error as tool result so LLM can handle it
                         format!("Error calling tool {}: {}", tool_call.function.name, e)
                     }
                 };
 
                 // Create tool response message
-                let mut tool_msg = ChatMessage::tool(result);
-                // Set tool_call info if needed (some models require this)
-                tool_msg.tool_calls = vec![tool_call.clone()];
-
-                messages.push(tool_msg);
+                messages.push(DirectMessage {
+                    role: "tool".to_string(),
+                    content: result,
+                    tool_calls: None,
+                });
             }
         }
 
         // If we hit max iterations, return last assistant message
         Ok("Agent reached maximum iterations without completing.".to_string())
-    }
-
-    /// Clear conversation history
-    pub fn clear_history(&mut self) {
-        self.history.clear();
-    }
-
-    /// Get available tool names
-    pub async fn tool_names(&mut self) -> Result<Vec<String>> {
-        let tools = self.mcp_pool.list_all_tools().await?;
-        Ok(tools.into_iter().map(|t| t.name).collect())
     }
 }
 
@@ -263,12 +417,12 @@ mod tests {
             })),
         };
 
-        let ollama_tools = Agent::mcp_tools_to_ollama(&[mcp_tool]);
+        let direct_tools = Agent::mcp_tools_to_direct(&[mcp_tool]);
 
-        assert_eq!(ollama_tools.len(), 1);
-        assert_eq!(ollama_tools[0].function.name, "get_weather");
+        assert_eq!(direct_tools.len(), 1);
+        assert_eq!(direct_tools[0].function.name, "get_weather");
         assert_eq!(
-            ollama_tools[0].function.description,
+            direct_tools[0].function.description,
             "Get weather for a city"
         );
     }
