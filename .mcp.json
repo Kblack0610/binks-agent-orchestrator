@@ -30,6 +30,23 @@
         "RUST_LOG": "info"
       }
     },
+    "inbox": {
+      "command": "./mcps/inbox-mcp/target/release/inbox-mcp",
+      "args": [],
+      "env": {
+        "INBOX_PATH": "${HOME}/.notes/inbox",
+        "RUST_LOG": "info"
+      }
+    },
+    "notify": {
+      "command": "./mcps/notify-mcp/target/release/notify-mcp",
+      "args": [],
+      "env": {
+        "SLACK_WEBHOOK_URL": "${SLACK_WEBHOOK_URL}",
+        "DISCORD_WEBHOOK_URL": "${DISCORD_WEBHOOK_URL}",
+        "RUST_LOG": "info"
+      }
+    },
     "agent": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/release/agent",
       "args": [
