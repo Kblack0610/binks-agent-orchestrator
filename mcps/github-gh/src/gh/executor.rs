@@ -132,6 +132,53 @@ pub async fn execute_gh_action(args: &[&str]) -> GhResult<String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
+/// Execute a gh command and return raw output
+///
+/// This function is used for commands that return raw text (like diffs)
+/// rather than JSON data.
+///
+/// # Arguments
+///
+/// * `args` - Command arguments (e.g., `["pr", "diff", "123", "-R", "owner/repo"]`)
+///
+/// # Returns
+///
+/// The raw stdout output from the command as a string
+#[instrument(fields(cmd = %args.join(" ")))]
+pub async fn execute_gh_raw(args: &[&str]) -> GhResult<String> {
+    debug!("executing: gh {}", args.join(" "));
+
+    let output = Command::new("gh")
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                GhError::NotFound
+            } else {
+                GhError::SpawnError(e)
+            }
+        })?
+        .wait_with_output()
+        .await?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let code = output.status.code().unwrap_or(-1);
+
+        if stderr.contains("gh auth login") || stderr.contains("not logged in") {
+            error!("gh authentication required");
+            return Err(GhError::NotAuthenticated);
+        }
+
+        error!(code, stderr = %stderr, "gh command failed");
+        return Err(GhError::CommandFailed { code, stderr });
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 /// Check if gh CLI is available and authenticated
 ///
 /// This function verifies that:

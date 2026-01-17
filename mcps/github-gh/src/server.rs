@@ -11,7 +11,7 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::gh::{execute_gh_action, execute_gh_json, GhError};
+use crate::gh::{execute_gh_action, execute_gh_json, execute_gh_raw, GhError};
 use crate::types::{Issue, PullRequest, Repository, Workflow, WorkflowRun};
 
 /// The main GitHub MCP Server
@@ -212,6 +212,60 @@ pub struct RunCancelParams {
     pub repo: String,
     #[schemars(description = "Workflow run ID")]
     pub run_id: u64,
+}
+
+// ============================================================================
+// Phase 4: Analysis Tools Parameter Types
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct PrDiffParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Pull request number")]
+    pub number: u32,
+    #[schemars(description = "Only show names of changed files")]
+    pub name_only: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct PrChecksParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Pull request number")]
+    pub number: u32,
+    #[schemars(description = "Only show failed checks")]
+    pub failed: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct SearchPrsParams {
+    #[schemars(description = "Repository in OWNER/REPO format (optional, searches all repos if not provided)")]
+    pub repo: Option<String>,
+    #[schemars(description = "Search query (GitHub search syntax)")]
+    pub query: String,
+    #[schemars(description = "Maximum number of results to return")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct PrCommentParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Pull request number")]
+    pub number: u32,
+    #[schemars(description = "Comment body in markdown")]
+    pub body: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct IssueCommentParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Issue number")]
+    pub number: u32,
+    #[schemars(description = "Comment body in markdown")]
+    pub body: String,
 }
 
 // ============================================================================
@@ -684,6 +738,107 @@ impl GitHubMcpServer {
         let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
         let msg = if output.is_empty() {
             format!("Run {} cancelled successfully", params.run_id)
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    // ========================================================================
+    // Phase 4: Analysis Tools
+    // ========================================================================
+
+    #[tool(description = "Get the diff for a pull request")]
+    async fn gh_pr_diff(
+        &self,
+        Parameters(params): Parameters<PrDiffParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let number_str = params.number.to_string();
+        let mut args = vec!["pr", "diff", &number_str, "-R", &params.repo];
+
+        if params.name_only == Some(true) {
+            args.push("--name-only");
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Get CI/CD check status for a pull request")]
+    async fn gh_pr_checks(
+        &self,
+        Parameters(params): Parameters<PrChecksParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let number_str = params.number.to_string();
+        let mut args = vec!["pr", "checks", &number_str, "-R", &params.repo];
+
+        if params.failed == Some(true) {
+            args.push("--fail");
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Search for pull requests using GitHub search syntax")]
+    async fn gh_search_prs(
+        &self,
+        Parameters(params): Parameters<SearchPrsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["search", "prs", &params.query];
+
+        let repo_str;
+        let limit_str;
+
+        if let Some(ref repo) = params.repo {
+            repo_str = format!("--repo={}", repo);
+            args.push(&repo_str);
+        }
+        if let Some(limit) = params.limit {
+            limit_str = limit.to_string();
+            args.extend(["--limit", &limit_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Add a comment to a pull request")]
+    async fn gh_pr_comment(
+        &self,
+        Parameters(params): Parameters<PrCommentParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let number_str = params.number.to_string();
+        let args = vec![
+            "pr", "comment", &number_str,
+            "-R", &params.repo,
+            "-b", &params.body,
+        ];
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            format!("Comment added to PR #{}", params.number)
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    #[tool(description = "Add a comment to an issue")]
+    async fn gh_issue_comment(
+        &self,
+        Parameters(params): Parameters<IssueCommentParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let number_str = params.number.to_string();
+        let args = vec![
+            "issue", "comment", &number_str,
+            "-R", &params.repo,
+            "-b", &params.body,
+        ];
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            format!("Comment added to issue #{}", params.number)
         } else {
             output
         };

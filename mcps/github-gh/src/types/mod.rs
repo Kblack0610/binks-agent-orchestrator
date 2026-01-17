@@ -3,12 +3,14 @@
 //! This module contains Rust structs that represent GitHub entities
 //! as returned by the gh CLI in JSON format.
 
+pub mod check;
 pub mod common;
 pub mod issue;
 pub mod pull_request;
 pub mod repo;
 pub mod workflow;
 
+pub use check::{CheckContext, CheckRun, StatusCheckRollup};
 pub use common::{Label, Milestone, User};
 pub use issue::Issue;
 pub use pull_request::PullRequest;
