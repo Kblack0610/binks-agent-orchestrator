@@ -1,182 +1,157 @@
-# Minimal Rust Agent
+# Binks Agent CLI
 
-A bare-bones Rust agent with Ollama LLM and MCP (Model Context Protocol) support.
+Rust-based AI agent with Ollama LLM and MCP tool integration.
 
-## Features
-
-- **Ollama Integration**: Chat with local LLMs via Ollama
-- **MCP Client**: Connect to MCP servers (kubernetes, ssh, github, etc.)
-- **Single Binary**: Minimal dependencies, compiles to ~5MB stripped binary
-- **Extensible**: Foundation for building a full agent system
-
-## Quick Start
+## Build
 
 ```bash
-# Build
-cargo build
-
-# Chat with Ollama
-cargo run -- --ollama-url http://localhost:11434 chat "Hello"
-
-# Interactive chat session
-cargo run -- interactive
-
-# List available MCP tools
-cargo run -- tools
-
-# Call a specific tool
-cargo run -- call <tool_name> --args '{"key": "value"}'
+cd agent
+cargo build --release
 ```
+
+## Environment
+
+```bash
+export OLLAMA_URL=http://192.168.1.4:11434  # Or http://localhost:11434
+export OLLAMA_MODEL=llama3.1:8b
+```
+
+---
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `chat <message>` | Send a single message to the LLM |
-| `interactive` | Start an interactive chat session |
-| `agent [message]` | Run tool-using agent (LLM decides when to call tools) |
-| `agent -s "prompt"` | Agent with custom system prompt |
-| `tools` | List all available tools from MCP servers |
-| `tools --server <name>` | List tools from a specific MCP server |
-| `call <tool> [--args <json>]` | Call a tool directly |
-| `serve` | Run as an MCP server (expose agent as tools) |
-| `serve -s "prompt"` | MCP server with custom system prompt |
+### chat
+
+Simple LLM chat (no tools).
+
+```bash
+agent chat "What is Rust?"
+```
+
+### interactive
+
+Interactive chat session with history.
+
+```bash
+agent interactive
+```
+
+### agent
+
+Tool-using agent mode. The LLM decides when to call tools.
+
+```bash
+# Single message
+agent agent "What's my CPU usage?"
+
+# Interactive
+agent agent
+
+# With custom system prompt
+agent agent -s "You are a DevOps expert" "Check cluster health"
+
+# Filter to specific MCP servers (good for smaller models)
+agent agent --servers sysinfo,github-gh "Get system info"
+```
+
+**Interactive commands:**
+- `tools` - List available tools
+- `servers` - List MCP servers
+- `clear` - Clear conversation history
+- `quit` - Exit
+
+### monitor
+
+Repository monitoring agent. Polls GitHub, writes to inbox, sends notifications.
+
+```bash
+# Run once (for cron)
+agent monitor --once --repos owner/repo1,owner/repo2
+
+# Run continuously with live output
+agent monitor --repos owner/repo --interval 300
+
+# With custom system prompt
+agent monitor --repos owner/repo -s "Focus on security issues"
+```
+
+**Live monitoring view:**
+```bash
+# Terminal 1: Run monitor
+agent monitor --repos kblack0610/binks-agent-orchestrator --interval 60
+
+# Terminal 2: Watch inbox updates
+tail -f ~/.notes/inbox/$(date +%Y-%m-%d).md
+```
+
+### tools
+
+List available MCP tools.
+
+```bash
+# All tools
+agent tools
+
+# From specific server
+agent tools --server github-gh
+```
+
+### call
+
+Call an MCP tool directly.
+
+```bash
+agent call get_system_summary
+
+agent call gh_issue_list --args '{"repo": "owner/repo", "state": "open"}'
+
+agent call write_inbox --args '{"message": "Test", "source": "manual"}'
+```
+
+### serve
+
+Run the agent as an MCP server (exposes `chat` and `agent_chat` tools).
+
+```bash
+agent serve
+
+# With custom system prompt
+agent serve -s "You are a helpful assistant"
+```
+
+---
 
 ## Configuration
 
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `llama3.1:8b` | Model to use |
-| `RUST_LOG` | - | Log level (e.g., `info`, `debug`) |
-
-### MCP Servers
-
-The agent reads MCP server configuration from `.mcp.json` in the current directory or any parent directory:
+MCP servers are configured in `.mcp.json` at the project root:
 
 ```json
 {
   "mcpServers": {
-    "kubernetes": {
-      "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest"],
-      "env": {
-        "KUBECONFIG": "${HOME}/.kube/config"
-      }
+    "sysinfo": {
+      "command": "./mcps/sysinfo-mcp/target/release/sysinfo-mcp"
     },
-    "ssh": {
-      "command": "npx",
-      "args": ["@aiondadotcom/mcp-ssh"]
+    "github-gh": {
+      "command": "./mcps/github-gh/target/release/github-gh-mcp"
     }
   }
 }
 ```
 
-## Architecture
+---
 
-```
-agent/
-├── Cargo.toml           # Dependencies (~13 crates)
-├── src/
-│   ├── main.rs          # CLI entry point (clap)
-│   ├── lib.rs           # Module exports
-│   ├── config.rs        # .mcp.json configuration loader
-│   ├── agent/
-│   │   └── mod.rs       # Tool-using agent loop
-│   ├── llm/
-│   │   ├── mod.rs       # Llm trait abstraction
-│   │   └── ollama.rs    # Ollama implementation
-│   ├── mcp/
-│   │   ├── mod.rs       # MCP module exports
-│   │   └── client.rs    # MCP client pool
-│   └── server/
-│       └── mod.rs       # MCP server implementation
-```
-
-## MCP Server Mode
-
-Run the agent as an MCP server to expose its capabilities to other tools:
+## Examples
 
 ```bash
-# Start MCP server on stdio
-cargo run -- serve
+# Check system health
+agent agent "What's my disk and memory usage?"
 
-# With custom system prompt
-cargo run -- serve -s "You are a helpful assistant focused on kubernetes tasks"
+# GitHub workflow
+agent agent "List open PRs in kblack0610/my-repo"
+
+# Kubernetes (if configured)
+agent agent --servers kubernetes "List all pods in the default namespace"
+
+# Monitor repos continuously
+agent monitor --repos myorg/repo1,myorg/repo2 --interval 600
 ```
-
-### Exposed Tools
-
-| Tool | Description |
-|------|-------------|
-| `chat` | Simple LLM chat (no tool access) |
-| `agent_chat` | Full agent with MCP tool access |
-| `list_tools` | List available MCP tools |
-
-### Using with Claude Code
-
-Add to your `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "binks-agent": {
-      "command": "/path/to/agent",
-      "args": ["serve", "-s", "You are a helpful assistant"]
-    }
-  }
-}
-```
-
-## Dependencies
-
-| Crate | Purpose |
-|-------|---------|
-| `ollama-rs` | Ollama API client |
-| `rmcp` | MCP protocol (client + server) |
-| `tokio` | Async runtime |
-| `clap` | CLI argument parsing |
-| `serde` / `serde_json` | Serialization |
-| `anyhow` / `thiserror` | Error handling |
-| `tracing` | Logging |
-
-## Development
-
-```bash
-# Hot reload during development
-cargo install cargo-watch
-cargo watch -x 'run -- tools'
-
-# Build release binary
-cargo build --release
-
-# Run with debug logging
-RUST_LOG=debug cargo run -- tools
-```
-
-## Tool-Calling Models
-
-For the `agent` command to work properly, you need an Ollama model that supports tool calling. Recommended models:
-
-```bash
-# Pull a model with good tool support
-ollama pull qwen2.5:7b
-ollama pull llama3.2:3b
-ollama pull mistral:7b
-
-# Use it
-cargo run -- --model qwen2.5:7b agent "List my kubernetes namespaces"
-```
-
-## Roadmap
-
-- [x] Phase 1: Ollama chat integration
-- [x] Phase 2: MCP client (connect to servers, list tools)
-- [x] Phase 3: Tool-using agent loop (LLM decides when to use tools)
-- [x] Phase 4: MCP server mode (expose agent as MCP server)
-
-## License
-
-MIT
