@@ -53,7 +53,10 @@ cd mcps/github-gh && cargo build --release
 ./agent/target/release/agent chat
 
 # List available tools
-./agent/target/release/agent list-tools
+./agent/target/release/agent tools
+
+# Monitor repos (live view)
+./agent/target/release/agent monitor --repos owner/repo --interval 60
 ```
 
 ## Project Structure
@@ -77,10 +80,33 @@ binks-agent-orchestrator/
 
 | Server | Description | Tools |
 |--------|-------------|-------|
+| `github-gh` | GitHub CLI wrapper | 21 tools: issues, PRs, workflows, diffs, checks |
 | `sysinfo-mcp` | Cross-platform system info | OS, CPU, memory, disk, network, uptime |
-| `github-gh` | GitHub CLI wrapper | Issues, PRs, workflows, repos |
+| `inbox-mcp` | Local file inbox | Write/read reports to ~/.notes/inbox |
+| `notify-mcp` | Notifications | Slack, Discord webhooks |
 | `kubernetes` | K8s management (external) | Pods, deployments, services |
 | `ssh` | SSH operations (external) | Remote commands, file transfer |
+
+See [mcps/overview.md](mcps/overview.md) for full tool list.
+
+## Hardware
+
+The Ollama LLM backend runs on a dedicated Mac Studio:
+
+| Component | Specification |
+|-----------|---------------|
+| **Hostname** | Kenneths-Mac-Studio.local |
+| **IP Address** | 192.168.1.4 |
+| **OS** | macOS 15.6 (Build 24G84) |
+| **CPU** | Apple M3 Ultra (32 cores) |
+| **Memory** | 512 GB unified memory |
+| **Storage** | 1.8 TB SSD (56% used) |
+| **Ollama Port** | 11434 |
+
+To connect to the Ollama host:
+```bash
+export OLLAMA_URL=http://192.168.1.4:11434
+```
 
 ## Configuration
 
@@ -107,8 +133,10 @@ export OLLAMA_MODEL=llama3.1:8b
 
 ## Documentation
 
+- [Agent CLI](agent/readme.md) - All agent commands and usage
+- [MCP Servers](mcps/overview.md) - Available tools and how to add new servers
+- [Monitoring](docs/monitoring.md) - Repository monitoring setup
 - [Architecture](docs/ARCHITECTURE.md) - System design and components
-- [Legacy Orchestration](docs/LEGACY_ORCHESTRATION.md) - Historical Python-based design
 
 ## Adding New MCP Servers
 
