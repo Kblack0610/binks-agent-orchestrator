@@ -1,0 +1,32 @@
+# Agent Configuration Example
+# Copy this file to .agent.toml and customize as needed
+#
+# Configuration priority:
+#   1. CLI arguments (--model, --ollama-url)
+#   2. Environment variables (OLLAMA_MODEL, OLLAMA_URL)
+#   3. This config file (.agent.toml)
+#   4. Hardcoded defaults
+#
+# The agent searches for .agent.toml starting from the current directory
+# and walking up the directory tree (like .mcp.json)
+
+[llm]
+# Ollama server URL
+url = "http://localhost:11434"
+
+# Model to use (qwen2.5-coder:32b recommended for Mac Studio with M3 Ultra)
+model = "qwen2.5-coder:32b"
+
+[agent]
+# Optional system prompt for the agent
+# system_prompt = "You are a helpful assistant with access to system tools."
+
+[monitor]
+# Polling interval in seconds for the monitor command
+interval = 300
+
+# Repositories to monitor (can also be passed via --repos)
+repos = [
+    # "owner/repo1",
+    # "owner/repo2",
+]

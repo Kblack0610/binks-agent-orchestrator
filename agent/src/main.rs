@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use agent::agent::Agent;
+use agent::config::AgentFileConfig;
 use agent::llm::{Llm, OllamaClient};
 use agent::mcp::McpClientPool;
 use agent::monitor::{self, MonitorConfig};
@@ -15,13 +16,13 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Ollama server URL
-    #[arg(long, env = "OLLAMA_URL", default_value = "http://192.168.1.4:11434")]
-    ollama_url: String,
+    /// Ollama server URL (default: from .agent.toml or http://localhost:11434)
+    #[arg(long, env = "OLLAMA_URL")]
+    ollama_url: Option<String>,
 
-    /// Model to use
-    #[arg(long, env = "OLLAMA_MODEL", default_value = "llama3.1:8b")]
-    model: String,
+    /// Model to use (default: from .agent.toml or qwen2.5-coder:32b)
+    #[arg(long, env = "OLLAMA_MODEL")]
+    model: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -90,21 +91,28 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
+    // Load config file (.agent.toml) - returns defaults if not found
+    let file_config = AgentFileConfig::load()?;
+
     let cli = Cli::parse();
+
+    // Resolve final values with priority: CLI/env > config file > hardcoded defaults
+    let ollama_url = cli.ollama_url.unwrap_or_else(|| file_config.llm.url.clone());
+    let model = cli.model.unwrap_or_else(|| file_config.llm.model.clone());
 
     match cli.command {
         Commands::Chat { message } => {
-            let llm = OllamaClient::new(&cli.ollama_url, &cli.model);
+            let llm = OllamaClient::new(&ollama_url, &model);
             let response = llm.chat(&message).await?;
             println!("{}", response);
         }
         Commands::Interactive => {
-            let llm = OllamaClient::new(&cli.ollama_url, &cli.model);
+            let llm = OllamaClient::new(&ollama_url, &model);
             run_interactive(llm).await?;
         }
         Commands::Agent { message, system, servers } => {
             let server_list = servers.map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
-            run_agent(&cli.ollama_url, &cli.model, message, system, server_list).await?;
+            run_agent(&ollama_url, &model, message, system, server_list).await?;
         }
         Commands::Tools { server } => {
             run_tools(server).await?;
@@ -114,26 +122,29 @@ async fn main() -> Result<()> {
         }
         Commands::Serve { system } => {
             let config = ServerConfig {
-                ollama_url: cli.ollama_url,
-                model: cli.model,
+                ollama_url: ollama_url,
+                model: model,
                 system_prompt: system,
             };
             server::serve(config).await?;
         }
         Commands::Monitor { once, interval, repos, system } => {
+            // Use repos from CLI, or fall back to config file
             let repos = repos
                 .map(|r| r.split(',').map(|s| s.trim().to_string()).collect())
-                .unwrap_or_else(Vec::new);
+                .unwrap_or_else(|| file_config.monitor.repos.clone());
 
             if repos.is_empty() {
-                eprintln!("Error: No repositories specified. Use --repos to specify repos to monitor.");
+                eprintln!("Error: No repositories specified. Use --repos to specify repos to monitor,");
+                eprintln!("or set repos in .agent.toml under [monitor].");
                 eprintln!("Example: agent monitor --once --repos owner/repo1,owner/repo2");
                 std::process::exit(1);
             }
 
+            // Use interval from CLI (300 default), but could also check config
             let config = MonitorConfig {
-                ollama_url: cli.ollama_url,
-                model: cli.model,
+                ollama_url: ollama_url,
+                model: model,
                 repos,
                 once,
                 interval,
