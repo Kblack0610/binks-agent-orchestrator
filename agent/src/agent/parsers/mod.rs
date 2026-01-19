@@ -11,10 +11,12 @@ use serde::{Deserialize, Serialize};
 mod standard;
 mod tool_args;
 mod function_params;
+mod xml_function;
 
 pub use standard::StandardParser;
 pub use tool_args::ToolArgsParser;
 pub use function_params::FunctionParamsParser;
+pub use xml_function::XmlFunctionParser;
 
 // ============================================================================
 // Shared Types (used by agent and parsers)
@@ -84,6 +86,7 @@ impl ToolCallParserRegistry {
     pub fn new() -> Self {
         let mut parsers: Vec<Box<dyn ToolCallParser>> = vec![
             Box::new(StandardParser),
+            Box::new(XmlFunctionParser::new()),
             Box::new(ToolArgsParser),
             Box::new(FunctionParamsParser),
         ];
@@ -101,12 +104,8 @@ impl ToolCallParserRegistry {
     pub fn parse(&self, content: &str) -> Option<(ToolCall, &'static str)> {
         let content = content.trim();
 
-        // Quick check: must look like JSON
-        if !content.starts_with('{') || !content.ends_with('}') {
-            return None;
-        }
-
         // Try each parser in priority order
+        // Each parser handles its own format detection (JSON, XML, etc.)
         for parser in &self.parsers {
             if let Some(tool_call) = parser.parse(content) {
                 return Some((tool_call, parser.name()));
@@ -136,17 +135,34 @@ mod tests {
         let names = registry.parser_names();
 
         assert!(names.contains(&"StandardParser"));
+        assert!(names.contains(&"XmlFunctionParser"));
         assert!(names.contains(&"ToolArgsParser"));
         assert!(names.contains(&"FunctionParamsParser"));
     }
 
     #[test]
-    fn test_registry_rejects_non_json() {
+    fn test_registry_rejects_invalid() {
         let registry = ToolCallParserRegistry::new();
 
         assert!(registry.parse("hello world").is_none());
         assert!(registry.parse("").is_none());
+        // Incomplete JSON still fails
         assert!(registry.parse("{ incomplete").is_none());
+    }
+
+    #[test]
+    fn test_registry_xml_format() {
+        let registry = ToolCallParserRegistry::new();
+
+        let content = r#"<function=list_dir>
+<parameter=path>/tmp</parameter>
+</function>"#;
+        let result = registry.parse(content);
+
+        assert!(result.is_some());
+        let (tool_call, parser_name) = result.unwrap();
+        assert_eq!(tool_call.function.name, "list_dir");
+        assert_eq!(parser_name, "XmlFunctionParser");
     }
 
     #[test]

@@ -37,6 +37,9 @@ schemars = "1.2"
 thiserror = "2"
 anyhow = "1"
 
+# Regex for tool call parsing
+regex = "1"
+
 # Unix signals for daemon management
 libc = "0.2"
 
