@@ -4,6 +4,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use agent::agent::Agent;
 use agent::config::{AgentFileConfig, McpConfig};
+use agent::context::EnvironmentContext;
 use agent::llm::{Llm, OllamaClient};
 use agent::mcp::McpClientPool;
 use agent::mcps::{DaemonClient, McpDaemon, is_daemon_running, default_socket_path, default_pid_path, default_log_dir};
@@ -159,7 +160,7 @@ async fn main() -> Result<()> {
         }
         Commands::Agent { message, system, servers, verbose } => {
             let server_list = servers.map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
-            run_agent(&ollama_url, &model, message, system, server_list, verbose).await?;
+            run_agent(&ollama_url, &model, message, system, server_list, verbose, &file_config).await?;
         }
         Commands::Tools { server } => {
             run_tools(server).await?;
@@ -347,13 +348,22 @@ async fn run_agent(
     system: Option<String>,
     servers: Option<Vec<String>>,
     verbose: bool,
+    file_config: &AgentFileConfig,
 ) -> Result<()> {
     let pool = McpClientPool::load()?
         .ok_or_else(|| anyhow::anyhow!("No .mcp.json found - agent needs MCP tools"))?;
 
     let mut agent = Agent::new(ollama_url, model, pool).with_verbose(verbose);
 
-    if let Some(sys) = system {
+    // System prompt precedence: CLI > config file > auto-generated
+    let system_prompt = system
+        .or_else(|| file_config.agent.system_prompt.clone())
+        .or_else(|| {
+            let ctx = EnvironmentContext::gather();
+            Some(ctx.to_system_prompt())
+        });
+
+    if let Some(sys) = system_prompt {
         agent = agent.with_system_prompt(&sys);
     }
 
