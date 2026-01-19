@@ -51,7 +51,7 @@ pub struct ListDirParams {
     pub path: String,
 
     #[schemars(description = "Include files recursively (default: false)")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::types::deserialize_lenient_bool")]
     pub recursive: bool,
 }
 
@@ -85,7 +85,7 @@ pub struct DeleteFileParams {
     pub path: String,
 
     #[schemars(description = "Recursively delete directories (default: false)")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::types::deserialize_lenient_bool")]
     pub recursive: bool,
 }
 
@@ -95,7 +95,7 @@ pub struct CreateDirParams {
     pub path: String,
 
     #[schemars(description = "Create parent directories as needed (default: true)")]
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", deserialize_with = "crate::types::deserialize_lenient_bool")]
     pub recursive: bool,
 }
 

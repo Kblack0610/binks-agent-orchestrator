@@ -56,6 +56,14 @@
         "OLLAMA_URL": "http://192.168.1.4:11434",
         "OLLAMA_MODEL": "llama3.1:8b"
       }
+    },
+    "filesystem": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/filesystem-mcp/target/release/filesystem-mcp",
+      "args": [],
+      "env": {
+        "FS_CONFIG_PATH": "${HOME}/.binks/filesystem.toml",
+        "RUST_LOG": "info"
+      }
     }
   }
 }

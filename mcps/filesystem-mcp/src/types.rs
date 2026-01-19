@@ -1,7 +1,112 @@
 //! Type definitions for filesystem MCP
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+// ============================================================================
+// Lenient Boolean Parsing (handles "true"/"false" strings from weak LLMs)
+// ============================================================================
+
+/// Deserialize a boolean that can be either a real bool or a string "true"/"false"
+pub fn deserialize_lenient_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+
+    struct LenientBoolVisitor;
+
+    impl<'de> Visitor<'de> for LenientBoolVisitor {
+        type Value = bool;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a boolean or string 'true'/'false'")
+        }
+
+        fn visit_bool<E>(self, value: bool) -> Result<bool, E> {
+            Ok(value)
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<bool, E>
+        where
+            E: de::Error,
+        {
+            match value.to_lowercase().as_str() {
+                "true" | "1" | "yes" => Ok(true),
+                "false" | "0" | "no" | "" => Ok(false),
+                _ => Err(de::Error::custom(format!(
+                    "invalid boolean string: '{}' (expected 'true' or 'false')",
+                    value
+                ))),
+            }
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<bool, E> {
+            Ok(value != 0)
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<bool, E> {
+            Ok(value != 0)
+        }
+    }
+
+    deserializer.deserialize_any(LenientBoolVisitor)
+}
+
+/// Deserialize an optional boolean with lenient parsing
+pub fn deserialize_lenient_bool_opt<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+
+    struct LenientBoolOptVisitor;
+
+    impl<'de> Visitor<'de> for LenientBoolOptVisitor {
+        type Value = Option<bool>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("null, a boolean, or string 'true'/'false'")
+        }
+
+        fn visit_none<E>(self) -> Result<Option<bool>, E> {
+            Ok(None)
+        }
+
+        fn visit_unit<E>(self) -> Result<Option<bool>, E> {
+            Ok(None)
+        }
+
+        fn visit_bool<E>(self, value: bool) -> Result<Option<bool>, E> {
+            Ok(Some(value))
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Option<bool>, E>
+        where
+            E: de::Error,
+        {
+            match value.to_lowercase().as_str() {
+                "true" | "1" | "yes" => Ok(Some(true)),
+                "false" | "0" | "no" | "" => Ok(Some(false)),
+                "null" | "none" => Ok(None),
+                _ => Err(de::Error::custom(format!(
+                    "invalid boolean string: '{}' (expected 'true' or 'false')",
+                    value
+                ))),
+            }
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Option<bool>, E> {
+            Ok(Some(value != 0))
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Option<bool>, E> {
+            Ok(Some(value != 0))
+        }
+    }
+
+    deserializer.deserialize_any(LenientBoolOptVisitor)
+}
 
 // ============================================================================
 // Configuration Types
