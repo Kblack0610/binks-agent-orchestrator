@@ -22,19 +22,12 @@ pub struct McpServerConfig {
 }
 
 impl McpConfig {
-    /// Load MCP config from .mcp.json, searching up the directory tree
+    /// Load MCP config from .mcp.json in the current directory only
     pub fn load() -> Result<Option<Self>> {
-        let mut dir = std::env::current_dir()?;
+        let config_path = std::env::current_dir()?.join(".mcp.json");
 
-        loop {
-            let config_path = dir.join(".mcp.json");
-            if config_path.exists() {
-                return Self::load_from_path(&config_path).map(Some);
-            }
-
-            if !dir.pop() {
-                break;
-            }
+        if config_path.exists() {
+            return Self::load_from_path(&config_path).map(Some);
         }
 
         Ok(None)
@@ -119,19 +112,12 @@ impl Default for MonitorSectionConfig {
 }
 
 impl AgentFileConfig {
-    /// Load config from .agent.toml, searching up the directory tree
+    /// Load config from .agent.toml in the current directory only
     pub fn load() -> Result<Self> {
-        let mut dir = std::env::current_dir()?;
+        let config_path = std::env::current_dir()?.join(".agent.toml");
 
-        loop {
-            let config_path = dir.join(".agent.toml");
-            if config_path.exists() {
-                return Self::load_from_path(&config_path);
-            }
-
-            if !dir.pop() {
-                break;
-            }
+        if config_path.exists() {
+            return Self::load_from_path(&config_path);
         }
 
         // No config file found, return defaults
