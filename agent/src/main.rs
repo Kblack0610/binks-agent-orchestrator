@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use agent::agent::Agent;
-use agent::config::AgentFileConfig;
+use agent::config::{AgentFileConfig, McpConfig};
 use agent::llm::{Llm, OllamaClient};
 use agent::mcp::McpClientPool;
 use agent::monitor::{self, MonitorConfig};
@@ -81,6 +81,18 @@ enum Commands {
         #[arg(long, short)]
         system: Option<String>,
     },
+    /// Run health checks on agent components
+    Health {
+        /// Also test LLM connectivity with a simple query
+        #[arg(long)]
+        test_llm: bool,
+        /// Also test tool execution with a simple call
+        #[arg(long)]
+        test_tools: bool,
+        /// Run all tests (equivalent to --test-llm --test-tools)
+        #[arg(long, short)]
+        all: bool,
+    },
 }
 
 #[tokio::main]
@@ -151,6 +163,9 @@ async fn main() -> Result<()> {
                 system_prompt: system,
             };
             monitor::run_monitor(config).await?;
+        }
+        Commands::Health { test_llm, test_tools, all } => {
+            run_health(&ollama_url, &model, test_llm || all, test_tools || all).await?;
         }
     }
 
@@ -417,4 +432,187 @@ async fn run_agent(
     }
 
     Ok(())
+}
+
+async fn run_health(ollama_url: &str, model: &str, test_llm: bool, test_tools: bool) -> Result<()> {
+    println!("=== Agent Health Check ===\n");
+
+    let mut all_passed = true;
+    let mut checks_run = 0;
+    let mut checks_passed = 0;
+
+    // Helper to print status
+    fn status(passed: bool) -> &'static str {
+        if passed { "✓" } else { "✗" }
+    }
+
+    // 1. Check .agent.toml config
+    checks_run += 1;
+    print!("Config (.agent.toml): ");
+    let config_path = std::env::current_dir()?.join(".agent.toml");
+    if config_path.exists() {
+        match AgentFileConfig::load() {
+            Ok(config) => {
+                println!("{} Found", status(true));
+                println!("  - LLM URL: {}", config.llm.url);
+                println!("  - Model: {}", config.llm.model);
+                checks_passed += 1;
+            }
+            Err(e) => {
+                println!("{} Parse error: {}", status(false), e);
+                all_passed = false;
+            }
+        }
+    } else {
+        println!("{} Not found (using defaults)", status(true));
+        println!("  - LLM URL: {}", ollama_url);
+        println!("  - Model: {}", model);
+        checks_passed += 1;
+    }
+
+    // 2. Check .mcp.json config
+    checks_run += 1;
+    print!("Config (.mcp.json): ");
+    let mcp_path = std::env::current_dir()?.join(".mcp.json");
+    if mcp_path.exists() {
+        match McpConfig::load() {
+            Ok(Some(config)) => {
+                let server_count = config.mcp_servers.len();
+                println!("{} Found ({} servers)", status(true), server_count);
+                for name in config.mcp_servers.keys() {
+                    println!("  - {}", name);
+                }
+                checks_passed += 1;
+            }
+            Ok(None) => {
+                println!("{} Not found", status(false));
+                all_passed = false;
+            }
+            Err(e) => {
+                println!("{} Parse error: {}", status(false), e);
+                all_passed = false;
+            }
+        }
+    } else {
+        println!("{} Not found", status(false));
+        all_passed = false;
+    }
+
+    // 3. Check MCP server connections and tools
+    checks_run += 1;
+    print!("MCP Connections: ");
+    match McpClientPool::load() {
+        Ok(Some(mut pool)) => {
+            match pool.list_all_tools().await {
+                Ok(tools) => {
+                    // Group by server
+                    let mut by_server: std::collections::HashMap<String, usize> =
+                        std::collections::HashMap::new();
+                    for tool in &tools {
+                        *by_server.entry(tool.server.clone()).or_default() += 1;
+                    }
+
+                    let connected_servers = by_server.len();
+                    let total_tools = tools.len();
+                    println!("{} {} servers, {} tools", status(true), connected_servers, total_tools);
+
+                    for (server, count) in by_server.iter() {
+                        println!("  - {}: {} tools", server, count);
+                    }
+                    checks_passed += 1;
+                }
+                Err(e) => {
+                    println!("{} Tool discovery failed: {}", status(false), e);
+                    all_passed = false;
+                }
+            }
+        }
+        Ok(None) => {
+            println!("{} No .mcp.json found", status(false));
+            all_passed = false;
+        }
+        Err(e) => {
+            println!("{} Failed to load: {}", status(false), e);
+            all_passed = false;
+        }
+    }
+
+    // 4. Optional: Test LLM connectivity
+    if test_llm {
+        checks_run += 1;
+        print!("LLM Connectivity: ");
+        let llm = OllamaClient::new(ollama_url, model);
+        match llm.chat("Say 'OK' and nothing else.").await {
+            Ok(response) => {
+                let trimmed = response.trim();
+                let short_response = if trimmed.len() > 50 {
+                    format!("{}...", &trimmed[..50])
+                } else {
+                    trimmed.to_string()
+                };
+                println!("{} Response: \"{}\"", status(true), short_response);
+                checks_passed += 1;
+            }
+            Err(e) => {
+                println!("{} Failed: {}", status(false), e);
+                all_passed = false;
+            }
+        }
+    }
+
+    // 5. Optional: Test tool execution
+    if test_tools {
+        checks_run += 1;
+        print!("Tool Execution: ");
+        match McpClientPool::load() {
+            Ok(Some(mut pool)) => {
+                // Try to call a simple sysinfo tool (without the mcp__ prefix)
+                match pool.call_tool("get_uptime", None).await {
+                    Ok(result) => {
+                        // Extract the text from result
+                        let text = result.content.iter()
+                            .filter_map(|c| match &c.raw {
+                                rmcp::model::RawContent::Text(t) => Some(t.text.as_str()),
+                                _ => None,
+                            })
+                            .next()
+                            .unwrap_or("(no text)");
+
+                        // Truncate if needed
+                        let short_text = if text.len() > 60 {
+                            format!("{}...", &text[..60])
+                        } else {
+                            text.to_string()
+                        };
+                        println!("{} get_uptime returned: {}", status(true), short_text);
+                        checks_passed += 1;
+                    }
+                    Err(e) => {
+                        println!("{} Failed: {}", status(false), e);
+                        all_passed = false;
+                    }
+                }
+            }
+            Ok(None) => {
+                println!("{} No MCP pool available", status(false));
+                all_passed = false;
+            }
+            Err(e) => {
+                println!("{} Pool load failed: {}", status(false), e);
+                all_passed = false;
+            }
+        }
+    }
+
+    // Summary
+    println!("\n=== Summary ===");
+    println!("Checks: {}/{} passed", checks_passed, checks_run);
+
+    if all_passed {
+        println!("\nAll health checks passed!");
+        Ok(())
+    } else {
+        println!("\nSome health checks failed.");
+        std::process::exit(1);
+    }
 }
