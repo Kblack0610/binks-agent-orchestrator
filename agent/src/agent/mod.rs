@@ -13,6 +13,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::mcp::{McpClientPool, McpTool};
 
+// Modular parser system for handling different tool call formats
+pub mod parsers;
+use parsers::{ToolCall, ToolCallParserRegistry};
+
 // Direct HTTP API types for Ollama (bypass ollama-rs for tool calls)
 #[derive(Debug, Serialize)]
 struct DirectChatRequest {
@@ -27,7 +31,7 @@ struct DirectMessage {
     role: String,
     content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    tool_calls: Option<Vec<DirectToolCall>>,
+    tool_calls: Option<Vec<ToolCall>>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -54,26 +58,15 @@ struct DirectResponseMessage {
     role: String,
     content: String,
     #[serde(default)]
-    tool_calls: Vec<DirectToolCall>,
+    tool_calls: Vec<ToolCall>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct DirectToolCall {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    id: Option<String>,
-    function: DirectToolCallFunction,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct DirectToolCallFunction {
-    #[serde(default)]
-    index: Option<i32>,
-    name: String,
-    arguments: serde_json::Value,
-}
+// DirectToolCall and DirectToolCallFunction are now provided by parsers module
+// as ToolCall and ToolCallFunction
 
 /// Maximum number of tool-calling iterations to prevent infinite loops
 const MAX_ITERATIONS: usize = 10;
+
 
 /// An agent that can use tools via MCP
 pub struct Agent {
@@ -84,6 +77,7 @@ pub struct Agent {
     mcp_pool: McpClientPool,
     system_prompt: Option<String>,
     history: Vec<DirectMessage>,
+    parser_registry: ToolCallParserRegistry,
 }
 
 impl Agent {
@@ -105,6 +99,7 @@ impl Agent {
             mcp_pool,
             system_prompt: None,
             history: Vec::new(),
+            parser_registry: ToolCallParserRegistry::new(),
         }
     }
 
@@ -160,8 +155,8 @@ impl Agent {
             .collect()
     }
 
-    /// Execute a tool call via MCP (using direct tool call format)
-    async fn execute_direct_tool_call(&mut self, tool_call: &DirectToolCall) -> Result<String> {
+    /// Execute a tool call via MCP
+    async fn execute_tool_call(&mut self, tool_call: &ToolCall) -> Result<String> {
         let name = &tool_call.function.name;
         let args = &tool_call.function.arguments;
 
@@ -340,7 +335,22 @@ impl Agent {
             }
 
             // Check if there are tool calls
-            if assistant_msg.tool_calls.is_empty() {
+            // First check the standard tool_calls array, then fallback to parsing content via registry
+            let tool_calls = if !assistant_msg.tool_calls.is_empty() {
+                assistant_msg.tool_calls.clone()
+            } else if let Some((parsed_call, parser_name)) = self.parser_registry.parse(&assistant_msg.content) {
+                // Fallback: model output tool call as JSON in content (common with qwen)
+                tracing::info!(
+                    "Parsed tool call from content using {}: {}",
+                    parser_name,
+                    parsed_call.function.name
+                );
+                vec![parsed_call]
+            } else {
+                vec![]
+            };
+
+            if tool_calls.is_empty() {
                 // No tool calls - we're done
                 tracing::info!("Agent responding without tool calls");
 
@@ -362,19 +372,19 @@ impl Agent {
             // Process tool calls
             tracing::info!(
                 "Agent making {} tool call(s)",
-                assistant_msg.tool_calls.len()
+                tool_calls.len()
             );
 
             // Add assistant message with tool calls to messages
             messages.push(DirectMessage {
                 role: "assistant".to_string(),
                 content: assistant_msg.content.clone(),
-                tool_calls: Some(assistant_msg.tool_calls.clone()),
+                tool_calls: Some(tool_calls.clone()),
             });
 
             // Execute each tool call and add results
-            for tool_call in &assistant_msg.tool_calls {
-                let result = match self.execute_direct_tool_call(tool_call).await {
+            for tool_call in &tool_calls {
+                let result = match self.execute_tool_call(tool_call).await {
                     Ok(r) => r,
                     Err(e) => {
                         format!("Error calling tool {}: {}", tool_call.function.name, e)
