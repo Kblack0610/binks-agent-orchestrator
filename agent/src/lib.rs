@@ -4,5 +4,6 @@ pub mod agent;
 pub mod config;
 pub mod llm;
 pub mod mcp;
+pub mod mcps;
 pub mod monitor;
 pub mod server;

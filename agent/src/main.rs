@@ -6,6 +6,7 @@ use agent::agent::Agent;
 use agent::config::{AgentFileConfig, McpConfig};
 use agent::llm::{Llm, OllamaClient};
 use agent::mcp::McpClientPool;
+use agent::mcps::{DaemonClient, McpDaemon, is_daemon_running, default_socket_path, default_pid_path, default_log_dir};
 use agent::monitor::{self, MonitorConfig};
 use agent::server::{self, ServerConfig};
 
@@ -93,6 +94,37 @@ enum Commands {
         #[arg(long, short)]
         all: bool,
     },
+    /// MCP server management
+    Mcps {
+        #[command(subcommand)]
+        command: McpsCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum McpsCommands {
+    /// Show MCP server status and tool cache
+    Status {
+        /// Show detailed tool list for each server
+        #[arg(long, short)]
+        verbose: bool,
+    },
+    /// Clear the tools cache and reconnect to servers
+    Refresh,
+    /// Start the MCP daemon (background supervisor for MCP servers)
+    Start {
+        /// Run as a background daemon process
+        #[arg(long, short)]
+        daemon: bool,
+    },
+    /// Stop the MCP daemon
+    Stop,
+    /// View daemon logs
+    Logs {
+        /// Number of lines to show (0 = all)
+        #[arg(long, short, default_value = "50")]
+        lines: usize,
+    },
 }
 
 #[tokio::main]
@@ -166,6 +198,9 @@ async fn main() -> Result<()> {
         }
         Commands::Health { test_llm, test_tools, all } => {
             run_health(&ollama_url, &model, test_llm || all, test_tools || all).await?;
+        }
+        Commands::Mcps { command } => {
+            run_mcps_command(command).await?;
         }
     }
 
@@ -615,4 +650,301 @@ async fn run_health(ollama_url: &str, model: &str, test_llm: bool, test_tools: b
         println!("\nSome health checks failed.");
         std::process::exit(1);
     }
+}
+
+async fn run_mcps_command(command: McpsCommands) -> Result<()> {
+    match command {
+        McpsCommands::Status { verbose } => {
+            run_mcps_status(verbose).await
+        }
+        McpsCommands::Refresh => {
+            run_mcps_refresh().await
+        }
+        McpsCommands::Start { daemon } => {
+            run_mcps_start(daemon).await
+        }
+        McpsCommands::Stop => {
+            run_mcps_stop().await
+        }
+        McpsCommands::Logs { lines } => {
+            run_mcps_logs(lines).await
+        }
+    }
+}
+
+async fn run_mcps_status(verbose: bool) -> Result<()> {
+    println!("=== MCP Server Status ===\n");
+
+    let pool = McpClientPool::load()?;
+
+    match pool {
+        Some(mut pool) => {
+            let servers = pool.server_names();
+
+            if servers.is_empty() {
+                println!("No MCP servers configured.");
+                return Ok(());
+            }
+
+            println!("Configured servers: {}\n", servers.len());
+
+            for server in &servers {
+                print!("  {} ", server);
+
+                // Check if tools are cached
+                let cached = pool.has_cached_tools(server);
+
+                // Try to get tools (this will cache them if not already cached)
+                match pool.list_tools_from(server).await {
+                    Ok(tools) => {
+                        let cache_status = if cached { "(cached)" } else { "(fresh)" };
+                        println!("✓ {} tools {}", tools.len(), cache_status);
+
+                        if verbose {
+                            for tool in &tools {
+                                let desc = tool.description
+                                    .as_deref()
+                                    .unwrap_or("No description")
+                                    .lines()
+                                    .next()
+                                    .unwrap_or("");
+                                // Truncate long descriptions
+                                let desc = if desc.len() > 60 {
+                                    format!("{}...", &desc[..60])
+                                } else {
+                                    desc.to_string()
+                                };
+                                println!("      - {} : {}", tool.name, desc);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("✗ Failed: {}", e);
+                    }
+                }
+            }
+
+            // Summary
+            let all_tools = pool.list_all_tools().await?;
+            println!("\nTotal: {} tools across {} servers", all_tools.len(), servers.len());
+        }
+        None => {
+            println!("No .mcp.json found in current directory.");
+            println!("Create one to configure MCP servers.");
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_mcps_refresh() -> Result<()> {
+    println!("Refreshing MCP connections...\n");
+
+    let pool = McpClientPool::load()?;
+
+    match pool {
+        Some(mut pool) => {
+            // Clear cache
+            pool.clear_cache();
+            println!("Cache cleared.");
+
+            // Reconnect to all servers
+            let servers = pool.server_names();
+            let mut success = 0;
+            let mut failed = 0;
+
+            for server in &servers {
+                print!("  {} ", server);
+                match pool.list_tools_from(server).await {
+                    Ok(tools) => {
+                        println!("✓ {} tools", tools.len());
+                        success += 1;
+                    }
+                    Err(e) => {
+                        println!("✗ {}", e);
+                        failed += 1;
+                    }
+                }
+            }
+
+            println!("\nRefresh complete: {} succeeded, {} failed", success, failed);
+        }
+        None => {
+            println!("No .mcp.json found.");
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_mcps_start(daemon: bool) -> Result<()> {
+    // Check if daemon is already running
+    if is_daemon_running().await {
+        println!("MCP daemon is already running.");
+        println!("Socket: {:?}", default_socket_path());
+        return Ok(());
+    }
+
+    // Load MCP config
+    let config = McpConfig::load()?
+        .ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
+
+    let socket_path = default_socket_path();
+    let pid_path = default_pid_path();
+    let log_dir = default_log_dir();
+
+    // Ensure directories exist
+    if let Some(parent) = socket_path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::create_dir_all(&log_dir).await?;
+
+    if daemon {
+        // Fork to background using std::process::Command
+        println!("Starting MCP daemon in background...");
+
+        let log_file = log_dir.join("daemon.log");
+        let current_exe = std::env::current_exe()?;
+        let current_dir = std::env::current_dir()?;
+
+        // Re-execute ourselves with mcps start (without --daemon)
+        let child = std::process::Command::new(&current_exe)
+            .arg("mcps")
+            .arg("start")
+            .current_dir(&current_dir)
+            .stdout(std::fs::File::create(&log_file)?)
+            .stderr(std::fs::File::create(log_dir.join("daemon.err"))?)
+            .spawn()
+            .map_err(|e| anyhow::anyhow!("Failed to spawn daemon: {}", e))?;
+
+        // Write PID file
+        let pid = child.id();
+        tokio::fs::write(&pid_path, pid.to_string()).await?;
+
+        // Wait briefly and check if daemon started
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        if is_daemon_running().await {
+            println!("MCP daemon started successfully.");
+            println!("  PID: {}", pid);
+            println!("  Socket: {:?}", socket_path);
+            println!("  Log: {:?}", log_file);
+        } else {
+            println!("Warning: Daemon may not have started. Check logs:");
+            println!("  {:?}", log_file);
+        }
+    } else {
+        // Run in foreground
+        println!("Starting MCP daemon (foreground)...");
+        println!("  Socket: {:?}", socket_path);
+        println!("  Press Ctrl+C to stop.\n");
+
+        // Write PID file for foreground mode too
+        let pid = std::process::id();
+        tokio::fs::write(&pid_path, pid.to_string()).await?;
+
+        let daemon = McpDaemon::new(config, socket_path);
+        daemon.run().await?;
+
+        // Cleanup PID file
+        let _ = tokio::fs::remove_file(&pid_path).await;
+    }
+
+    Ok(())
+}
+
+async fn run_mcps_stop() -> Result<()> {
+    let socket_path = default_socket_path();
+    let pid_path = default_pid_path();
+
+    // First try to send shutdown command via socket
+    if is_daemon_running().await {
+        println!("Sending shutdown command to daemon...");
+        let client = DaemonClient::with_socket_path(socket_path.clone());
+        match client.shutdown().await {
+            Ok(_) => {
+                println!("Daemon shutdown initiated.");
+            }
+            Err(e) => {
+                println!("Warning: shutdown command failed: {}", e);
+            }
+        }
+
+        // Wait a moment for clean shutdown
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+
+    // Check if PID file exists and kill process if needed
+    if pid_path.exists() {
+        let pid_str = tokio::fs::read_to_string(&pid_path).await?;
+        if let Ok(pid) = pid_str.trim().parse::<i32>() {
+            // Check if process is still running
+            #[cfg(unix)]
+            {
+                // Try to send SIGTERM
+                let _ = unsafe { libc::kill(pid, libc::SIGTERM) };
+            }
+        }
+
+        // Remove PID file
+        let _ = tokio::fs::remove_file(&pid_path).await;
+    }
+
+    // Remove socket file if it exists
+    let _ = tokio::fs::remove_file(&socket_path).await;
+
+    println!("MCP daemon stopped.");
+    Ok(())
+}
+
+async fn run_mcps_logs(lines: usize) -> Result<()> {
+    let log_dir = default_log_dir();
+    let log_file = log_dir.join("daemon.log");
+    let err_file = log_dir.join("daemon.err");
+
+    if !log_file.exists() && !err_file.exists() {
+        println!("No daemon logs found.");
+        println!("Expected location: {:?}", log_dir);
+        return Ok(());
+    }
+
+    // Read stdout log
+    if log_file.exists() {
+        println!("=== Daemon stdout ({:?}) ===\n", log_file);
+        let content = tokio::fs::read_to_string(&log_file).await?;
+        let log_lines: Vec<&str> = content.lines().collect();
+
+        let display_lines = if lines == 0 {
+            &log_lines[..]
+        } else {
+            let start = log_lines.len().saturating_sub(lines);
+            &log_lines[start..]
+        };
+
+        for line in display_lines {
+            println!("{}", line);
+        }
+    }
+
+    // Read stderr log
+    if err_file.exists() {
+        let err_content = tokio::fs::read_to_string(&err_file).await?;
+        if !err_content.trim().is_empty() {
+            println!("\n=== Daemon stderr ({:?}) ===\n", err_file);
+            let err_lines: Vec<&str> = err_content.lines().collect();
+
+            let display_lines = if lines == 0 {
+                &err_lines[..]
+            } else {
+                let start = err_lines.len().saturating_sub(lines);
+                &err_lines[start..]
+            };
+
+            for line in display_lines {
+                println!("{}", line);
+            }
+        }
+    }
+
+    Ok(())
 }

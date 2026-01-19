@@ -10,6 +10,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
+ "dirs",
+ "libc",
  "ollama-rs",
  "reqwest",
  "rmcp",
