@@ -119,6 +119,11 @@ impl Agent {
         self
     }
 
+    /// Update the system prompt dynamically
+    pub fn set_system_prompt(&mut self, prompt: Option<String>) {
+        self.system_prompt = prompt;
+    }
+
     /// Clean up a JSON schema for Ollama compatibility
     /// Removes $schema, title, and other fields that confuse Ollama
     fn clean_schema_for_ollama(schema: &serde_json::Value) -> serde_json::Value {

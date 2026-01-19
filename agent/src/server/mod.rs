@@ -73,6 +73,8 @@ pub struct AgentChatParams {
     pub system_prompt: Option<String>,
     #[schemars(description = "Optional list of MCP server names to filter tools (e.g., ['sysinfo', 'kubernetes']). Recommended for smaller models that struggle with many tools.")]
     pub servers: Option<Vec<String>>,
+    #[schemars(description = "Keep conversation history between calls. Default: false (each call is independent)")]
+    pub retain_history: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -179,9 +181,19 @@ impl AgentMcpServer {
         let mut guard = self.agent.lock().await;
         let agent = guard.as_mut().unwrap(); // Safe: ensure_agent guarantees it's Some
 
-        // Update system prompt if provided
+        // Clear history by default for MCP usage (each call is independent)
+        // Unless retain_history is explicitly set to true
+        if !params.retain_history.unwrap_or(false) {
+            agent.clear_history();
+        }
+
+        // Apply system prompt if provided (or clear it if not)
         if let Some(ref prompt) = params.system_prompt {
             tracing::info!("Setting system prompt: {}", prompt);
+            agent.set_system_prompt(Some(prompt.clone()));
+        } else {
+            // Clear any previous system prompt for clean state
+            agent.set_system_prompt(None);
         }
 
         // Use filtered servers if provided, otherwise use all tools
