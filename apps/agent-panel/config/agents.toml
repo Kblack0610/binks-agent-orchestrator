@@ -1,0 +1,18 @@
+# Agent Panel Configuration
+
+# How often to poll for agent status (seconds)
+poll_interval = 2
+
+# Auto-hide panel after N seconds (0 = never auto-hide)
+auto_hide_after = 0
+
+# Terminal command to use when opening agent windows
+terminal = "kitty --single-instance -e"
+
+# Patterns to match agent processes in tmux
+agent_patterns = [
+    "claude",
+    "claude-real",
+    "aider",
+    "opencode",
+]

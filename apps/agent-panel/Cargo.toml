@@ -1,0 +1,46 @@
+[package]
+name = "agent-panel"
+version = "0.1.0"
+edition = "2021"
+authors = ["kblack0610"]
+description = "System-level agent monitoring panel for Hyprland"
+license = "MIT"
+readme = "README.md"
+keywords = ["hyprland", "wayland", "layer-shell", "monitoring", "agents"]
+categories = ["gui", "command-line-utilities"]
+
+[dependencies]
+# UI framework with layer-shell support
+iced = { version = "0.14", default-features = false, features = ["tokio", "wgpu"] }
+iced_layershell = "0.14"
+
+# Async runtime
+tokio = { version = "1", features = ["full", "net", "process"] }
+
+# System monitoring
+sysinfo = "0.32"
+
+# Configuration
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# Time handling
+chrono = "0.4"
+
+# Text processing
+regex = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Desktop notifications (fallback)
+notify-rust = "4"
+
+# Directory utilities
+dirs-next = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
