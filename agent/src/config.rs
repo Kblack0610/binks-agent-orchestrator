@@ -6,13 +6,13 @@ use std::collections::HashMap;
 use std::path::Path;
 
 /// MCP server configuration (from .mcp.json)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct McpConfig {
     #[serde(rename = "mcpServers")]
     pub mcp_servers: HashMap<String, McpServerConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct McpServerConfig {
     pub command: String,
     #[serde(default)]

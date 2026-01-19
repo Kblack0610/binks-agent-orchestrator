@@ -8,6 +8,7 @@
 //! - `agent_chat` - Send a message through the tool-using agent
 //! - `list_tools` - List available MCP tools from connected servers
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -19,7 +20,7 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::agent::Agent;
+use crate::agent::{Agent, DirectMessage};
 use crate::llm::{Llm, OllamaClient};
 use crate::mcp::McpClientPool;
 
@@ -51,6 +52,8 @@ pub struct AgentMcpServer {
     agent: Arc<Mutex<Option<Agent>>>,
     /// Simple LLM client for non-agent chat
     llm: OllamaClient,
+    /// Session storage for conversation history
+    sessions: Arc<Mutex<HashMap<String, Vec<DirectMessage>>>>,
 }
 
 // ============================================================================
@@ -73,8 +76,14 @@ pub struct AgentChatParams {
     pub system_prompt: Option<String>,
     #[schemars(description = "Optional list of MCP server names to filter tools (e.g., ['sysinfo', 'kubernetes']). Recommended for smaller models that struggle with many tools.")]
     pub servers: Option<Vec<String>>,
-    #[schemars(description = "Keep conversation history between calls. Default: false (each call is independent)")]
-    pub retain_history: Option<bool>,
+    #[schemars(description = "Session ID for conversation continuity. Omit for stateless single-turn calls.")]
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ClearSessionParams {
+    #[schemars(description = "The session ID to clear")]
+    pub session_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -96,6 +105,7 @@ impl AgentMcpServer {
             config,
             agent: Arc::new(Mutex::new(None)),
             llm,
+            sessions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -168,22 +178,35 @@ impl AgentMcpServer {
         Ok(())
     }
 
-    #[tool(description = "Send a message to the AI agent with access to MCP tools. The agent can use tools like kubernetes, ssh, github, sysinfo to accomplish tasks. Use 'servers' to filter to specific tool sets (recommended for smaller models). Note: First call may take a few seconds to initialize connections.")]
+    #[tool(description = "Send a message to the AI agent with access to MCP tools. The agent can use tools like kubernetes, ssh, github, sysinfo to accomplish tasks. Use 'servers' to filter to specific tool sets (recommended for smaller models). Use 'session_id' to maintain conversation across calls. Note: First call may take a few seconds to initialize connections.")]
     async fn agent_chat(
         &self,
         Parameters(params): Parameters<AgentChatParams>,
     ) -> Result<CallToolResult, McpError> {
-        tracing::info!("agent_chat: {} (servers: {:?})", params.message, params.servers);
+        tracing::info!("agent_chat: {} (servers: {:?}, session: {:?})", params.message, params.servers, params.session_id);
 
         // Lazily initialize agent on first call
         self.ensure_agent().await?;
 
-        let mut guard = self.agent.lock().await;
-        let agent = guard.as_mut().unwrap(); // Safe: ensure_agent guarantees it's Some
+        let mut agent_guard = self.agent.lock().await;
+        let agent = agent_guard.as_mut().unwrap(); // Safe: ensure_agent guarantees it's Some
 
-        // Clear history by default for MCP usage (each call is independent)
-        // Unless retain_history is explicitly set to true
-        if !params.retain_history.unwrap_or(false) {
+        // Load session history or clear for stateless calls
+        if let Some(ref session_id) = params.session_id {
+            // Scope the lock to release it before chat
+            let history_to_restore = {
+                let sessions = self.sessions.lock().await;
+                sessions.get(session_id).cloned()
+            };
+            if let Some(history) = history_to_restore {
+                tracing::info!("Restoring session '{}' with {} messages", session_id, history.len());
+                agent.set_history(history);
+            } else {
+                tracing::info!("Creating new session '{}'", session_id);
+                agent.clear_history();
+            }
+        } else {
+            // No session_id = stateless, clear history
             agent.clear_history();
         }
 
@@ -208,7 +231,29 @@ impl AgentMcpServer {
 
         let response = response.map_err(|e| McpError::internal_error(e.to_string(), None))?;
 
+        // Save session history if session_id provided
+        if let Some(ref session_id) = params.session_id {
+            let mut sessions = self.sessions.lock().await;
+            sessions.insert(session_id.clone(), agent.get_history());
+            tracing::info!("Saved session '{}' with {} messages", session_id, agent.get_history().len());
+        }
+
         Ok(CallToolResult::success(vec![Content::text(response)]))
+    }
+
+    #[tool(description = "Clear a specific session's conversation history.")]
+    async fn clear_session(
+        &self,
+        Parameters(params): Parameters<ClearSessionParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!("clear_session: {}", params.session_id);
+
+        let mut sessions = self.sessions.lock().await;
+        if sessions.remove(&params.session_id).is_some() {
+            Ok(CallToolResult::success(vec![Content::text(format!("Session '{}' cleared", params.session_id))]))
+        } else {
+            Ok(CallToolResult::success(vec![Content::text(format!("Session '{}' not found (already cleared or never existed)", params.session_id))]))
+        }
     }
 
     #[tool(description = "List all available MCP tools that the agent can use. Note: First call may take a few seconds to initialize connections.")]

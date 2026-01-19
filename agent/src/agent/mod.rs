@@ -29,7 +29,7 @@ struct DirectChatRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct DirectMessage {
+pub struct DirectMessage {
     role: String,
     content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -122,6 +122,16 @@ impl Agent {
     /// Update the system prompt dynamically
     pub fn set_system_prompt(&mut self, prompt: Option<String>) {
         self.system_prompt = prompt;
+    }
+
+    /// Get current conversation history (for session storage)
+    pub fn get_history(&self) -> Vec<DirectMessage> {
+        self.history.clone()
+    }
+
+    /// Set conversation history (for session restoration)
+    pub fn set_history(&mut self, history: Vec<DirectMessage>) {
+        self.history = history;
     }
 
     /// Clean up a JSON schema for Ollama compatibility
