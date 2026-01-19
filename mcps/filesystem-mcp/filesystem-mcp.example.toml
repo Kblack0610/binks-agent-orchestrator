@@ -1,0 +1,42 @@
+# Filesystem MCP Configuration
+# Copy this to one of:
+#   - ./filesystem-mcp.toml (current directory)
+#   - ~/.config/filesystem-mcp/config.toml
+#   - ~/.filesystem-mcp.toml
+
+[paths]
+# Directories the agent can read from
+read = ["~", "/tmp"]
+
+# Directories the agent can write to (must be subset of read)
+write = ["~/projects", "~/dev", "/tmp"]
+
+# Directories never accessible (takes precedence over read/write)
+deny = [
+    "~/.ssh",
+    "~/.gnupg",
+    "~/.aws",
+    "~/.config/gh",
+    "~/.password-store",
+    "~/.local/share/keyrings",
+]
+
+[limits]
+# Maximum file size in bytes (default: 10MB)
+max_file_size = 10485760
+
+# Maximum files per list operation (default: 1000)
+max_files_per_list = 1000
+
+# Maximum search depth (default: 10)
+max_search_depth = 10
+
+[safety]
+# Require confirmation for delete operations (not yet implemented)
+confirm_delete = false
+
+# Require confirmation for overwrite operations (not yet implemented)
+confirm_overwrite = false
+
+# Create backup before overwriting (not yet implemented)
+backup_on_overwrite = false
