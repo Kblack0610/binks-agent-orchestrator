@@ -112,15 +112,31 @@ impl Default for MonitorSectionConfig {
 }
 
 impl AgentFileConfig {
-    /// Load config from .agent.toml in the current directory only
+    /// Load config from .agent.toml
+    ///
+    /// Search order:
+    /// 1. ./agent/.agent.toml (from project root)
+    /// 2. ./.agent.toml (current directory)
+    /// 3. Fall back to defaults
     pub fn load() -> Result<Self> {
-        let config_path = std::env::current_dir()?.join(".agent.toml");
+        if let Ok(cwd) = std::env::current_dir() {
+            // 1. Check agent/.agent.toml (running from project root)
+            let agent_config = cwd.join("agent").join(".agent.toml");
+            if agent_config.exists() {
+                eprintln!("Loading config from: {}", agent_config.display());
+                return Self::load_from_path(&agent_config);
+            }
 
-        if config_path.exists() {
-            return Self::load_from_path(&config_path);
+            // 2. Check .agent.toml in current dir (running from agent/)
+            let local_config = cwd.join(".agent.toml");
+            if local_config.exists() {
+                eprintln!("Loading config from: {}", local_config.display());
+                return Self::load_from_path(&local_config);
+            }
         }
 
         // No config file found, return defaults
+        eprintln!("Warning: No .agent.toml found, using defaults");
         Ok(Self::default())
     }
 
