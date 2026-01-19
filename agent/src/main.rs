@@ -46,6 +46,9 @@ enum Commands {
         /// Recommended for smaller models that struggle with many tools
         #[arg(long)]
         servers: Option<String>,
+        /// Show timing information for each step
+        #[arg(long, short)]
+        verbose: bool,
     },
     /// List available tools from MCP servers
     Tools {
@@ -154,9 +157,9 @@ async fn main() -> Result<()> {
             let llm = OllamaClient::new(&ollama_url, &model);
             run_interactive(llm).await?;
         }
-        Commands::Agent { message, system, servers } => {
+        Commands::Agent { message, system, servers, verbose } => {
             let server_list = servers.map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
-            run_agent(&ollama_url, &model, message, system, server_list).await?;
+            run_agent(&ollama_url, &model, message, system, server_list, verbose).await?;
         }
         Commands::Tools { server } => {
             run_tools(server).await?;
@@ -343,11 +346,12 @@ async fn run_agent(
     message: Option<String>,
     system: Option<String>,
     servers: Option<Vec<String>>,
+    verbose: bool,
 ) -> Result<()> {
     let pool = McpClientPool::load()?
         .ok_or_else(|| anyhow::anyhow!("No .mcp.json found - agent needs MCP tools"))?;
 
-    let mut agent = Agent::new(ollama_url, model, pool);
+    let mut agent = Agent::new(ollama_url, model, pool).with_verbose(verbose);
 
     if let Some(sys) = system {
         agent = agent.with_system_prompt(&sys);

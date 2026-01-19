@@ -7,6 +7,8 @@
 //! 4. If tools are called, results are fed back to LLM
 //! 5. Loop continues until LLM responds without tool calls
 
+use std::time::Instant;
+
 use anyhow::{Context, Result};
 use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
@@ -78,6 +80,7 @@ pub struct Agent {
     system_prompt: Option<String>,
     history: Vec<DirectMessage>,
     parser_registry: ToolCallParserRegistry,
+    verbose: bool,
 }
 
 impl Agent {
@@ -100,12 +103,19 @@ impl Agent {
             system_prompt: None,
             history: Vec::new(),
             parser_registry: ToolCallParserRegistry::new(),
+            verbose: false,
         }
     }
 
     /// Set the system prompt
     pub fn with_system_prompt(mut self, prompt: &str) -> Self {
         self.system_prompt = Some(prompt.to_string());
+        self
+    }
+
+    /// Enable verbose timing output
+    pub fn with_verbose(mut self, verbose: bool) -> Self {
+        self.verbose = verbose;
         self
     }
 
@@ -254,6 +264,8 @@ impl Agent {
 
     /// Internal method to run chat with a specific set of tools
     async fn chat_with_tools(&mut self, user_message: &str, tools: Vec<DirectTool>) -> Result<String> {
+        let total_start = Instant::now();
+
         // Build initial messages
         let mut messages: Vec<DirectMessage> = Vec::new();
 
@@ -303,6 +315,7 @@ impl Agent {
 
             // Send direct HTTP request
             let url = format!("{}/api/chat", self.ollama_url);
+            let ollama_start = Instant::now();
             let response = self
                 .http_client
                 .post(&url)
@@ -320,6 +333,7 @@ impl Agent {
             let raw_body = response.text().await.context("Failed to get response text")?;
             let response_body: DirectChatResponse = serde_json::from_str(&raw_body)
                 .context("Failed to parse Ollama response")?;
+            let ollama_elapsed = ollama_start.elapsed();
 
             let assistant_msg = response_body.message;
 
@@ -330,6 +344,16 @@ impl Agent {
                 tracing::info!("Content preview: {}", &assistant_msg.content[..assistant_msg.content.len().min(200)]);
             }
             tracing::info!("Tool calls count: {}", assistant_msg.tool_calls.len());
+
+            // Verbose timing output
+            if self.verbose {
+                let tool_count = if assistant_msg.tool_calls.is_empty() {
+                    "final".to_string()
+                } else {
+                    format!("{} tool call(s)", assistant_msg.tool_calls.len())
+                };
+                eprintln!("[{:>7}ms] Ollama response ({})", ollama_elapsed.as_millis(), tool_count);
+            }
             for (i, tc) in assistant_msg.tool_calls.iter().enumerate() {
                 tracing::info!("Tool call {}: {} args={:?}", i, tc.function.name, tc.function.arguments);
             }
@@ -353,6 +377,14 @@ impl Agent {
             if tool_calls.is_empty() {
                 // No tool calls - we're done
                 tracing::info!("Agent responding without tool calls");
+
+                if self.verbose {
+                    eprintln!("[{:>7}ms] Total ({} iteration{})",
+                        total_start.elapsed().as_millis(),
+                        iterations,
+                        if iterations == 1 { "" } else { "s" }
+                    );
+                }
 
                 // Add to history
                 self.history.push(DirectMessage {
@@ -384,12 +416,18 @@ impl Agent {
 
             // Execute each tool call and add results
             for tool_call in &tool_calls {
+                let tool_start = Instant::now();
                 let result = match self.execute_tool_call(tool_call).await {
                     Ok(r) => r,
                     Err(e) => {
                         format!("Error calling tool {}: {}", tool_call.function.name, e)
                     }
                 };
+                let tool_elapsed = tool_start.elapsed();
+
+                if self.verbose {
+                    eprintln!("[{:>7}ms] → {}", tool_elapsed.as_millis(), tool_call.function.name);
+                }
 
                 // Create tool response message
                 messages.push(DirectMessage {
@@ -398,6 +436,15 @@ impl Agent {
                     tool_calls: None,
                 });
             }
+        }
+
+        // Final timing summary
+        if self.verbose {
+            eprintln!("[{:>7}ms] Total ({} iteration{})",
+                total_start.elapsed().as_millis(),
+                iterations,
+                if iterations == 1 { "" } else { "s" }
+            );
         }
 
         // If we hit max iterations, return last assistant message
