@@ -9,6 +9,12 @@ Binks is an orchestration platform that connects an AI agent to various tools th
 ## Architecture
 
 ```
+┌──────────────────────────────────────────────────────────────┐
+│                     ORCHESTRATOR                             │
+│  Multi-agent workflows: planner → checkpoint → implementer   │
+└─────────────────────────┬────────────────────────────────────┘
+                          │ uses as library
+                          ▼
 ┌──────────────────┐     ┌──────────────────┐
 │   Rust Agent     │────▶│   Ollama LLM     │
 │  (tool-using)    │     │                  │
@@ -64,6 +70,7 @@ cd mcps/github-gh && cargo build --release
 ```
 binks-agent-orchestrator/
 ├── agent/              # Rust agent (LLM + MCP client)
+├── orchestrator/       # Multi-agent workflow orchestration
 ├── mcps/               # MCP servers
 │   ├── sysinfo-mcp/    # System information tools
 │   └── github-gh/      # GitHub CLI tools
@@ -134,6 +141,7 @@ export OLLAMA_MODEL=llama3.1:8b
 ## Documentation
 
 - [Agent CLI](agent/readme.md) - All agent commands and usage
+- [Orchestrator](orchestrator/README.md) - Multi-agent workflows
 - [MCP Servers](mcps/overview.md) - Available tools and how to add new servers
 - [Monitoring](docs/monitoring.md) - Repository monitoring setup
 - [Architecture](docs/ARCHITECTURE.md) - System design and components

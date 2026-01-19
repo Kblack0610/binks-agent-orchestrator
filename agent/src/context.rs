@@ -27,7 +27,12 @@ impl EnvironmentContext {
 
     /// Convert to a system prompt string
     pub fn to_system_prompt(&self) -> String {
-        let mut prompt = String::from("You are an AI agent with access to tools.\n\nEnvironment:\n");
+        let mut prompt = String::from(
+            "You are an AI agent with access to tools.\n\n\
+             IMPORTANT: Check the Environment section below before using tools for \
+             basic questions about your current location or repository.\n\n\
+             Environment:\n",
+        );
 
         prompt.push_str(&format!("- Working directory: {}\n", self.cwd.display()));
 
@@ -161,5 +166,83 @@ mod tests {
         assert!(prompt.contains("Repository: my-project"));
         assert!(prompt.contains("branch: main"));
         assert!(prompt.contains("clean"));
+    }
+
+    #[test]
+    fn test_extract_repo_name_gitlab() {
+        assert_eq!(
+            extract_repo_name("https://gitlab.com/group/subgroup/repo.git"),
+            "repo"
+        );
+        assert_eq!(
+            extract_repo_name("git@gitlab.com:group/subgroup/repo.git"),
+            "repo"
+        );
+    }
+
+    #[test]
+    fn test_extract_repo_name_edge_cases() {
+        // Whitespace
+        assert_eq!(
+            extract_repo_name("  https://github.com/o/repo.git  "),
+            "repo"
+        );
+        // No .git suffix
+        assert_eq!(
+            extract_repo_name("https://github.com/owner/my-repo"),
+            "my-repo"
+        );
+        // Just a name (fallback case)
+        assert_eq!(extract_repo_name("local-repo"), "local-repo");
+    }
+
+    #[test]
+    fn test_to_system_prompt_no_git() {
+        let ctx = EnvironmentContext {
+            cwd: PathBuf::from("/tmp/random"),
+            git_repo: None,
+            git_branch: None,
+            git_clean: None,
+        };
+
+        let prompt = ctx.to_system_prompt();
+        assert!(prompt.contains("Working directory: /tmp/random"));
+        assert!(!prompt.contains("Repository:"));
+    }
+
+    #[test]
+    fn test_to_system_prompt_modified() {
+        let ctx = EnvironmentContext {
+            cwd: PathBuf::from("/home/user/project"),
+            git_repo: Some("dirty-repo".to_string()),
+            git_branch: Some("feature".to_string()),
+            git_clean: Some(false),
+        };
+
+        let prompt = ctx.to_system_prompt();
+        assert!(prompt.contains("modified)"));
+        assert!(!prompt.contains("clean)"));
+    }
+
+    #[test]
+    fn test_to_system_prompt_no_branch() {
+        // Detached HEAD state - has repo but no branch
+        let ctx = EnvironmentContext {
+            cwd: PathBuf::from("/home/user/project"),
+            git_repo: Some("detached-repo".to_string()),
+            git_branch: None,
+            git_clean: Some(true),
+        };
+
+        let prompt = ctx.to_system_prompt();
+        assert!(prompt.contains("Repository: detached-repo"));
+        assert!(!prompt.contains("branch:"));
+    }
+
+    #[test]
+    fn test_gather_returns_valid_cwd() {
+        // Integration test - should always return a valid cwd
+        let ctx = EnvironmentContext::gather();
+        assert!(!ctx.cwd.as_os_str().is_empty());
     }
 }

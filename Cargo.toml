@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "agent",
+    "orchestrator",
+    "mcps/sysinfo-mcp",
+    "mcps/github-gh",
+    "mcps/inbox-mcp",
+    "mcps/notify-mcp",
+    "mcps/filesystem-mcp",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full", "process", "io-std"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# MCP
+rmcp = { version = "0.13", features = ["server", "client", "macros", "transport-io", "transport-child-process"] }
