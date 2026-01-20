@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build release binaries
+        run: cargo build --release --workspace
+
+      - name: Package binaries
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          mkdir -p dist
+
+          # Core binaries
+          cp target/release/agent dist/
+          cp target/release/orchestrator dist/
+          cp target/release/agent-panel dist/
+
+          # MCP servers
+          cp target/release/sysinfo-mcp dist/
+          cp target/release/github-gh-mcp dist/
+          cp target/release/inbox-mcp dist/
+          cp target/release/notify-mcp dist/
+          cp target/release/filesystem-mcp dist/
+          cp target/release/memory-mcp dist/
+          cp target/release/git-mcp dist/
+
+          # Create tarball
+          tar -czvf binks-agent-orchestrator-${VERSION}-linux-x86_64.tar.gz -C dist .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: binks-agent-orchestrator-*.tar.gz
+          generate_release_notes: true
