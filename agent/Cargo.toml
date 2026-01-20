@@ -53,6 +53,27 @@ clap = { version = "4", features = ["derive", "env"] }
 # Platform directories
 dirs = "6"
 
+# Web server
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["fs", "cors"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+
+# Database
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Static file embedding
+rust-embed = "8"
+mime_guess = "2"
+
+# UUID generation
+uuid = { version = "1", features = ["v4"] }
+
+# Open browser
+open = "5"
+
+# WebSocket utilities
+futures-util = "0.3"
+
 [profile.release]
 opt-level = 3
 lto = true

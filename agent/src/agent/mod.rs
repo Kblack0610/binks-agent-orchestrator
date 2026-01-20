@@ -30,10 +30,21 @@ struct DirectChatRequest {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DirectMessage {
-    role: String,
-    content: String,
+    pub role: String,
+    pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    tool_calls: Option<Vec<ToolCall>>,
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl DirectMessage {
+    /// Create a new message
+    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            role: role.into(),
+            content: content.into(),
+            tool_calls: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]

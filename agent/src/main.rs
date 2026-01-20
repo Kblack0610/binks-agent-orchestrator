@@ -10,6 +10,7 @@ use agent::mcp::McpClientPool;
 use agent::mcps::{DaemonClient, McpDaemon, is_daemon_running, default_socket_path, default_pid_path, default_log_dir};
 use agent::monitor::{self, MonitorConfig};
 use agent::server::{self, ServerConfig};
+use agent::web::{self, WebConfig};
 
 #[derive(Parser)]
 #[command(name = "agent")]
@@ -102,6 +103,21 @@ enum Commands {
     Mcps {
         #[command(subcommand)]
         command: McpsCommands,
+    },
+    /// Start the web interface server
+    Web {
+        /// Port to listen on
+        #[arg(short, long, default_value = "3001")]
+        port: u16,
+        /// System prompt for the agent
+        #[arg(long, short)]
+        system: Option<String>,
+        /// Run in development mode (no embedded frontend)
+        #[arg(long)]
+        dev: bool,
+        /// Open browser after starting
+        #[arg(long)]
+        open: bool,
     },
 }
 
@@ -205,6 +221,28 @@ async fn main() -> Result<()> {
         }
         Commands::Mcps { command } => {
             run_mcps_command(command).await?;
+        }
+        Commands::Web { port, system, dev, open } => {
+            let config = WebConfig {
+                port,
+                ollama_url: ollama_url.clone(),
+                model: model.clone(),
+                system_prompt: system.or_else(|| file_config.agent.system_prompt.clone()),
+                dev_mode: dev,
+            };
+
+            if open {
+                // Open browser after a short delay
+                let url = format!("http://localhost:{}", port);
+                tokio::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    if let Err(e) = open::that(&url) {
+                        tracing::warn!("Failed to open browser: {}", e);
+                    }
+                });
+            }
+
+            web::serve(config).await?;
         }
     }
 
