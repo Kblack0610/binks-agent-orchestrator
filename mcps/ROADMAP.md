@@ -119,6 +119,50 @@ confirm_delete = true
 
 ---
 
+#### web-search-mcp (Rust) - Priority 4.5
+**Purpose:** Search engine API integration for information retrieval
+
+**Design:**
+- Pluggable backend architecture
+- Primary: Brave Search API
+- Fallback: SearXNG (self-hosted), Tavily (AI-optimized)
+- Rate limiting and result caching
+
+**Tools:**
+| Tool | Description |
+|------|-------------|
+| `search(query, limit?)` | General web search |
+| `search_news(query, limit?)` | News-specific search |
+| `search_images(query, limit?)` | Image search |
+| `get_config()` | Show active backend |
+
+**Architecture:**
+```
+┌─────────────────────────────────────┐
+│         web-search-mcp              │
+├─────────────────────────────────────┤
+│  SearchBackend Trait                │
+│  ├── BraveSearchBackend (primary)   │
+│  ├── SearXNGBackend (self-hosted)   │
+│  └── TavilyBackend (AI-optimized)   │
+└─────────────────────────────────────┘
+```
+
+**Configuration:**
+```toml
+[search]
+backend = "brave"  # or "searxng", "tavily"
+api_key = "${BRAVE_API_KEY}"
+max_results = 10
+
+[searxng]
+url = "http://localhost:8888"  # self-hosted fallback
+```
+
+**Dependencies:** `reqwest`, `rmcp`, `serde`
+
+---
+
 ### Phase 3: Intelligence
 
 #### scratchpad-mcp (Rust) - Priority 5
@@ -205,6 +249,7 @@ struct ThinkingStep {
 | filesystem | Build | Security-critical, need custom sandboxing |
 | git | Build | git2 crate excellent, complements github-gh |
 | web-fetch | Build | Simple HTTP easy, reqwest is great |
+| web-search | Build | Pluggable backends, control over rate limiting |
 | scratchpad | Build | Simple, fits specific needs |
 | semantic | Build (tree-sitter) | Lightweight layer sufficient for most tasks |
 | browser | Use Playwright | Chromium too complex |
@@ -222,7 +267,8 @@ Phase 1 (Foundation)
 
 Phase 2 (Capabilities)
 ├── git-mcp ....................... Local git operations
-└── web-fetch-mcp ................. HTTP and HTML parsing
+├── web-fetch-mcp ................. HTTP and HTML parsing
+└── web-search-mcp ................ Search engine APIs (Brave, SearXNG)
 
 Phase 3 (Intelligence)
 ├── scratchpad-mcp ................ Structured reasoning
@@ -248,10 +294,10 @@ Phase 4 (Integration)
 │  └──────────────┘ └──────────────┘                          │
 ├─────────────────────────────────────────────────────────────┤
 │  Phase 2: Capabilities                                       │
-│  ┌──────────────┐ ┌──────────────┐                          │
-│  │     git      │ │  web-fetch   │                          │
-│  │   (git2)     │ │  (reqwest)   │                          │
-│  └──────────────┘ └──────────────┘                          │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐         │
+│  │     git      │ │  web-fetch   │ │  web-search  │         │
+│  │   (git2)     │ │  (reqwest)   │ │ (brave/searx)│         │
+│  └──────────────┘ └──────────────┘ └──────────────┘         │
 ├─────────────────────────────────────────────────────────────┤
 │  Phase 3: Intelligence                                       │
 │  ┌──────────────┐ ┌──────────────┐                          │
