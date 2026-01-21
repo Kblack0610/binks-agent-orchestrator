@@ -227,17 +227,18 @@ impl Database {
 mod tests {
     use super::*;
     use crate::db::conversations::CreateConversation;
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
 
-    fn test_db() -> Database {
+    fn test_db() -> (Database, TempDir) {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
-        Database::open_at(path).unwrap()
+        let db = Database::open_at(path).unwrap();
+        (db, dir)
     }
 
     #[test]
     fn test_create_message() {
-        let db = test_db();
+        let (db, _dir) = test_db();
         let conv = db
             .create_conversation(CreateConversation {
                 title: Some("Test".to_string()),
@@ -262,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_get_messages() {
-        let db = test_db();
+        let (db, _dir) = test_db();
         let conv = db
             .create_conversation(CreateConversation {
                 title: Some("Test".to_string()),
@@ -293,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_message_with_tool_calls() {
-        let db = test_db();
+        let (db, _dir) = test_db();
         let conv = db
             .create_conversation(CreateConversation {
                 title: Some("Test".to_string()),
@@ -324,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_cascade_delete() {
-        let db = test_db();
+        let (db, _dir) = test_db();
         let conv = db
             .create_conversation(CreateConversation {
                 title: Some("Test".to_string()),

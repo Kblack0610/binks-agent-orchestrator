@@ -189,17 +189,18 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
 
-    fn test_db() -> Database {
+    fn test_db() -> (Database, TempDir) {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
-        Database::open_at(path).unwrap()
+        let db = Database::open_at(path).unwrap();
+        (db, dir)
     }
 
     #[test]
     fn test_create_conversation() {
-        let db = test_db();
+        let (db, _dir) = test_db();
         let conv = db
             .create_conversation(CreateConversation {
                 title: Some("Test Conversation".to_string()),
@@ -214,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_get_conversation() {
-        let db = test_db();
+        let (db, _dir) = test_db();
         let created = db
             .create_conversation(CreateConversation {
                 title: Some("Test".to_string()),
@@ -230,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_list_conversations() {
-        let db = test_db();
+        let (db, _dir) = test_db();
 
         for i in 0..5 {
             db.create_conversation(CreateConversation {
@@ -247,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_delete_conversation() {
-        let db = test_db();
+        let (db, _dir) = test_db();
         let conv = db
             .create_conversation(CreateConversation {
                 title: Some("To Delete".to_string()),
