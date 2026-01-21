@@ -73,18 +73,18 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         // Conversations
         .route("/conversations", get(api::list_conversations))
         .route("/conversations", post(api::create_conversation))
-        .route("/conversations/{id}", get(api::get_conversation))
-        .route("/conversations/{id}", patch(api::update_conversation))
-        .route("/conversations/{id}", delete(api::delete_conversation))
+        .route("/conversations/:id", get(api::get_conversation))
+        .route("/conversations/:id", patch(api::update_conversation))
+        .route("/conversations/:id", delete(api::delete_conversation))
         // Messages
-        .route("/conversations/{id}/messages", get(api::get_messages))
+        .route("/conversations/:id/messages", get(api::get_messages))
         // Tools
         .route("/tools", get(api::list_tools))
         // Health
         .route("/health", get(api::health_check));
 
     let ws_routes = Router::new()
-        .route("/chat/{conversation_id}", get(ws::chat_handler));
+        .route("/chat/:conversation_id", get(ws::chat_handler));
 
     let mut router = Router::new()
         .nest("/api", api_routes)
