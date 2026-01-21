@@ -64,6 +64,14 @@
         "FS_CONFIG_PATH": "${HOME}/.binks/filesystem.toml",
         "RUST_LOG": "info"
       }
+    },
+    "web-search": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/web-search-mcp/target/release/web-search-mcp",
+      "args": [],
+      "env": {
+        "SEARXNG_URL": "http://searxng-service.ai-services.svc.cluster.local:8080",
+        "RUST_LOG": "info"
+      }
     }
   }
 }
