@@ -46,6 +46,7 @@ pub struct Milestone {
 }
 
 /// Represents a repository reference
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoRef {
     /// Repository name with owner (e.g., "owner/repo")

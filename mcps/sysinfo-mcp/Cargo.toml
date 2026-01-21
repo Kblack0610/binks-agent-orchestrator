@@ -32,9 +32,3 @@ tracing.workspace = true
 [[bin]]
 name = "sysinfo-mcp"
 path = "src/main.rs"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-strip = true

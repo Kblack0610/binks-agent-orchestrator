@@ -47,3 +47,9 @@ clap = { version = "4", features = ["derive", "env"] }
 
 # MCP
 rmcp = { version = "0.13", features = ["server", "client", "macros", "transport-io", "transport-child-process"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

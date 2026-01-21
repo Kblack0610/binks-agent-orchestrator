@@ -10,8 +10,6 @@ pub mod pull_request;
 pub mod repo;
 pub mod workflow;
 
-pub use check::{CheckContext, CheckRun, StatusCheckRollup};
-pub use common::{Label, Milestone, User};
 pub use issue::Issue;
 pub use pull_request::PullRequest;
 pub use repo::Repository;

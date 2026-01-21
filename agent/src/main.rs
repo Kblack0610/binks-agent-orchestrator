@@ -58,6 +58,8 @@ enum Commands {
         #[arg(long)]
         server: Option<String>,
     },
+    /// List available models from Ollama
+    Models,
     /// Call a tool directly
     Call {
         /// Tool name
@@ -180,6 +182,14 @@ async fn main() -> Result<()> {
         }
         Commands::Tools { server } => {
             run_tools(server).await?;
+        }
+        Commands::Models => {
+            let models = agent::llm::list_models(&ollama_url).await?;
+            println!("Available models:");
+            for m in models {
+                let current_marker = if m.name == model { " (current)" } else { "" };
+                println!("  {}{}", m.name, current_marker);
+            }
         }
         Commands::Call { tool, args } => {
             run_call_tool(&tool, args).await?;

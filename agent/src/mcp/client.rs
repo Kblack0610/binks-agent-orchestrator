@@ -23,9 +23,6 @@ use tokio::sync::{mpsc, oneshot};
 use crate::config::{McpConfig, McpServerConfig};
 use crate::mcps::{DaemonClient, is_daemon_running};
 
-/// Default idle timeout for persistent connections (5 minutes)
-const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(300);
-
 /// A tool from an MCP server
 #[derive(Debug, Clone)]
 pub struct McpTool {
@@ -448,7 +445,6 @@ impl ManagedConnection {
 /// with the rest of the application via channels.
 pub struct McpConnectionManager {
     connections: HashMap<String, ManagedConnection>,
-    idle_timeout: Duration,
 }
 
 impl McpConnectionManager {
@@ -461,10 +457,7 @@ impl McpConnectionManager {
             .map(|(name, cfg)| (name, ManagedConnection::new(cfg)))
             .collect();
 
-        Self {
-            connections,
-            idle_timeout: DEFAULT_IDLE_TIMEOUT,
-        }
+        Self { connections }
     }
 
     /// Spawn the manager as a background task and return a handle

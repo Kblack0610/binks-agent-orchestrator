@@ -6,8 +6,41 @@ use ollama_rs::{
     generation::chat::{request::ChatMessageRequest, ChatMessage},
     Ollama,
 };
+use serde::{Deserialize, Serialize};
 
 use super::{Llm, Message, Role};
+
+/// Information about an available model
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelInfo {
+    pub name: String,
+    pub size: u64,
+    pub modified_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaTagsResponse {
+    models: Vec<ModelInfo>,
+}
+
+/// List available models from Ollama
+pub async fn list_models(ollama_url: &str) -> Result<Vec<ModelInfo>> {
+    let url = url::Url::parse(ollama_url).unwrap_or_else(|_| {
+        url::Url::parse("http://localhost:11434").unwrap()
+    });
+
+    let client = reqwest::Client::new();
+    let api_url = format!("{}api/tags", url);
+
+    let response: OllamaTagsResponse = client
+        .get(&api_url)
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    Ok(response.models)
+}
 
 /// Ollama client wrapper
 pub struct OllamaClient {

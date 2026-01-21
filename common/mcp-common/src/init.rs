@@ -95,8 +95,6 @@ macro_rules! serve_stdio {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // Note: Can't easily test tracing initialization in unit tests
     // as it can only be initialized once per process
 }

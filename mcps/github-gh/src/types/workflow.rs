@@ -69,6 +69,7 @@ pub struct WorkflowRun {
 }
 
 /// Represents a job within a workflow run
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowJob {
@@ -99,6 +100,7 @@ pub struct WorkflowJob {
 }
 
 /// Represents a step within a workflow job
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowStep {
     /// Step name

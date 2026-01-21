@@ -2,7 +2,7 @@
 
 mod ollama;
 
-pub use ollama::OllamaClient;
+pub use ollama::{list_models, ModelInfo, OllamaClient};
 
 use anyhow::Result;
 use async_trait::async_trait;

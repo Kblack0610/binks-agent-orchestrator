@@ -54,6 +54,7 @@ where
 }
 
 /// Deserialize an optional boolean with lenient parsing
+#[allow(dead_code)]
 pub fn deserialize_lenient_bool_opt<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where
     D: Deserializer<'de>,

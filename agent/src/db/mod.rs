@@ -61,11 +61,6 @@ impl Database {
         schema::create_tables(&conn)?;
         Ok(())
     }
-
-    /// Get a reference to the connection (for internal use)
-    pub(crate) fn connection(&self) -> &Arc<Mutex<Connection>> {
-        &self.conn
-    }
 }
 
 #[cfg(test)]

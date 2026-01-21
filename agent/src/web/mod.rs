@@ -8,9 +8,8 @@ pub mod ws;
 
 use anyhow::Result;
 use axum::{
-    extract::State,
     http::{header, StatusCode, Uri},
-    response::{Html, IntoResponse, Response},
+    response::{Html, Response},
     routing::{delete, get, patch, post},
     Router,
 };
@@ -80,6 +79,8 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         .route("/conversations/:id/messages", get(api::get_messages))
         // Tools
         .route("/tools", get(api::list_tools))
+        // Models
+        .route("/models", get(api::list_models))
         // Health
         .route("/health", get(api::health_check));
 
@@ -184,6 +185,7 @@ pnpm dev</pre>
         <li><code>PATCH /api/conversations/:id</code> - Update conversation</li>
         <li><code>DELETE /api/conversations/:id</code> - Delete conversation</li>
         <li><code>GET /api/tools</code> - List available tools</li>
+        <li><code>GET /api/models</code> - List available models</li>
         <li><code>WS /ws/chat/:id</code> - WebSocket for chat</li>
     </ul>
 </body>

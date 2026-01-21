@@ -10,7 +10,6 @@
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use ollama_rs::Ollama;
 use serde::{Deserialize, Serialize};
 
 use crate::mcp::{McpClientPool, McpTool};
@@ -68,6 +67,7 @@ struct DirectChatResponse {
 
 #[derive(Debug, Deserialize)]
 struct DirectResponseMessage {
+    #[allow(dead_code)]
     role: String,
     content: String,
     #[serde(default)]
@@ -83,7 +83,6 @@ const MAX_ITERATIONS: usize = 10;
 
 /// An agent that can use tools via MCP
 pub struct Agent {
-    ollama: Ollama,
     ollama_url: String,
     http_client: reqwest::Client,
     model: String,
@@ -106,7 +105,6 @@ impl Agent {
         let base_url = format!("http://{}:{}", host, port);
 
         Self {
-            ollama: Ollama::new(format!("http://{}", host), port),
             ollama_url: base_url,
             http_client: reqwest::Client::new(),
             model: model.to_string(),
@@ -143,6 +141,16 @@ impl Agent {
     /// Set conversation history (for session restoration)
     pub fn set_history(&mut self, history: Vec<DirectMessage>) {
         self.history = history;
+    }
+
+    /// Get the current model name
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    /// Switch to a different model at runtime
+    pub fn set_model(&mut self, model: &str) {
+        self.model = model.to_string();
     }
 
     /// Clean up a JSON schema for Ollama compatibility

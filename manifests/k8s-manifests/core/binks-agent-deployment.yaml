@@ -1,0 +1,106 @@
+# Binks Agent Deployment
+# Provides web UI and API for chat interface at binks.chat
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: binks-agent-data
+  namespace: ai-services
+  labels:
+    app: binks-agent
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: do-block-storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: binks-agent
+  namespace: ai-services
+  labels:
+    app: binks-agent
+    tier: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: binks-agent
+  strategy:
+    type: Recreate  # Required for PVC with ReadWriteOnce
+  template:
+    metadata:
+      labels:
+        app: binks-agent
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: binks-agent
+        image: ghcr.io/kblack0610/binks-agent:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3001
+          name: http
+        env:
+        # Ollama configuration - external server
+        - name: OLLAMA_URL
+          value: "http://192.168.1.4:11434"
+        - name: OLLAMA_MODEL
+          value: "llama3.1:8b"
+        # Data directory for SQLite
+        - name: BINKS_DATA_DIR
+          value: "/data"
+        # Logging
+        - name: RUST_LOG
+          value: "info,agent=debug"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "25m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3001
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: binks-agent-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: binks-agent
+  namespace: ai-services
+  labels:
+    app: binks-agent
+spec:
+  selector:
+    app: binks-agent
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3001
+    name: http
+  type: ClusterIP

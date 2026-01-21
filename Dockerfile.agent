@@ -1,0 +1,64 @@
+# Multi-stage Dockerfile for binks-agent
+# Build: docker build -f Dockerfile.agent -t binks-agent .
+
+# ============================================
+# Stage 1: Build
+# ============================================
+FROM rust:1.83-slim-bookworm AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy only agent source (no workspace dependencies)
+COPY agent/Cargo.toml agent/Cargo.lock* ./
+COPY agent/src ./src
+COPY agent/static ./static
+
+# Build release binary
+RUN cargo build --release
+
+# ============================================
+# Stage 2: Runtime
+# ============================================
+FROM debian:bookworm-slim
+
+# Install runtime dependencies (curl for healthcheck)
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 binks
+
+# Create data directory for SQLite
+RUN mkdir -p /data && chown binks:binks /data
+
+# Copy the binary
+COPY --from=builder /build/target/release/agent /usr/local/bin/agent
+
+# Switch to non-root user
+USER binks
+WORKDIR /home/binks
+
+# Expose web server port
+EXPOSE 3001
+
+# Environment variables (can be overridden)
+ENV OLLAMA_URL=http://ollama:11434
+ENV OLLAMA_MODEL=llama3.1:8b
+ENV BINKS_DATA_DIR=/data
+ENV RUST_LOG=info
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3001/api/health || exit 1
+
+# Default command: start web server
+CMD ["agent", "web", "--port", "3001"]

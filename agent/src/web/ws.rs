@@ -26,6 +26,8 @@ pub enum ClientMessage {
         content: String,
         /// Optional list of servers to filter tools
         servers: Option<Vec<String>>,
+        /// Optional model override for this message
+        model: Option<String>,
     },
     /// Cancel current operation
     #[serde(rename = "cancel")]
@@ -150,10 +152,11 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
             Message::Text(text) => {
                 if let Ok(client_msg) = serde_json::from_str::<ClientMessage>(&text) {
                     match client_msg {
-                        ClientMessage::Message { content, servers } => {
+                        ClientMessage::Message { content, servers, model } => {
                             handle_chat_message(
                                 &content,
                                 servers,
+                                model,
                                 &conversation_id,
                                 &state,
                                 &agent,
@@ -204,11 +207,18 @@ async fn create_agent(state: &AppState) -> anyhow::Result<Agent> {
 async fn handle_chat_message(
     content: &str,
     servers: Option<Vec<String>>,
+    model: Option<String>,
     conversation_id: &str,
     state: &AppState,
     agent: &Arc<Mutex<Agent>>,
     sender: &Arc<Mutex<futures_util::stream::SplitSink<WebSocket, Message>>>,
 ) {
+    // Apply model override if provided
+    if let Some(ref model_name) = model {
+        agent.lock().await.set_model(model_name);
+        tracing::info!("Model override applied: {}", model_name);
+    }
+
     // Save user message to database
     if let Err(e) = state.db.create_message(CreateMessage {
         conversation_id: conversation_id.to_string(),

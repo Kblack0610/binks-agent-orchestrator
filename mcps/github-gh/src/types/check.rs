@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Represents a GitHub check run (CI/CD job)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CheckRun {
@@ -32,6 +33,7 @@ pub struct CheckRun {
 }
 
 /// Status check rollup for a commit/PR
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusCheckRollup {
@@ -45,6 +47,7 @@ pub struct StatusCheckRollup {
 }
 
 /// Individual check context in a rollup
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CheckContext {
@@ -69,6 +72,7 @@ pub struct CheckContext {
     pub target_url: Option<String>,
 }
 
+#[allow(dead_code)]
 impl CheckRun {
     /// Returns the JSON fields to request from gh CLI
     pub fn list_fields() -> &'static [&'static str] {

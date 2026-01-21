@@ -3,7 +3,6 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -273,5 +272,31 @@ pub async fn list_tools(
             }
         }
         None => Ok(Json(vec![])), // No tools available
+    }
+}
+
+/// Models list response
+#[derive(Debug, Serialize)]
+pub struct ModelsResponse {
+    pub models: Vec<crate::llm::ModelInfo>,
+    pub current: String,
+}
+
+/// List available Ollama models
+pub async fn list_models(
+    State(state): State<AppState>,
+) -> Result<Json<ModelsResponse>, (StatusCode, Json<ErrorResponse>)> {
+    match crate::llm::list_models(&state.ollama_url).await {
+        Ok(models) => Ok(Json(ModelsResponse {
+            models,
+            current: state.model.clone(),
+        })),
+        Err(e) => {
+            tracing::error!("Failed to list models: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse::new(e.to_string())),
+            ))
+        }
     }
 }
