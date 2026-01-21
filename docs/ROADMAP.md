@@ -92,6 +92,41 @@ We use a strategic mix of **pre-built tools** (for common operations) and **cust
 
 ---
 
+## Stability & Code Quality Phases
+
+### Phase S1: Agent Stability (P0) 🔴 CRITICAL
+**Goal:** Make binks reliable for production use
+
+- [ ] Add configurable timeouts (LLM: 5min, tools: 1min)
+- [ ] Add retry with exponential backoff (3 attempts)
+- [ ] Make MAX_ITERATIONS configurable (--max-iterations flag)
+- [ ] Add model fallback chain (primary → fallback models)
+- [ ] Add conversation history pruning (prevent OOM)
+
+### Phase S2: Observability (P1)
+**Goal:** Debug failures and monitor performance
+
+- [ ] Structured logging with correlation IDs
+- [ ] Health check HTTP endpoint (/health, /ready)
+- [ ] Basic metrics (latency, errors)
+
+### Phase S3: Code Cleanup (P1)
+**Goal:** Reduce maintenance burden (~2000 lines saved)
+
+- [ ] Create `mcp-common` crate (init, errors, results)
+- [ ] Consolidate workspace dependencies
+- [ ] Extract common parameter types
+- [ ] Standardize error handling across MCPs
+
+### Phase S4: PR Testing (P2)
+**Goal:** Enable automated PR review and testing
+
+- [ ] Create `exec-mcp` for command execution
+- [ ] Add `test-pr` workflow
+- [ ] Language-agnostic test runners (Node, Rust, Python, Go)
+
+---
+
 ## Available Agno Pre-built Toolkits
 
 Reference for future integration:

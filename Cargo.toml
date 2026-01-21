@@ -8,6 +8,7 @@ members = [
     "mcps/inbox-mcp",
     "mcps/notify-mcp",
     "mcps/filesystem-mcp",
+    "mcps/web-search-mcp",
 ]
 
 [workspace.package]

@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: searxng
+  namespace: ai-services
+  labels:
+    app: searxng
+    tier: search
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: searxng
+  template:
+    metadata:
+      labels:
+        app: searxng
+    spec:
+      containers:
+      - name: searxng
+        image: searxng/searxng:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: SEARXNG_BASE_URL
+          value: "http://searxng-service.ai-services.svc.cluster.local:8080"
+        - name: SEARXNG_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: searxng-secret
+              key: secret-key
+              optional: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: searxng-config
+          mountPath: /etc/searxng/settings.yml
+          subPath: settings.yml
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: searxng-config
+        configMap:
+          name: searxng-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: searxng-service
+  namespace: ai-services
+spec:
+  selector:
+    app: searxng
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: searxng-config
+  namespace: ai-services
+data:
+  settings.yml: |
+    use_default_settings: true
+    general:
+      instance_name: "Binks SearXNG"
+      privacypolicy_url: false
+      donation_url: false
+      contact_url: false
+      enable_metrics: false
+    search:
+      safe_search: 0
+      autocomplete: "duckduckgo"
+      default_lang: "en"
+      formats:
+        - html
+        - json
+    server:
+      secret_key: "change-this-in-production"
+      limiter: false
+      image_proxy: true
+      http_protocol_version: "1.1"
+    ui:
+      static_use_hash: true
+      default_theme: simple
+      results_on_new_tab: false
+    enabled_plugins:
+      - 'Hash plugin'
+      - 'Self Information'
+      - 'Tracker URL remover'
+    engines:
+      # Enable popular search engines
+      - name: google
+        engine: google
+        shortcut: g
+        disabled: false
+      - name: duckduckgo
+        engine: duckduckgo
+        shortcut: ddg
+        disabled: false
+      - name: bing
+        engine: bing
+        shortcut: b
+        disabled: false
+      - name: wikipedia
+        engine: wikipedia
+        shortcut: w
+        disabled: false
+      # News engines
+      - name: google news
+        engine: google_news
+        shortcut: gn
+        disabled: false
+      # Image engines
+      - name: google images
+        engine: google_images
+        shortcut: gi
+        disabled: false
+      - name: bing images
+        engine: bing_images
+        shortcut: bi
+        disabled: false
