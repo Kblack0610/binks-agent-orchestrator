@@ -1,0 +1,31 @@
+[package]
+name = "mcp-common"
+version.workspace = true
+edition.workspace = true
+description = "Common utilities for MCP servers - initialization, error handling, and result formatting"
+license = "MIT"
+
+[dependencies]
+# MCP SDK
+rmcp.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Schema generation for MCP tools
+schemars.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"
