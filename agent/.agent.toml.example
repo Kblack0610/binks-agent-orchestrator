@@ -14,8 +14,8 @@
 # Ollama server URL
 url = "http://localhost:11434"
 
-# Model to use (qwen2.5-coder:32b recommended for Mac Studio with M3 Ultra)
-model = "qwen2.5-coder:32b"
+# Model to use (default: qwen3-coder:30b)
+model = "qwen3-coder:30b"
 
 [agent]
 # Optional system prompt for the agent

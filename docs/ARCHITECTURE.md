@@ -11,6 +11,48 @@ Binks is a **Rust-based AI agent system** that uses the **Model Context Protocol
 3. **Rust Core** - Performance and safety through Rust implementation
 4. **Local LLM** - Ollama integration for privacy and control
 
+## Architectural Anti-Patterns (DO NOT ADD)
+
+The following features are **explicitly prohibited** from this codebase. They add hidden complexity, make debugging harder, and introduce subtle bugs:
+
+### ❌ Retries / Exponential Backoff
+- If something fails, it should fail immediately and clearly
+- Retries hide transient issues and make timing bugs hard to reproduce
+- Users should see failures and decide whether to retry
+
+### ❌ Model Fallback Chains
+- If the configured model isn't available, fail explicitly
+- Silent fallback masks configuration issues
+- Users should know which model is running
+
+### ❌ Circuit Breakers
+- Added complexity with minimal benefit for this use case
+- Just let it fail and show the error
+
+### ❌ Automatic Recovery Mechanisms
+- Self-healing systems are hard to debug
+- Prefer explicit failure over implicit recovery
+
+### ❌ Rate Limiting with Backoff
+- Let the underlying services (Ollama, MCP servers) handle this
+- Don't add layers of abstraction
+
+### ✅ DO Add These (Simple, Explicit)
+
+- **Timeouts** - Simple, deterministic, prevents hangs
+- **Configurable limits** - MAX_ITERATIONS, context size
+- **Clear error messages** - Tell the user exactly what failed
+- **Health checks** - Verify services are running before starting
+
+### Design Philosophy
+
+**Fail fast, fail loud.** This agent should be predictable and debuggable. When something breaks:
+1. The error should be immediate
+2. The error message should be clear
+3. The user can decide what to do
+
+Hidden recovery mechanisms make the system "feel" more stable but actually make it harder to diagnose real issues.
+
 ---
 
 ## Architecture Diagram

@@ -86,7 +86,7 @@ fn default_ollama_url() -> String {
 }
 
 fn default_model() -> String {
-    "qwen2.5-coder:32b".to_string()
+    "qwen3-coder:30b".to_string()
 }
 
 fn default_interval() -> u64 {

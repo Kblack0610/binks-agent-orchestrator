@@ -36,7 +36,7 @@ impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             ollama_url: "http://localhost:11434".to_string(),
-            model: "qwen2.5-coder:32b".to_string(),
+            model: "qwen3-coder:30b".to_string(),
             system_prompt: None,
         }
     }
