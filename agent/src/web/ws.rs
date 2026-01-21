@@ -13,8 +13,65 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use super::state::AppState;
+use crate::agent::events::{AgentEvent, event_channel, EventReceiver};
 use crate::agent::Agent;
 use crate::db::messages::{CreateMessage, MessageRole, ToolCall, ToolResult};
+
+// ============================================================================
+// Event Conversion
+// ============================================================================
+
+/// Convert an AgentEvent to a ServerMessage (if applicable)
+///
+/// Not all AgentEvents have a corresponding ServerMessage. This function
+/// returns `None` for events that don't need to be sent to the WebSocket client.
+impl AgentEvent {
+    pub fn to_server_message(&self) -> Option<ServerMessage> {
+        match self {
+            AgentEvent::Token { content } => Some(ServerMessage::Token {
+                content: content.clone(),
+            }),
+            AgentEvent::ToolStart { name, arguments } => Some(ServerMessage::ToolStart {
+                name: name.clone(),
+                arguments: arguments.clone(),
+            }),
+            AgentEvent::ToolComplete {
+                name,
+                result,
+                is_error,
+                ..
+            } => Some(ServerMessage::ToolResult {
+                name: name.clone(),
+                result: result.clone(),
+                is_error: *is_error,
+            }),
+            AgentEvent::Error { message } => Some(ServerMessage::Error {
+                message: message.clone(),
+            }),
+            // These events don't have direct WebSocket message equivalents
+            AgentEvent::ProcessingStart { .. } => None,
+            AgentEvent::Thinking { .. } => None,
+            AgentEvent::Iteration { .. } => None,
+            AgentEvent::ResponseComplete { .. } => None,
+        }
+    }
+}
+
+/// Forward events from the agent to the WebSocket client
+async fn forward_events(
+    mut event_rx: EventReceiver,
+    sender: Arc<Mutex<futures_util::stream::SplitSink<WebSocket, Message>>>,
+) {
+    while let Some(event) = event_rx.recv().await {
+        if let Some(server_msg) = event.to_server_message() {
+            let json = match serde_json::to_string(&server_msg) {
+                Ok(j) => j,
+                Err(_) => continue,
+            };
+            let _ = sender.lock().await.send(Message::Text(json.into())).await;
+        }
+    }
+}
 
 /// Incoming WebSocket message from client
 #[derive(Debug, Deserialize)]
@@ -213,10 +270,24 @@ async fn handle_chat_message(
     agent: &Arc<Mutex<Agent>>,
     sender: &Arc<Mutex<futures_util::stream::SplitSink<WebSocket, Message>>>,
 ) {
+    // Create event channel for real-time tool/token visibility
+    let (event_tx, event_rx) = event_channel();
+
+    // Spawn task to forward agent events to WebSocket client
+    let ws_sender = Arc::clone(sender);
+    let forward_task = tokio::spawn(async move {
+        forward_events(event_rx, ws_sender).await;
+    });
+
     // Apply model override if provided
-    if let Some(ref model_name) = model {
-        agent.lock().await.set_model(model_name);
-        tracing::info!("Model override applied: {}", model_name);
+    {
+        let mut agent_guard = agent.lock().await;
+        if let Some(ref model_name) = model {
+            agent_guard.set_model(model_name);
+            tracing::info!("Model override applied: {}", model_name);
+        }
+        // Set the event sender so agent events are forwarded
+        agent_guard.set_event_sender(Some(event_tx));
     }
 
     // Save user message to database
@@ -240,7 +311,12 @@ async fn handle_chat_message(
         agent_guard.chat(content).await
     };
 
+    // Clear the event sender to signal completion
+    agent_guard.set_event_sender(None);
     drop(agent_guard);
+
+    // Wait for forwarding task to complete (it will finish when channel closes)
+    let _ = forward_task.await;
 
     match result {
         Ok(response) => {

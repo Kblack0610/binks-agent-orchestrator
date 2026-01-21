@@ -3,12 +3,14 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use agent::agent::Agent;
+use agent::cli::{Repl, ReplConfig};
 use agent::config::{AgentFileConfig, McpConfig};
 use agent::context::EnvironmentContext;
 use agent::llm::{Llm, OllamaClient};
 use agent::mcp::McpClientPool;
 use agent::mcps::{DaemonClient, McpDaemon, is_daemon_running, default_socket_path, default_pid_path, default_log_dir};
 use agent::monitor::{self, MonitorConfig};
+use agent::output::TerminalOutput;
 use agent::server::{self, ServerConfig};
 use agent::web::{self, WebConfig};
 
@@ -448,84 +450,16 @@ async fn run_agent(
             }
         }
     } else {
-        // Interactive mode
-        use std::io::{self, BufRead, Write};
+        // Interactive mode with enhanced REPL
+        let output = TerminalOutput::auto();
 
-        println!("Interactive agent mode. Type 'quit' to exit, 'tools' to list tools, 'servers' to list servers.");
-        println!();
-
-        let stdin = io::stdin();
-        let mut stdout = io::stdout();
-
-        loop {
-            print!("agent> ");
-            stdout.flush()?;
-
-            let mut input = String::new();
-            stdin.lock().read_line(&mut input)?;
-            let input = input.trim();
-
-            if input.is_empty() {
-                continue;
-            }
-
-            if input == "quit" || input == "exit" {
-                break;
-            }
-
-            if input == "tools" {
-                match agent.tool_names().await {
-                    Ok(names) => {
-                        println!("\nAvailable tools ({}):", names.len());
-                        for name in names {
-                            println!("  - {}", name);
-                        }
-                        println!();
-                    }
-                    Err(e) => {
-                        eprintln!("Error listing tools: {}", e);
-                    }
-                }
-                continue;
-            }
-
-            if input == "servers" {
-                match agent.server_names().await {
-                    Ok(names) => {
-                        println!("\nAvailable servers ({}):", names.len());
-                        for name in names {
-                            println!("  - {}", name);
-                        }
-                        println!();
-                    }
-                    Err(e) => {
-                        eprintln!("Error listing servers: {}", e);
-                    }
-                }
-                continue;
-            }
-
-            if input == "clear" {
-                agent.clear_history();
-                println!("History cleared.\n");
-                continue;
-            }
-
-            let result = if let Some(ref srvs) = server_refs {
-                agent.chat_with_servers(input, srvs).await
-            } else {
-                agent.chat(input).await
-            };
-
-            match result {
-                Ok(response) => {
-                    println!("\n{}\n", response);
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                }
-            }
+        let mut repl_config = ReplConfig::default();
+        if let Some(filter) = servers {
+            repl_config.server_filter = Some(filter);
         }
+
+        let mut repl = Repl::new(&mut agent, &output).with_config(repl_config);
+        repl.run().await?;
     }
 
     Ok(())

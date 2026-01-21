@@ -18,6 +18,10 @@ use crate::mcp::{McpClientPool, McpTool};
 pub mod parsers;
 use parsers::{ToolCall, ToolCallParserRegistry};
 
+// Agent event emission for real-time visibility
+pub mod events;
+pub use events::{AgentEvent, AgentEventSender, EventReceiver, EventSender, event_channel};
+
 // Direct HTTP API types for Ollama (bypass ollama-rs for tool calls)
 #[derive(Debug, Serialize)]
 struct DirectChatRequest {
@@ -91,6 +95,7 @@ pub struct Agent {
     history: Vec<DirectMessage>,
     parser_registry: ToolCallParserRegistry,
     verbose: bool,
+    event_sender: AgentEventSender,
 }
 
 impl Agent {
@@ -113,6 +118,7 @@ impl Agent {
             history: Vec::new(),
             parser_registry: ToolCallParserRegistry::new(),
             verbose: false,
+            event_sender: AgentEventSender::none(),
         }
     }
 
@@ -126,6 +132,20 @@ impl Agent {
     pub fn with_verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
         self
+    }
+
+    /// Set event sender for real-time event visibility
+    pub fn with_event_sender(mut self, sender: EventSender) -> Self {
+        self.event_sender = AgentEventSender::new(sender);
+        self
+    }
+
+    /// Set event sender dynamically
+    pub fn set_event_sender(&mut self, sender: Option<EventSender>) {
+        self.event_sender = match sender {
+            Some(s) => AgentEventSender::new(s),
+            None => AgentEventSender::none(),
+        };
     }
 
     /// Update the system prompt dynamically
@@ -151,6 +171,16 @@ impl Agent {
     /// Switch to a different model at runtime
     pub fn set_model(&mut self, model: &str) {
         self.model = model.to_string();
+    }
+
+    /// Get the Ollama URL
+    pub fn ollama_url(&self) -> &str {
+        &self.ollama_url
+    }
+
+    /// Get the current system prompt
+    pub fn system_prompt(&self) -> Option<&str> {
+        self.system_prompt.as_deref()
     }
 
     /// Clean up a JSON schema for Ollama compatibility
@@ -280,6 +310,16 @@ impl Agent {
         Ok(servers)
     }
 
+    /// Get tools for a specific server
+    pub async fn tools_for_server(&mut self, server_name: &str) -> Result<Vec<McpTool>> {
+        let tools = self.mcp_pool.list_all_tools().await?;
+        let filtered: Vec<_> = tools
+            .into_iter()
+            .filter(|t| t.server == server_name)
+            .collect();
+        Ok(filtered)
+    }
+
     /// Run a chat with tools filtered to specific MCP servers
     /// This is useful when you have many tools but only need a subset
     pub async fn chat_with_servers(&mut self, user_message: &str, servers: &[&str]) -> Result<String> {
@@ -299,6 +339,9 @@ impl Agent {
     /// Internal method to run chat with a specific set of tools
     async fn chat_with_tools(&mut self, user_message: &str, tools: Vec<DirectTool>) -> Result<String> {
         let total_start = Instant::now();
+
+        // Emit processing start event
+        self.event_sender.processing_start(user_message);
 
         // Build initial messages
         let mut messages: Vec<DirectMessage> = Vec::new();
@@ -332,6 +375,10 @@ impl Agent {
             }
 
             tracing::debug!("Agent iteration {}", iterations);
+
+            // Emit iteration event (tool_calls count from previous iteration, 0 for first)
+            // We'll emit another event after we know the tool count
+            self.event_sender.iteration(iterations, 0);
 
             // Create direct HTTP request
             let request = DirectChatRequest {
@@ -412,9 +459,18 @@ impl Agent {
                 // No tool calls - we're done
                 tracing::info!("Agent responding without tool calls");
 
+                let total_duration = total_start.elapsed();
+
+                // Emit response complete event
+                self.event_sender.response_complete(
+                    &assistant_msg.content,
+                    iterations,
+                    total_duration,
+                );
+
                 if self.verbose {
                     eprintln!("[{:>7}ms] Total ({} iteration{})",
-                        total_start.elapsed().as_millis(),
+                        total_duration.as_millis(),
                         iterations,
                         if iterations == 1 { "" } else { "s" }
                     );
@@ -450,14 +506,28 @@ impl Agent {
 
             // Execute each tool call and add results
             for tool_call in &tool_calls {
+                // Emit tool start event
+                self.event_sender.tool_start(
+                    &tool_call.function.name,
+                    &tool_call.function.arguments,
+                );
+
                 let tool_start = Instant::now();
-                let result = match self.execute_tool_call(tool_call).await {
-                    Ok(r) => r,
+                let (result, is_error) = match self.execute_tool_call(tool_call).await {
+                    Ok(r) => (r, false),
                     Err(e) => {
-                        format!("Error calling tool {}: {}", tool_call.function.name, e)
+                        (format!("Error calling tool {}: {}", tool_call.function.name, e), true)
                     }
                 };
                 let tool_elapsed = tool_start.elapsed();
+
+                // Emit tool complete event
+                self.event_sender.tool_complete(
+                    &tool_call.function.name,
+                    &result,
+                    tool_elapsed,
+                    is_error,
+                );
 
                 if self.verbose {
                     eprintln!("[{:>7}ms] → {}", tool_elapsed.as_millis(), tool_call.function.name);
@@ -473,16 +543,24 @@ impl Agent {
         }
 
         // Final timing summary
+        let total_duration = total_start.elapsed();
         if self.verbose {
             eprintln!("[{:>7}ms] Total ({} iteration{})",
-                total_start.elapsed().as_millis(),
+                total_duration.as_millis(),
                 iterations,
                 if iterations == 1 { "" } else { "s" }
             );
         }
 
+        // Emit error event for max iterations
+        let error_msg = format!(
+            "Agent reached maximum iterations ({}) without completing",
+            MAX_ITERATIONS
+        );
+        self.event_sender.error(&error_msg);
+
         // If we hit max iterations, return last assistant message
-        Ok("Agent reached maximum iterations without completing.".to_string())
+        Ok(error_msg)
     }
 }
 

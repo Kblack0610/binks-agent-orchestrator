@@ -50,6 +50,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # CLI
 clap = { version = "4", features = ["derive", "env"] }
 
+# Terminal detection
+atty = "0.2"
+
 # Platform directories
 dirs = "6"
 
