@@ -1,7 +1,7 @@
 //! Filesystem MCP - Sandboxed filesystem server with security controls
 //!
 //! Provides secure file operations with configurable allowlists/denylists.
-//! Operations are restricted to configured directories to prevent unauthorized access.
+//! Operations are restricted to configured directories.
 
 mod sandbox;
 mod server;
@@ -10,21 +10,16 @@ mod types;
 use std::path::PathBuf;
 
 use rmcp::{transport::io::stdio, ServiceExt};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use server::FilesystemMcpServer;
 use types::Config;
 
 fn load_config() -> Config {
-    // Try to load config from standard locations
     let config_paths = [
-        // 1. Current directory
         PathBuf::from("filesystem-mcp.toml"),
-        // 2. User config directory
         dirs::config_dir()
             .map(|p| p.join("filesystem-mcp").join("config.toml"))
             .unwrap_or_default(),
-        // 3. Home directory
         dirs::home_dir()
             .map(|p| p.join(".filesystem-mcp.toml"))
             .unwrap_or_default(),
@@ -52,33 +47,17 @@ fn load_config() -> Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize logging to stderr (MCP uses stdio for protocol)
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_writer(std::io::stderr)
-                .with_ansi(false),
-        )
-        .with(EnvFilter::from_default_env().add_directive("filesystem_mcp=info".parse()?))
-        .init();
+    mcp_common::init_tracing("filesystem_mcp")?;
 
     tracing::info!("Starting Filesystem MCP server");
 
-    // Load configuration
     let config = load_config();
-
-    // Create the server
     let server = FilesystemMcpServer::new(config)?;
-
-    // Start serving on stdio
     let service = server.serve(stdio()).await?;
 
     tracing::info!("Filesystem MCP server running");
-
-    // Wait for shutdown
     service.waiting().await?;
 
     tracing::info!("Filesystem MCP server stopped");
-
     Ok(())
 }

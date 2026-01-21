@@ -1,29 +1,32 @@
 [package]
 name = "filesystem-mcp"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Sandboxed filesystem MCP server with security controls"
 license = "MIT"
 
 [dependencies]
-# MCP SDK (official)
-rmcp = { version = "0.13", features = ["server", "macros", "transport-io"] }
+# Internal crates
+mcp-common.workspace = true
+
+# MCP SDK
+rmcp.workspace = true
 
 # Async runtime
-tokio = { version = "1", features = ["full", "fs"] }
+tokio.workspace = true
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-schemars = "1.2"
-toml = "0.8"
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+toml.workspace = true
 
 # Date/time handling
 chrono = { version = "0.4", features = ["serde"] }
 
 # Error handling
-thiserror = "2"
-anyhow = "1"
+thiserror.workspace = true
+anyhow.workspace = true
 
 # Home directory
 dirs = "5"
@@ -32,8 +35,7 @@ dirs = "5"
 glob = "0.3"
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing.workspace = true
 
 [[bin]]
 name = "filesystem-mcp"

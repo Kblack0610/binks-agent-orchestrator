@@ -3,6 +3,9 @@ resolver = "2"
 members = [
     "agent",
     "orchestrator",
+    # Common crates
+    "common/mcp-common",
+    # MCP servers
     "mcps/sysinfo-mcp",
     "mcps/github-gh",
     "mcps/inbox-mcp",
@@ -16,6 +19,9 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
+# Internal crates
+mcp-common = { path = "common/mcp-common" }
+
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "io-std"] }
 async-trait = "0.1"
@@ -24,6 +30,9 @@ async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
+
+# Schema generation
+schemars = "1.2"
 
 # Error handling
 thiserror = "2"

@@ -1,32 +1,33 @@
 [package]
 name = "sysinfo-mcp"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Cross-platform system information MCP server"
 license = "MIT"
 
 [dependencies]
-# MCP SDK (official)
-rmcp = { version = "0.13", features = ["server", "macros", "transport-io"] }
+# Internal crates
+mcp-common.workspace = true
+
+# MCP SDK
+rmcp.workspace = true
 
 # Cross-platform system information
 sysinfo = "0.32"
 
 # Async runtime
-tokio = { version = "1", features = ["full"] }
+tokio.workspace = true
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-schemars = "1.2"
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
 
 # Error handling
-thiserror = "2"
-anyhow = "1"
+anyhow.workspace = true
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing.workspace = true
 
 [[bin]]
 name = "sysinfo-mcp"
