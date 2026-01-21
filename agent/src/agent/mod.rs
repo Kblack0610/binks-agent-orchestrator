@@ -394,6 +394,16 @@ impl Agent {
             tracing::info!("Messages count: {}", messages.len());
             tracing::info!("Tools count: {}", tools.len());
 
+            // Verbose feedback before Ollama call
+            if self.verbose {
+                eprint!("[       ...] Waiting for {} ", self.model);
+                if iterations == 1 {
+                    eprintln!("({}msg, {}tools)", messages.len(), tools.len());
+                } else {
+                    eprintln!("(iteration {})", iterations);
+                }
+            }
+
             // Send direct HTTP request
             let url = format!("{}/api/chat", self.ollama_url);
             let ollama_start = Instant::now();
@@ -511,6 +521,18 @@ impl Agent {
                     &tool_call.function.name,
                     &tool_call.function.arguments,
                 );
+
+                // Verbose feedback before tool call
+                if self.verbose {
+                    eprint!("[       ...] Calling {} ", tool_call.function.name);
+                    // Show truncated args if available
+                    let args_str = tool_call.function.arguments.to_string();
+                    if args_str.len() > 60 {
+                        eprintln!("({}...)", &args_str[..60]);
+                    } else {
+                        eprintln!("({})", args_str);
+                    }
+                }
 
                 let tool_start = Instant::now();
                 let (result, is_error) = match self.execute_tool_call(tool_call).await {
