@@ -179,6 +179,57 @@ pub async fn execute_gh_raw(args: &[&str]) -> GhResult<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+/// Execute a gh command and return output even on non-zero exit codes
+///
+/// This function is used for commands like `gh pr checks` where a non-zero
+/// exit code indicates check failure (not a command error) and stdout
+/// still contains valid output.
+///
+/// # Arguments
+///
+/// * `args` - Command arguments
+///
+/// # Returns
+///
+/// A tuple of (stdout, exit_code) - stdout is returned regardless of exit code
+#[instrument(fields(cmd = %args.join(" ")))]
+pub async fn execute_gh_raw_with_exit_code(args: &[&str]) -> GhResult<(String, i32)> {
+    debug!("executing: gh {}", args.join(" "));
+
+    let output = Command::new("gh")
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                GhError::NotFound
+            } else {
+                GhError::SpawnError(e)
+            }
+        })?
+        .wait_with_output()
+        .await?;
+
+    let exit_code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    // Only fail on auth errors, let caller handle other non-zero exits
+    if stderr.contains("gh auth login") || stderr.contains("not logged in") {
+        error!("gh authentication required");
+        return Err(GhError::NotAuthenticated);
+    }
+
+    // For actual command not found or invalid usage, still error
+    if exit_code != 0 && stdout.is_empty() && !stderr.is_empty() {
+        error!(exit_code, stderr = %stderr, "gh command failed with no output");
+        return Err(GhError::CommandFailed { code: exit_code, stderr });
+    }
+
+    Ok((stdout, exit_code))
+}
+
 /// Check if gh CLI is available and authenticated
 ///
 /// This function verifies that:

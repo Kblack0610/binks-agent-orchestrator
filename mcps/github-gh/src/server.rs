@@ -11,7 +11,7 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::gh::{execute_gh_action, execute_gh_json, execute_gh_raw, GhError};
+use crate::gh::{execute_gh_action, execute_gh_json, execute_gh_raw, execute_gh_raw_with_exit_code, GhError};
 use crate::types::{Issue, PullRequest, Repository, Workflow, WorkflowRun};
 
 /// The main GitHub MCP Server
@@ -776,11 +776,31 @@ impl GitHubMcpServer {
             args.push("--fail");
         }
 
-        match execute_gh_raw(&args).await {
-            Ok(output) => Ok(CallToolResult::success(vec![Content::text(output)])),
+        // Use execute_gh_raw_with_exit_code because gh pr checks returns:
+        // - exit code 0: all checks passed
+        // - exit code 1: some checks failed (stdout still has valid check data!)
+        // - exit code 2+: actual errors
+        match execute_gh_raw_with_exit_code(&args).await {
+            Ok((output, exit_code)) => {
+                // Exit code 0 or 1 both have valid output
+                if output.trim().is_empty() {
+                    Ok(CallToolResult::success(vec![Content::text(
+                        format!("No checks reported for PR #{}", params.number)
+                    )]))
+                } else {
+                    // Add status indicator based on exit code
+                    let status_msg = if exit_code == 0 {
+                        "✓ All checks passed"
+                    } else {
+                        "✗ Some checks failed"
+                    };
+                    Ok(CallToolResult::success(vec![Content::text(
+                        format!("{}\n\n{}", status_msg, output)
+                    )]))
+                }
+            }
             Err(e) => {
                 let err_str = e.to_string();
-                // Handle "no checks" case gracefully
                 if err_str.contains("no checks reported") {
                     Ok(CallToolResult::success(vec![Content::text(
                         format!("No checks reported for PR #{}", params.number)
