@@ -283,6 +283,194 @@ pub struct IssueCommentParams {
 }
 
 // ============================================================================
+// New Visibility Tools Parameter Types
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct StatusParams {
+    #[schemars(description = "Filter by organization")]
+    pub org: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct PrStatusParams {
+    #[schemars(description = "Repository in OWNER/REPO format (optional, uses current repo if not specified)")]
+    pub repo: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct IssueStatusParams {
+    #[schemars(description = "Repository in OWNER/REPO format (optional, uses current repo if not specified)")]
+    pub repo: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct SearchIssuesParams {
+    #[schemars(description = "Search query (GitHub search syntax)")]
+    pub query: String,
+    #[schemars(description = "Repository in OWNER/REPO format (optional)")]
+    pub repo: Option<String>,
+    #[schemars(description = "Maximum number of results to return")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct SearchReposParams {
+    #[schemars(description = "Search query (GitHub search syntax)")]
+    pub query: String,
+    #[schemars(description = "Maximum number of results to return")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct SearchCommitsParams {
+    #[schemars(description = "Search query (GitHub search syntax)")]
+    pub query: String,
+    #[schemars(description = "Repository in OWNER/REPO format (optional)")]
+    pub repo: Option<String>,
+    #[schemars(description = "Maximum number of results to return")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct RunRerunParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Workflow run ID")]
+    pub run_id: u64,
+    #[schemars(description = "Only rerun failed jobs")]
+    pub failed: Option<bool>,
+    #[schemars(description = "Enable debug logging")]
+    pub debug: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct PrReviewParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Pull request number")]
+    pub number: u32,
+    #[schemars(description = "Review action: approve, request-changes, comment")]
+    pub action: String,
+    #[schemars(description = "Review body/comment")]
+    pub body: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ReleaseListParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Maximum number of releases to return")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ReleaseViewParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Release tag name (e.g., v1.0.0). Use 'latest' for most recent.")]
+    pub tag: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct LabelListParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Maximum number of labels to return")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct CacheListParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Maximum number of caches to return")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct SecretListParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct VariableListParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct PrReadyParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Pull request number")]
+    pub number: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct PrEditParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Pull request number")]
+    pub number: u32,
+    #[schemars(description = "New PR title")]
+    pub title: Option<String>,
+    #[schemars(description = "New PR body")]
+    pub body: Option<String>,
+    #[schemars(description = "New base branch")]
+    pub base: Option<String>,
+    #[schemars(description = "Labels to add (comma-separated)")]
+    pub add_labels: Option<String>,
+    #[schemars(description = "Labels to remove (comma-separated)")]
+    pub remove_labels: Option<String>,
+    #[schemars(description = "Assignees to add (comma-separated)")]
+    pub add_assignees: Option<String>,
+    #[schemars(description = "Reviewers to add (comma-separated)")]
+    pub add_reviewers: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ReleaseCreateParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Tag name for the release (e.g., v1.0.0)")]
+    pub tag: String,
+    #[schemars(description = "Release title")]
+    pub title: Option<String>,
+    #[schemars(description = "Release notes body")]
+    pub notes: Option<String>,
+    #[schemars(description = "Target branch or commit SHA")]
+    pub target: Option<String>,
+    #[schemars(description = "Create as draft release")]
+    pub draft: Option<bool>,
+    #[schemars(description = "Mark as prerelease")]
+    pub prerelease: Option<bool>,
+    #[schemars(description = "Auto-generate release notes")]
+    pub generate_notes: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct LabelCreateParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Label name")]
+    pub name: String,
+    #[schemars(description = "Label color (hex without #, e.g., 'ff0000')")]
+    pub color: Option<String>,
+    #[schemars(description = "Label description")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct IssueDeleteParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Issue number")]
+    pub number: u32,
+}
+
+// ============================================================================
 // Tool Router Implementation
 // ============================================================================
 
@@ -929,6 +1117,437 @@ impl GitHubMcpServer {
         let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
         let msg = if output.is_empty() {
             format!("Comment added to issue #{}", params.number)
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    // ========================================================================
+    // Tier 1: High-Value Visibility Tools
+    // ========================================================================
+
+    #[tool(description = "Show status of relevant issues, PRs, and notifications across all repositories. Shows mentions, review requests, and assigned items.")]
+    async fn gh_status(
+        &self,
+        Parameters(params): Parameters<StatusParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["status"];
+
+        let org_str;
+        if let Some(ref org) = params.org {
+            org_str = format!("-o={}", org);
+            args.push(&org_str);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Show status of your PRs in a repository - open PRs, checks failing, approved, needs review")]
+    async fn gh_pr_status(
+        &self,
+        Parameters(params): Parameters<PrStatusParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["pr", "status"];
+
+        let repo_str;
+        if let Some(ref repo) = params.repo {
+            repo_str = repo.clone();
+            args.extend(["-R", &repo_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Show status of issues relevant to you - assigned, mentioned, created by you")]
+    async fn gh_issue_status(
+        &self,
+        Parameters(params): Parameters<IssueStatusParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["issue", "status"];
+
+        let repo_str;
+        if let Some(ref repo) = params.repo {
+            repo_str = repo.clone();
+            args.extend(["-R", &repo_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Search for issues using GitHub search syntax")]
+    async fn gh_search_issues(
+        &self,
+        Parameters(params): Parameters<SearchIssuesParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["search", "issues", &params.query];
+
+        let repo_str;
+        let limit_str;
+
+        if let Some(ref repo) = params.repo {
+            repo_str = format!("--repo={}", repo);
+            args.push(&repo_str);
+        }
+        if let Some(limit) = params.limit {
+            limit_str = limit.to_string();
+            args.extend(["--limit", &limit_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Search for repositories using GitHub search syntax")]
+    async fn gh_search_repos(
+        &self,
+        Parameters(params): Parameters<SearchReposParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["search", "repos", &params.query];
+
+        let limit_str;
+        if let Some(limit) = params.limit {
+            limit_str = limit.to_string();
+            args.extend(["--limit", &limit_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Search for commits using GitHub search syntax")]
+    async fn gh_search_commits(
+        &self,
+        Parameters(params): Parameters<SearchCommitsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["search", "commits", &params.query];
+
+        let repo_str;
+        let limit_str;
+
+        if let Some(ref repo) = params.repo {
+            repo_str = format!("--repo={}", repo);
+            args.push(&repo_str);
+        }
+        if let Some(limit) = params.limit {
+            limit_str = limit.to_string();
+            args.extend(["--limit", &limit_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "Rerun a workflow run - optionally only failed jobs")]
+    async fn gh_run_rerun(
+        &self,
+        Parameters(params): Parameters<RunRerunParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let run_id_str = params.run_id.to_string();
+        let mut args = vec!["run", "rerun", &run_id_str, "-R", &params.repo];
+
+        if params.failed == Some(true) {
+            args.push("--failed");
+        }
+        if params.debug == Some(true) {
+            args.push("--debug");
+        }
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            if params.failed == Some(true) {
+                format!("Rerun triggered for failed jobs of run {}", params.run_id)
+            } else {
+                format!("Rerun triggered for all jobs of run {}", params.run_id)
+            }
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    #[tool(description = "Submit a review on a pull request - approve, request-changes, or comment")]
+    async fn gh_pr_review(
+        &self,
+        Parameters(params): Parameters<PrReviewParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let number_str = params.number.to_string();
+        let mut args = vec!["pr", "review", &number_str, "-R", &params.repo];
+
+        // Add the review action
+        let action_flag = format!("--{}", params.action);
+        args.push(&action_flag);
+
+        let body_str;
+        if let Some(ref body) = params.body {
+            body_str = body.clone();
+            args.extend(["-b", &body_str]);
+        }
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            format!("Review '{}' submitted for PR #{}", params.action, params.number)
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    // ========================================================================
+    // Tier 2: Release Tools
+    // ========================================================================
+
+    #[tool(description = "List releases in a repository")]
+    async fn gh_release_list(
+        &self,
+        Parameters(params): Parameters<ReleaseListParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["release", "list", "-R", &params.repo];
+
+        let limit_str;
+        if let Some(limit) = params.limit {
+            limit_str = limit.to_string();
+            args.extend(["-L", &limit_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "View release details including changelog and assets. Use 'latest' for the most recent release.")]
+    async fn gh_release_view(
+        &self,
+        Parameters(params): Parameters<ReleaseViewParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = vec!["release", "view", &params.tag, "-R", &params.repo];
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    // ========================================================================
+    // Tier 3: Repository Resource Tools
+    // ========================================================================
+
+    #[tool(description = "List labels in a repository")]
+    async fn gh_label_list(
+        &self,
+        Parameters(params): Parameters<LabelListParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["label", "list", "-R", &params.repo];
+
+        let limit_str;
+        if let Some(limit) = params.limit {
+            limit_str = limit.to_string();
+            args.extend(["-L", &limit_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "List GitHub Actions caches in a repository")]
+    async fn gh_cache_list(
+        &self,
+        Parameters(params): Parameters<CacheListParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["cache", "list", "-R", &params.repo];
+
+        let limit_str;
+        if let Some(limit) = params.limit {
+            limit_str = limit.to_string();
+            args.extend(["-L", &limit_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "List repository secrets (names only, not values)")]
+    async fn gh_secret_list(
+        &self,
+        Parameters(params): Parameters<SecretListParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = vec!["secret", "list", "-R", &params.repo];
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "List repository variables for GitHub Actions")]
+    async fn gh_variable_list(
+        &self,
+        Parameters(params): Parameters<VariableListParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = vec!["variable", "list", "-R", &params.repo];
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    // ========================================================================
+    // Tier 4: Additional PR/Issue Operations
+    // ========================================================================
+
+    #[tool(description = "Mark a draft pull request as ready for review")]
+    async fn gh_pr_ready(
+        &self,
+        Parameters(params): Parameters<PrReadyParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let number_str = params.number.to_string();
+        let args = vec!["pr", "ready", &number_str, "-R", &params.repo];
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            format!("PR #{} marked as ready for review", params.number)
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    #[tool(description = "Edit a pull request - change title, body, labels, assignees, reviewers")]
+    async fn gh_pr_edit(
+        &self,
+        Parameters(params): Parameters<PrEditParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let number_str = params.number.to_string();
+        let mut args = vec!["pr", "edit", &number_str, "-R", &params.repo];
+
+        let title_str;
+        let body_str;
+        let base_str;
+        let add_labels_str;
+        let remove_labels_str;
+        let add_assignees_str;
+        let add_reviewers_str;
+
+        if let Some(ref title) = params.title {
+            title_str = title.clone();
+            args.extend(["-t", &title_str]);
+        }
+        if let Some(ref body) = params.body {
+            body_str = body.clone();
+            args.extend(["-b", &body_str]);
+        }
+        if let Some(ref base) = params.base {
+            base_str = base.clone();
+            args.extend(["-B", &base_str]);
+        }
+        if let Some(ref add_labels) = params.add_labels {
+            add_labels_str = add_labels.clone();
+            args.extend(["--add-label", &add_labels_str]);
+        }
+        if let Some(ref remove_labels) = params.remove_labels {
+            remove_labels_str = remove_labels.clone();
+            args.extend(["--remove-label", &remove_labels_str]);
+        }
+        if let Some(ref add_assignees) = params.add_assignees {
+            add_assignees_str = add_assignees.clone();
+            args.extend(["--add-assignee", &add_assignees_str]);
+        }
+        if let Some(ref add_reviewers) = params.add_reviewers {
+            add_reviewers_str = add_reviewers.clone();
+            args.extend(["--add-reviewer", &add_reviewers_str]);
+        }
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            format!("PR #{} updated successfully", params.number)
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    // ========================================================================
+    // Create/Write Operations (last tier)
+    // ========================================================================
+
+    #[tool(description = "Create a new release in a repository")]
+    async fn gh_release_create(
+        &self,
+        Parameters(params): Parameters<ReleaseCreateParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["release", "create", &params.tag, "-R", &params.repo];
+
+        let title_str;
+        let notes_str;
+        let target_str;
+
+        if let Some(ref title) = params.title {
+            title_str = title.clone();
+            args.extend(["-t", &title_str]);
+        }
+        if let Some(ref notes) = params.notes {
+            notes_str = notes.clone();
+            args.extend(["-n", &notes_str]);
+        }
+        if let Some(ref target) = params.target {
+            target_str = target.clone();
+            args.extend(["--target", &target_str]);
+        }
+        if params.draft == Some(true) {
+            args.push("--draft");
+        }
+        if params.prerelease == Some(true) {
+            args.push("--prerelease");
+        }
+        if params.generate_notes == Some(true) {
+            args.push("--generate-notes");
+        }
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            format!("Release {} created successfully", params.tag)
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    #[tool(description = "Create a new label in a repository")]
+    async fn gh_label_create(
+        &self,
+        Parameters(params): Parameters<LabelCreateParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut args = vec!["label", "create", &params.name, "-R", &params.repo];
+
+        let color_str;
+        let description_str;
+
+        if let Some(ref color) = params.color {
+            color_str = color.clone();
+            args.extend(["-c", &color_str]);
+        }
+        if let Some(ref description) = params.description {
+            description_str = description.clone();
+            args.extend(["-d", &description_str]);
+        }
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            format!("Label '{}' created successfully", params.name)
+        } else {
+            output
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    #[tool(description = "Delete an issue (requires admin permissions)")]
+    async fn gh_issue_delete(
+        &self,
+        Parameters(params): Parameters<IssueDeleteParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let number_str = params.number.to_string();
+        let args = vec!["issue", "delete", &number_str, "-R", &params.repo, "--yes"];
+
+        let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
+        let msg = if output.is_empty() {
+            format!("Issue #{} deleted successfully", params.number)
         } else {
             output
         };

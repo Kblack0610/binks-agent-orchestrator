@@ -37,8 +37,8 @@ enum Commands {
         /// Message to send
         message: String,
     },
-    /// Interactive chat session
-    Interactive,
+    /// Simple chat session (no tools, just LLM conversation)
+    Simple,
     /// Run the tool-using agent (LLM decides when to call tools)
     Agent {
         /// Initial message (optional, starts interactive if not provided)
@@ -174,9 +174,9 @@ async fn main() -> Result<()> {
             let response = llm.chat(&message).await?;
             println!("{}", response);
         }
-        Commands::Interactive => {
+        Commands::Simple => {
             let llm = OllamaClient::new(&ollama_url, &model);
-            run_interactive(llm).await?;
+            run_simple(llm).await?;
         }
         Commands::Agent { message, system, servers, verbose } => {
             let server_list = servers.map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
@@ -261,10 +261,10 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn run_interactive(llm: OllamaClient) -> Result<()> {
+async fn run_simple(llm: OllamaClient) -> Result<()> {
     use std::io::{self, BufRead, Write};
 
-    println!("Interactive mode. Type 'quit' to exit.");
+    println!("Simple chat mode (no tools). Type 'quit' to exit.");
     println!("Model: {}", llm.model());
     println!();
 
