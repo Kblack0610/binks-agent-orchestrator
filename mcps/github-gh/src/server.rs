@@ -214,6 +214,20 @@ pub struct RunCancelParams {
     pub run_id: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct RunLogParams {
+    #[schemars(description = "Repository in OWNER/REPO format")]
+    pub repo: String,
+    #[schemars(description = "Workflow run ID")]
+    pub run_id: u64,
+    #[schemars(description = "View logs for a specific job ID only")]
+    pub job: Option<String>,
+    #[schemars(description = "Only show logs from failed steps (default: false shows all logs)")]
+    pub failed_only: Option<bool>,
+    #[schemars(description = "The attempt number of the workflow run")]
+    pub attempt: Option<u32>,
+}
+
 // ============================================================================
 // Phase 4: Analysis Tools Parameter Types
 // ============================================================================
@@ -742,6 +756,50 @@ impl GitHubMcpServer {
             output
         };
         Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+
+    #[tool(description = "View logs for a workflow run or specific job. Use failed_only=true to see only failed step logs, which is useful for debugging CI failures.")]
+    async fn gh_run_log(
+        &self,
+        Parameters(params): Parameters<RunLogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let run_id_str = params.run_id.to_string();
+        let mut args = vec!["run", "view", &run_id_str, "-R", &params.repo];
+
+        let job_str;
+        let attempt_str;
+
+        // Add --log or --log-failed flag
+        if params.failed_only == Some(true) {
+            args.push("--log-failed");
+        } else {
+            args.push("--log");
+        }
+
+        // Add job filter if specified
+        if let Some(ref job) = params.job {
+            job_str = job.clone();
+            args.extend(["--job", &job_str]);
+        }
+
+        // Add attempt number if specified
+        if let Some(attempt) = params.attempt {
+            attempt_str = attempt.to_string();
+            args.extend(["--attempt", &attempt_str]);
+        }
+
+        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
+
+        if output.trim().is_empty() {
+            let msg = if params.failed_only == Some(true) {
+                format!("No failed step logs found for run {}", params.run_id)
+            } else {
+                format!("No logs found for run {}", params.run_id)
+            };
+            Ok(CallToolResult::success(vec![Content::text(msg)]))
+        } else {
+            Ok(CallToolResult::success(vec![Content::text(output)]))
+        }
     }
 
     // ========================================================================
