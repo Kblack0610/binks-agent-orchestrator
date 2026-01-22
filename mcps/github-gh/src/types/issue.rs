@@ -54,9 +54,9 @@ pub struct Issue {
     /// Issue URL on GitHub
     pub url: String,
 
-    /// Number of comments
+    /// Comments on the issue (array of comment objects)
     #[serde(default)]
-    pub comments: Option<u32>,
+    pub comments: Vec<serde_json::Value>,
 }
 
 impl Issue {
@@ -75,7 +75,6 @@ impl Issue {
             "createdAt",
             "updatedAt",
             "url",
-            "comments",
         ]
     }
 

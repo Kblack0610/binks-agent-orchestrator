@@ -60,8 +60,8 @@ pub struct WorkflowRun {
     pub updated_at: String,
 
     /// Start time (ISO 8601)
-    #[serde(default)]
-    pub run_started_at: Option<String>,
+    #[serde(default, alias = "startedAt")]
+    pub started_at: Option<String>,
 
     /// Display title
     #[serde(default)]
@@ -156,7 +156,7 @@ impl WorkflowRun {
             "url",
             "createdAt",
             "updatedAt",
-            "runStartedAt",
+            "startedAt",
             "displayTitle",
         ]
     }

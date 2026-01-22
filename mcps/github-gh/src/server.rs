@@ -776,8 +776,20 @@ impl GitHubMcpServer {
             args.push("--fail");
         }
 
-        let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-        Ok(CallToolResult::success(vec![Content::text(output)]))
+        match execute_gh_raw(&args).await {
+            Ok(output) => Ok(CallToolResult::success(vec![Content::text(output)])),
+            Err(e) => {
+                let err_str = e.to_string();
+                // Handle "no checks" case gracefully
+                if err_str.contains("no checks reported") {
+                    Ok(CallToolResult::success(vec![Content::text(
+                        format!("No checks reported for PR #{}", params.number)
+                    )]))
+                } else {
+                    Err(gh_to_mcp_error(e))
+                }
+            }
+        }
     }
 
     #[tool(description = "Search for pull requests using GitHub search syntax")]

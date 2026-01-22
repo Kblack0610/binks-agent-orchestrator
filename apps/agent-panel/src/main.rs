@@ -13,7 +13,7 @@ mod ipc;
 mod ui;
 
 use iced::theme::Style;
-use iced_layershell::reexport::Anchor;
+use iced_layershell::reexport::{Anchor, KeyboardInteractivity};
 use iced_layershell::settings::LayerShellSettings;
 use iced_layershell::application;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -39,6 +39,8 @@ fn main() -> iced_layershell::Result {
             anchor: Anchor::Top | Anchor::Right,
             margin: (10, 10, 0, 0),
             exclusive_zone: 0,
+            keyboard_interactivity: KeyboardInteractivity::None,
+            events_transparent: true,
             ..Default::default()
         })
         .run()
