@@ -13,6 +13,7 @@ use agent::monitor::{self, MonitorConfig};
 use agent::output::TerminalOutput;
 use agent::server::{self, ServerConfig};
 use agent::web::{self, WebConfig};
+use agent::orchestrator::{WorkflowEngine, EngineConfig, AgentRegistry};
 
 #[derive(Parser)]
 #[command(name = "agent")]
@@ -123,6 +124,11 @@ enum Commands {
         #[arg(long)]
         open: bool,
     },
+    /// Run multi-agent workflows
+    Workflow {
+        #[command(subcommand)]
+        command: WorkflowCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -149,6 +155,33 @@ enum McpsCommands {
         #[arg(long, short, default_value = "50")]
         lines: usize,
     },
+}
+
+#[derive(Subcommand)]
+enum WorkflowCommands {
+    /// List available workflows
+    List,
+    /// Show workflow details
+    Show {
+        /// Name of the workflow to show
+        name: String,
+    },
+    /// Run a workflow
+    Run {
+        /// Name of the workflow to run
+        name: String,
+        /// Task description
+        #[arg(long, short)]
+        task: String,
+        /// Run without human checkpoints (auto-approve all)
+        #[arg(long)]
+        non_interactive: bool,
+        /// Enable verbose output
+        #[arg(long, short)]
+        verbose: bool,
+    },
+    /// List available agents
+    Agents,
 }
 
 #[tokio::main]
@@ -255,6 +288,9 @@ async fn main() -> Result<()> {
             }
 
             web::serve(config).await?;
+        }
+        Commands::Workflow { command } => {
+            run_workflow_command(command, &ollama_url, &model).await?;
         }
     }
 
@@ -938,6 +974,129 @@ async fn run_mcps_logs(lines: usize) -> Result<()> {
 
             for line in display_lines {
                 println!("{}", line);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_workflow_command(command: WorkflowCommands, ollama_url: &str, model: &str) -> Result<()> {
+    // Create engine with default registry
+    let _file_config = AgentFileConfig::load()?;
+
+    match command {
+        WorkflowCommands::List => {
+            let config = EngineConfig {
+                ollama_url: ollama_url.to_string(),
+                default_model: model.to_string(),
+                non_interactive: true,
+                verbose: false,
+                custom_workflows_dir: None,
+            };
+            let registry = AgentRegistry::with_defaults(model);
+            let engine = WorkflowEngine::new(registry, config);
+
+            println!("Available workflows:\n");
+
+            for (name, description, is_custom) in engine.list_workflows() {
+                let marker = if is_custom { " [custom]" } else { "" };
+                println!("  {} - {}{}", name, description, marker);
+            }
+        }
+
+        WorkflowCommands::Show { name } => {
+            let config = EngineConfig {
+                ollama_url: ollama_url.to_string(),
+                default_model: model.to_string(),
+                non_interactive: true,
+                verbose: false,
+                custom_workflows_dir: None,
+            };
+            let registry = AgentRegistry::with_defaults(model);
+            let engine = WorkflowEngine::new(registry, config);
+
+            match engine.get_workflow(&name) {
+                Some(workflow) => {
+                    println!("Workflow: {}\n", workflow.name);
+                    println!("Description: {}\n", workflow.description);
+                    println!("Steps:");
+                    for (i, step) in workflow.steps.iter().enumerate() {
+                        match step {
+                            agent::orchestrator::workflow::WorkflowStep::Agent { name, task, model } => {
+                                let model_info = model.as_ref().map(|m| format!(" (model: {})", m)).unwrap_or_default();
+                                println!("  {}. Agent '{}'{}", i + 1, name, model_info);
+                                println!("     Task: {}", task);
+                            }
+                            agent::orchestrator::workflow::WorkflowStep::Checkpoint { message, show } => {
+                                let show_info = show.as_ref().map(|s| format!(" [shows: {}]", s)).unwrap_or_default();
+                                println!("  {}. Checkpoint{}", i + 1, show_info);
+                                println!("     Message: {}", message);
+                            }
+                            _ => {
+                                println!("  {}. (other step type)", i + 1);
+                            }
+                        }
+                    }
+                }
+                None => {
+                    eprintln!("Error: Workflow '{}' not found", name);
+                    eprintln!("\nAvailable workflows:");
+                    for (name, description, _) in engine.list_workflows() {
+                        eprintln!("  {} - {}", name, description);
+                    }
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        WorkflowCommands::Run { name, task, non_interactive, verbose } => {
+            let config = EngineConfig {
+                ollama_url: ollama_url.to_string(),
+                default_model: model.to_string(),
+                non_interactive,
+                verbose,
+                custom_workflows_dir: None,
+            };
+            let registry = AgentRegistry::with_defaults(model);
+            let engine = WorkflowEngine::new(registry, config);
+
+            println!("Running workflow '{}' with task: {}\n", name, task);
+
+            match engine.run(&name, &task).await {
+                Ok(result) => {
+                    println!("\nWorkflow completed with status: {:?}", result.status);
+                    // Show the last agent's output from context if available
+                    if let Some(output) = result.context.get("changes")
+                        .or_else(|| result.context.get("plan"))
+                        .or_else(|| result.context.get("review"))
+                    {
+                        println!("\nFinal output:\n{}", output);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("\nWorkflow failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        WorkflowCommands::Agents => {
+            let registry = AgentRegistry::with_defaults(model);
+
+            println!("Available agents:\n");
+
+            for (name, config) in registry.iter() {
+                println!("  {} - {}", name, config.display_name);
+                println!("    Model: {}", config.model);
+                println!("    Temperature: {}", config.temperature);
+                if !config.tools.is_empty() {
+                    println!("    Tools: {}", config.tools.join(", "));
+                }
+                if !config.can_handoff_to.is_empty() {
+                    println!("    Handoffs: {}", config.can_handoff_to.join(", "));
+                }
+                println!();
             }
         }
     }
