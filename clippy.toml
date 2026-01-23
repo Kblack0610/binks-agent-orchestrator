@@ -1,0 +1,11 @@
+# Clippy configuration
+# See https://doc.rust-lang.org/clippy/configuration.html
+
+# Maximum size of a function body allowed before warning
+too-many-lines-threshold = 200
+
+# Maximum cognitive complexity allowed
+cognitive-complexity-threshold = 25
+
+# MSRV for suggesting newer APIs
+msrv = "1.75.0"

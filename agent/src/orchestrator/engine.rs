@@ -320,7 +320,11 @@ impl WorkflowEngine {
                 }
 
                 WorkflowStep::Parallel(_steps) => {
-                    // TODO: Implement parallel execution
+                    // TODO(future): Parallel agent execution
+                    // Would allow running multiple agents concurrently, useful for:
+                    // - Independent reviews (security + code quality in parallel)
+                    // - Parallel research tasks
+                    // Implementation: tokio::join! on agent.chat() calls
                     println!("  ⚠ Parallel execution not yet implemented");
                     step_results.push(StepResult {
                         step_index,
@@ -331,7 +335,11 @@ impl WorkflowEngine {
                 }
 
                 WorkflowStep::Branch { .. } => {
-                    // TODO: Implement conditional branching
+                    // TODO(future): Conditional branching
+                    // Would allow dynamic workflow paths based on agent output, e.g.:
+                    // - Skip tests if only docs changed
+                    // - Run different reviewers based on change type
+                    // Implementation: Evaluate condition expr against context map
                     println!("  ⚠ Conditional branching not yet implemented");
                     step_results.push(StepResult {
                         step_index,
@@ -357,16 +365,16 @@ impl WorkflowEngine {
 
     /// Substitute {variable} placeholders in a string
     fn substitute_variables(&self, template: &str, context: &HashMap<String, String>) -> String {
-        println!("DEBUG: Substituting variables in template: {}", template);
+        tracing::debug!(template = %template, "Substituting variables");
         let mut result = template.to_string();
 
         for (key, value) in context {
             let placeholder = format!("{{{}}}", key);
             result = result.replace(&placeholder, value);
-            println!("DEBUG: Replaced placeholder '{}' with value '{}'", placeholder, value);
+            tracing::debug!(placeholder = %placeholder, value = %value, "Replaced placeholder");
         }
 
-        println!("DEBUG: Final result after substitution: {}", result);
+        tracing::debug!(result = %result, "Variable substitution complete");
         result
     }
 }

@@ -145,14 +145,12 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
 
     // Verify conversation exists
     if state.db.get_conversation(&conversation_id).ok().flatten().is_none() {
-        let _ = sender
-            .send(Message::Text(
-                serde_json::to_string(&ServerMessage::Error {
-                    message: "Conversation not found".to_string(),
-                })
-                .unwrap().into(),
-            ))
-            .await;
+        let error_msg = ServerMessage::Error {
+            message: "Conversation not found".to_string(),
+        };
+        if let Ok(json) = serde_json::to_string(&error_msg) {
+            let _ = sender.send(Message::Text(json.into())).await;
+        }
         return;
     }
 
@@ -160,11 +158,11 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
     let connected_msg = ServerMessage::Connected {
         conversation_id: conversation_id.clone(),
     };
-    if sender
-        .send(Message::Text(serde_json::to_string(&connected_msg).unwrap().into()))
-        .await
-        .is_err()
-    {
+    let Ok(connected_json) = serde_json::to_string(&connected_msg) else {
+        tracing::error!("Failed to serialize connected message");
+        return;
+    };
+    if sender.send(Message::Text(connected_json.into())).await.is_err() {
         return;
     }
 
@@ -172,14 +170,12 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
     let agent = match create_agent(&state).await {
         Ok(agent) => Arc::new(Mutex::new(agent)),
         Err(e) => {
-            let _ = sender
-                .send(Message::Text(
-                    serde_json::to_string(&ServerMessage::Error {
-                        message: format!("Failed to create agent: {}", e),
-                    })
-                    .unwrap().into(),
-                ))
-                .await;
+            let error_msg = ServerMessage::Error {
+                message: format!("Failed to create agent: {}", e),
+            };
+            if let Ok(json) = serde_json::to_string(&error_msg) {
+                let _ = sender.send(Message::Text(json.into())).await;
+            }
             return;
         }
     };
@@ -222,16 +218,17 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                             .await;
                         }
                         ClientMessage::Cancel => {
-                            // TODO: Implement cancellation
-                            tracing::info!("Cancel requested for {}", conversation_id);
+                            // TODO(priority): Implement agent task cancellation
+                            // Requires: Add CancellationToken to Agent, check token in agentic loop
+                            // The agent.chat() call would need to accept a cancellation token
+                            // and check it between iterations/tool calls
+                            tracing::info!("Cancel requested for {} (not yet implemented)", conversation_id);
                         }
                         ClientMessage::Ping => {
                             let pong = ServerMessage::Pong;
-                            let _ = sender
-                                .lock()
-                                .await
-                                .send(Message::Text(serde_json::to_string(&pong).unwrap().into()))
-                                .await;
+                            if let Ok(json) = serde_json::to_string(&pong) {
+                                let _ = sender.lock().await.send(Message::Text(json.into())).await;
+                            }
                         }
                     }
                 }
@@ -339,21 +336,17 @@ async fn handle_chat_message(
                 tool_results: None,
             };
 
-            let _ = sender
-                .lock()
-                .await
-                .send(Message::Text(serde_json::to_string(&server_msg).unwrap().into()))
-                .await;
+            if let Ok(json) = serde_json::to_string(&server_msg) {
+                let _ = sender.lock().await.send(Message::Text(json.into())).await;
+            }
         }
         Err(e) => {
             let error_msg = ServerMessage::Error {
                 message: e.to_string(),
             };
-            let _ = sender
-                .lock()
-                .await
-                .send(Message::Text(serde_json::to_string(&error_msg).unwrap().into()))
-                .await;
+            if let Ok(json) = serde_json::to_string(&error_msg) {
+                let _ = sender.lock().await.send(Message::Text(json.into())).await;
+            }
         }
     }
 }

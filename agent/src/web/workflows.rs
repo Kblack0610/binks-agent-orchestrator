@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use super::state::AppState;
 use crate::orchestrator::{
-    AgentRegistry, EngineConfig, WorkflowEngine,
+    AgentRegistry, WorkflowEngine,
     workflow::{WorkflowStep, WorkflowStatus},
 };
 
@@ -145,13 +145,7 @@ pub fn new_workflow_runs() -> WorkflowRuns {
 pub async fn list_workflows(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<WorkflowSummary>>, (StatusCode, Json<ErrorResponse>)> {
-    let config = EngineConfig {
-        ollama_url: state.ollama_url.clone(),
-        default_model: state.model.clone(),
-        non_interactive: true,
-        verbose: false,
-        custom_workflows_dir: None,
-    };
+    let config = state.engine_config(true);
     let registry = AgentRegistry::with_defaults(&state.model);
     let engine = WorkflowEngine::new(registry, config);
 
@@ -174,13 +168,7 @@ pub async fn get_workflow(
     State(state): State<AppState>,
     Path(name): Path<String>,
 ) -> Result<Json<WorkflowDetail>, (StatusCode, Json<ErrorResponse>)> {
-    let config = EngineConfig {
-        ollama_url: state.ollama_url.clone(),
-        default_model: state.model.clone(),
-        non_interactive: true,
-        verbose: false,
-        custom_workflows_dir: None,
-    };
+    let config = state.engine_config(true);
     let registry = AgentRegistry::with_defaults(&state.model);
     let engine = WorkflowEngine::new(registry, config);
 
@@ -254,13 +242,7 @@ pub async fn run_workflow(
     Json(req): Json<RunWorkflowRequest>,
 ) -> Result<(StatusCode, Json<WorkflowRunInfo>), (StatusCode, Json<ErrorResponse>)> {
     // Validate workflow exists
-    let config = EngineConfig {
-        ollama_url: state.ollama_url.clone(),
-        default_model: state.model.clone(),
-        non_interactive: req.non_interactive,
-        verbose: false,
-        custom_workflows_dir: None,
-    };
+    let config = state.engine_config(req.non_interactive);
     let registry = AgentRegistry::with_defaults(&state.model);
     let engine = WorkflowEngine::new(registry, config);
 

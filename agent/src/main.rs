@@ -27,7 +27,7 @@ struct Cli {
     ollama_url: Option<String>,
 
     /// Model to use (default: from .agent.toml or qwen2.5-coder:32b)
-    #[arg(long, env = "OLLAMA_MODEL", global = true)]
+    #[arg(short = 'm', long, env = "OLLAMA_MODEL", global = true)]
     model: Option<String>,
 
     /// Increase verbosity (-v info, -vv debug, -vvv trace). Default is warn.

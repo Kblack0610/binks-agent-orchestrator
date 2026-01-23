@@ -48,7 +48,7 @@
       }
     },
     "agent": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/agent",
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/release/agent",
       "args": [
         "serve"
       ],

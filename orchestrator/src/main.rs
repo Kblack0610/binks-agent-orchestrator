@@ -31,7 +31,7 @@ struct Cli {
     ollama_url: Option<String>,
 
     /// Default model to use
-    #[arg(long, env = "OLLAMA_MODEL", global = true)]
+    #[arg(short = 'm', long, env = "OLLAMA_MODEL", global = true)]
     model: Option<String>,
 
     /// Increase verbosity (-v info, -vv debug, -vvv trace). Default is warn.
