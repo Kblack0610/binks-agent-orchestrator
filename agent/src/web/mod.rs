@@ -4,6 +4,7 @@
 
 pub mod api;
 pub mod state;
+pub mod workflows;
 pub mod ws;
 
 use anyhow::Result;
@@ -81,6 +82,14 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         .route("/tools", get(api::list_tools))
         // Models
         .route("/models", get(api::list_models))
+        // Workflows
+        .route("/workflows", get(workflows::list_workflows))
+        .route("/workflows/:name", get(workflows::get_workflow))
+        .route("/workflows/:name/run", post(workflows::run_workflow))
+        .route("/workflows/runs/:id", get(workflows::get_run_status))
+        .route("/workflows/runs/:id/checkpoint", post(workflows::submit_checkpoint))
+        // Agents (orchestrator agents)
+        .route("/agents", get(workflows::list_agents))
         // Health
         .route("/health", get(api::health_check));
 
@@ -187,6 +196,15 @@ pnpm dev</pre>
         <li><code>GET /api/tools</code> - List available tools</li>
         <li><code>GET /api/models</code> - List available models</li>
         <li><code>WS /ws/chat/:id</code> - WebSocket for chat</li>
+    </ul>
+    <h2>Workflow Endpoints</h2>
+    <ul>
+        <li><code>GET /api/workflows</code> - List available workflows</li>
+        <li><code>GET /api/workflows/:name</code> - Get workflow details</li>
+        <li><code>POST /api/workflows/:name/run</code> - Start workflow execution</li>
+        <li><code>GET /api/workflows/runs/:id</code> - Get workflow run status</li>
+        <li><code>POST /api/workflows/runs/:id/checkpoint</code> - Respond to checkpoint</li>
+        <li><code>GET /api/agents</code> - List orchestrator agents</li>
     </ul>
 </body>
 </html>"#,

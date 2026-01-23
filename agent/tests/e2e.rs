@@ -20,3 +20,6 @@ mod health_check;
 
 #[path = "e2e/tool_execution.rs"]
 mod tool_execution;
+
+#[path = "e2e/directory_independence.rs"]
+mod directory_independence;

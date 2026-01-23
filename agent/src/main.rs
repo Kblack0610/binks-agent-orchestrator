@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use agent::agent::Agent;
@@ -23,12 +23,16 @@ struct Cli {
     command: Commands,
 
     /// Ollama server URL (default: from .agent.toml or http://localhost:11434)
-    #[arg(long, env = "OLLAMA_URL")]
+    #[arg(long, env = "OLLAMA_URL", global = true)]
     ollama_url: Option<String>,
 
     /// Model to use (default: from .agent.toml or qwen2.5-coder:32b)
-    #[arg(long, env = "OLLAMA_MODEL")]
+    #[arg(long, env = "OLLAMA_MODEL", global = true)]
     model: Option<String>,
+
+    /// Increase verbosity (-v info, -vv debug, -vvv trace). Default is warn.
+    #[arg(short, long, action = ArgAction::Count, global = true)]
+    verbose: u8,
 }
 
 #[derive(Subcommand)]
@@ -51,9 +55,6 @@ enum Commands {
         /// Recommended for smaller models that struggle with many tools
         #[arg(long)]
         servers: Option<String>,
-        /// Show timing information for each step
-        #[arg(long, short)]
-        verbose: bool,
     },
     /// List available tools from MCP servers
     Tools {
@@ -176,26 +177,45 @@ enum WorkflowCommands {
         /// Run without human checkpoints (auto-approve all)
         #[arg(long)]
         non_interactive: bool,
-        /// Enable verbose output
-        #[arg(long, short)]
-        verbose: bool,
     },
     /// List available agents
     Agents,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Initialize tracing
+/// Initialize tracing with the given verbosity level
+///
+/// - 0: warn (default)
+/// - 1: info (-v)
+/// - 2: debug (-vv)
+/// - 3+: trace (-vvv)
+fn init_tracing(verbosity: u8) {
+    let level = match verbosity {
+        0 => tracing::Level::WARN,
+        1 => tracing::Level::INFO,
+        2 => tracing::Level::DEBUG,
+        _ => tracing::Level::TRACE,
+    };
+
+    // Allow RUST_LOG to override if set
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(level.to_string()));
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
-        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(filter)
         .init();
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Parse CLI first to get verbosity before initializing tracing
+    let cli = Cli::parse();
+
+    // Initialize tracing with CLI-controlled verbosity
+    init_tracing(cli.verbose);
 
     // Load config file (.agent.toml) - returns defaults if not found
     let file_config = AgentFileConfig::load()?;
-
-    let cli = Cli::parse();
 
     // Resolve final values with priority: CLI/env > config file > hardcoded defaults
     let ollama_url = cli.ollama_url.unwrap_or_else(|| file_config.llm.url.clone());
@@ -211,9 +231,11 @@ async fn main() -> Result<()> {
             let llm = OllamaClient::new(&ollama_url, &model);
             run_simple(llm).await?;
         }
-        Commands::Agent { message, system, servers, verbose } => {
+        Commands::Agent { message, system, servers } => {
             let server_list = servers.map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
-            run_agent(&ollama_url, &model, message, system, server_list, verbose, &file_config).await?;
+            // Any verbosity (-v or higher) enables timing output
+            let timing_enabled = cli.verbose >= 1;
+            run_agent(&ollama_url, &model, message, system, server_list, timing_enabled, &file_config).await?;
         }
         Commands::Tools { server } => {
             run_tools(server).await?;
@@ -290,7 +312,7 @@ async fn main() -> Result<()> {
             web::serve(config).await?;
         }
         Commands::Workflow { command } => {
-            run_workflow_command(command, &ollama_url, &model).await?;
+            run_workflow_command(command, &ollama_url, &model, cli.verbose).await?;
         }
     }
 
@@ -981,7 +1003,7 @@ async fn run_mcps_logs(lines: usize) -> Result<()> {
     Ok(())
 }
 
-async fn run_workflow_command(command: WorkflowCommands, ollama_url: &str, model: &str) -> Result<()> {
+async fn run_workflow_command(command: WorkflowCommands, ollama_url: &str, model: &str, verbose: u8) -> Result<()> {
     // Create engine with default registry
     let _file_config = AgentFileConfig::load()?;
 
@@ -1050,12 +1072,14 @@ async fn run_workflow_command(command: WorkflowCommands, ollama_url: &str, model
             }
         }
 
-        WorkflowCommands::Run { name, task, non_interactive, verbose } => {
+        WorkflowCommands::Run { name, task, non_interactive } => {
+            // Any verbosity (-v or higher) enables verbose workflow output
+            let timing_enabled = verbose >= 1;
             let config = EngineConfig {
                 ollama_url: ollama_url.to_string(),
                 default_model: model.to_string(),
                 non_interactive,
-                verbose,
+                verbose: timing_enabled,
                 custom_workflows_dir: None,
             };
             let registry = AgentRegistry::with_defaults(model);

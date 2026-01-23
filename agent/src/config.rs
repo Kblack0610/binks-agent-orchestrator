@@ -3,7 +3,49 @@
 use anyhow::Result;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// Find a config file by walking up the directory tree, then checking global config.
+///
+/// Search order:
+/// 1. Current directory and parent directories (walking up to root)
+/// 2. Global config at ~/.config/binks/
+///
+/// Returns the path if found, None otherwise.
+fn find_config_file(filename: &str) -> Option<PathBuf> {
+    let mut current = std::env::current_dir().ok()?;
+
+    // Walk up the directory tree
+    loop {
+        // Check current directory
+        let candidate = current.join(filename);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+
+        // Also check agent/ subdirectory (for project root detection)
+        let agent_candidate = current.join("agent").join(filename);
+        if agent_candidate.exists() {
+            return Some(agent_candidate);
+        }
+
+        // Move to parent directory
+        match current.parent() {
+            Some(parent) => current = parent.to_path_buf(),
+            None => break, // Reached filesystem root
+        }
+    }
+
+    // Fallback: Check global config
+    if let Some(config_dir) = dirs::config_dir() {
+        let global_path = config_dir.join("binks").join(filename);
+        if global_path.exists() {
+            return Some(global_path);
+        }
+    }
+
+    None
+}
 
 /// MCP server configuration (from .mcp.json)
 #[derive(Debug, Clone, Deserialize)]
@@ -22,14 +64,18 @@ pub struct McpServerConfig {
 }
 
 impl McpConfig {
-    /// Load MCP config from .mcp.json in the current directory only
+    /// Load MCP config from .mcp.json
+    ///
+    /// Search order:
+    /// 1. Walk up directory tree from cwd looking for .mcp.json
+    /// 2. Check ~/.config/binks/.mcp.json (global fallback)
     pub fn load() -> Result<Option<Self>> {
-        let config_path = std::env::current_dir()?.join(".mcp.json");
-
-        if config_path.exists() {
+        if let Some(config_path) = find_config_file(".mcp.json") {
+            tracing::debug!("Loading MCP config from: {}", config_path.display());
             return Self::load_from_path(&config_path).map(Some);
         }
 
+        tracing::debug!("No .mcp.json found");
         Ok(None)
     }
 
@@ -115,28 +161,17 @@ impl AgentFileConfig {
     /// Load config from .agent.toml
     ///
     /// Search order:
-    /// 1. ./agent/.agent.toml (from project root)
-    /// 2. ./.agent.toml (current directory)
+    /// 1. Walk up directory tree from cwd looking for .agent.toml
+    /// 2. Check ~/.config/binks/.agent.toml (global fallback)
     /// 3. Fall back to defaults
     pub fn load() -> Result<Self> {
-        if let Ok(cwd) = std::env::current_dir() {
-            // 1. Check agent/.agent.toml (running from project root)
-            let agent_config = cwd.join("agent").join(".agent.toml");
-            if agent_config.exists() {
-                eprintln!("Loading config from: {}", agent_config.display());
-                return Self::load_from_path(&agent_config);
-            }
-
-            // 2. Check .agent.toml in current dir (running from agent/)
-            let local_config = cwd.join(".agent.toml");
-            if local_config.exists() {
-                eprintln!("Loading config from: {}", local_config.display());
-                return Self::load_from_path(&local_config);
-            }
+        if let Some(config_path) = find_config_file(".agent.toml") {
+            tracing::debug!("Loading config from: {}", config_path.display());
+            return Self::load_from_path(&config_path);
         }
 
         // No config file found, return defaults
-        eprintln!("Warning: No .agent.toml found, using defaults");
+        tracing::debug!("No .agent.toml found, using defaults");
         Ok(Self::default())
     }
 

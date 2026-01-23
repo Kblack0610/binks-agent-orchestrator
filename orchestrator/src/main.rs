@@ -12,7 +12,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use agent::config::AgentFileConfig;
@@ -27,16 +27,16 @@ struct Cli {
     command: Commands,
 
     /// Ollama server URL
-    #[arg(long, env = "OLLAMA_URL")]
+    #[arg(long, env = "OLLAMA_URL", global = true)]
     ollama_url: Option<String>,
 
     /// Default model to use
-    #[arg(long, env = "OLLAMA_MODEL")]
+    #[arg(long, env = "OLLAMA_MODEL", global = true)]
     model: Option<String>,
 
-    /// Enable verbose output
-    #[arg(long, short)]
-    verbose: bool,
+    /// Increase verbosity (-v info, -vv debug, -vvv trace). Default is warn.
+    #[arg(short, long, action = ArgAction::Count, global = true)]
+    verbose: u8,
 }
 
 #[derive(Subcommand)]
@@ -92,17 +92,59 @@ enum AgentCommands {
     },
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Initialize tracing
+/// Initialize tracing with the given verbosity level
+///
+/// - 0: warn (default)
+/// - 1: info (-v)
+/// - 2: debug (-vv)
+/// - 3+: trace (-vvv)
+fn init_tracing(verbosity: u8) {
+    let level = match verbosity {
+        0 => tracing::Level::WARN,
+        1 => tracing::Level::INFO,
+        2 => tracing::Level::DEBUG,
+        _ => tracing::Level::TRACE,
+    };
+
+    // Allow RUST_LOG to override if set
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(level.to_string()));
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
-        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(filter)
         .init();
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Parse CLI first to get verbosity before initializing tracing
+    let cli = Cli::parse();
+
+    // Initialize tracing with CLI-controlled verbosity
+    init_tracing(cli.verbose);
+
+    // Print deprecation warning (only at info level or higher)
+    if cli.verbose >= 1 {
+        eprintln!("\x1b[33m");
+        eprintln!("╔════════════════════════════════════════════════════════════════╗");
+        eprintln!("║  DEPRECATION NOTICE                                             ║");
+        eprintln!("║                                                                  ║");
+        eprintln!("║  The standalone 'orchestrator' binary is deprecated.            ║");
+        eprintln!("║  Please use 'agent workflow' commands instead:                   ║");
+        eprintln!("║                                                                  ║");
+        eprintln!("║    agent workflow list                                           ║");
+        eprintln!("║    agent workflow show <name>                                    ║");
+        eprintln!("║    agent workflow run <name> --task \"description\"              ║");
+        eprintln!("║    agent workflow agents                                         ║");
+        eprintln!("║                                                                  ║");
+        eprintln!("║  This binary will be removed in a future release.               ║");
+        eprintln!("╚════════════════════════════════════════════════════════════════╝");
+        eprintln!("\x1b[0m");
+    }
 
     // Load config
     let file_config = AgentFileConfig::load()?;
-    let cli = Cli::parse();
 
     // Resolve config values
     let ollama_url = cli
@@ -112,7 +154,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Workflow { command } => {
-            run_workflow_command(command, &ollama_url, &model, cli.verbose).await
+            run_workflow_command(command, &ollama_url, &model, cli.verbose >= 1).await
         }
         Commands::Agents { command } => run_agents_command(command, &model),
     }
