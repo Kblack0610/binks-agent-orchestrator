@@ -3,6 +3,8 @@
 //! Session layer: In-memory, ephemeral storage for reasoning chains and working memory
 //! Persistent layer: SQLite-backed knowledge graph that survives across sessions
 
+mod handlers;
+mod params;
 mod persistent;
 mod server;
 mod session;

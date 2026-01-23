@@ -3,6 +3,8 @@
 //! Provides git repository operations that complement GitHub API tools.
 //! Useful for local repo inspection, diffs, blame, and history analysis.
 
+mod handlers;
+mod params;
 mod server;
 mod types;
 

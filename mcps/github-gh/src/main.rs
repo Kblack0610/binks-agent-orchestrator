@@ -14,6 +14,8 @@
 use rmcp::{transport::stdio, ServiceExt};
 
 mod gh;
+mod handlers;
+mod params;
 mod server;
 mod tools;
 mod types;
