@@ -11,6 +11,8 @@
 //! - prerequisites: Verify Ollama and binaries available
 //! - health_check: Test the `agent health` command
 //! - tool_execution: Test direct MCP tool calls
+//! - directory_independence: Test config discovery from different directories
+//! - tier_filtering: Test model-size-based MCP server filtering
 
 #[path = "e2e/prerequisites.rs"]
 mod prerequisites;
@@ -23,3 +25,6 @@ mod tool_execution;
 
 #[path = "e2e/directory_independence.rs"]
 mod directory_independence;
+
+#[path = "e2e/tier_filtering.rs"]
+mod tier_filtering;
