@@ -390,7 +390,7 @@ mod tests {
             config: EngineConfig::default(),
             builtin_workflows: HashMap::new(),
             custom_workflows: HashMap::new(),
-            checkpoint_handler: Box::new(super::checkpoint::AutoApproveCheckpointHandler),
+            checkpoint_handler: Box::new(crate::orchestrator::checkpoint::AutoApproveCheckpointHandler),
         };
 
         let mut context = HashMap::new();

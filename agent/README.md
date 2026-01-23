@@ -9,6 +9,45 @@ cd agent
 cargo build --release
 ```
 
+### Build Profiles
+
+The agent supports multiple build profiles via Cargo feature flags, allowing you to create smaller binaries for specific use cases:
+
+| Profile | Command | Size | Use Case |
+|---------|---------|------|----------|
+| **Minimal** | `cargo build --no-default-features --release` | ~4.5 MB | LLM chat only, embedding in other projects |
+| **MCP Agent** | `cargo build --no-default-features --features mcp --release` | ~8.7 MB | Tool-calling agent without web/persistence |
+| **Full** | `cargo build --release` | ~13 MB | All features (web UI, workflows, monitoring) |
+
+### Feature Flags
+
+```toml
+[features]
+default = ["mcp", "persistence", "web", "orchestrator", "monitor"]
+
+mcp = [...]          # MCP tool support (agent tool-calling loop)
+persistence = [...]  # SQLite conversation history
+web = [...]          # Web UI server (requires persistence)
+orchestrator = [...]  # Multi-agent workflows (requires mcp)
+monitor = [...]      # Repository monitoring (requires mcp)
+```
+
+**Commands by profile:**
+
+- **Minimal**: `chat`, `simple`, `models`
+- **MCP**: + `agent`, `tools`, `call`, `serve`, `health`, `mcps`
+- **Full**: + `monitor`, `web`, `workflow`
+
+**Example: Minimal LLM chat binary**
+```bash
+# Build
+cargo build -p agent --no-default-features --release
+
+# Use
+./target/release/agent chat "Hello, world!"
+./target/release/agent simple  # Interactive chat session
+```
+
 ## Environment
 
 ```bash

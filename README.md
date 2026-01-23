@@ -41,13 +41,18 @@ Binks is an orchestration platform that connects an AI agent to various tools th
 ### Build
 
 ```bash
-# Build the agent
+# Build the agent (full features)
 cd agent && cargo build --release
+
+# Build minimal agent (4.5 MB, LLM chat only)
+cargo build -p agent --no-default-features --release
 
 # Build MCP servers
 cd mcps/sysinfo-mcp && cargo build --release
 cd mcps/github-gh && cargo build --release
 ```
+
+> **Note:** The agent supports multiple build profiles (minimal 4.5MB → full 13MB) via feature flags. See [agent/README.md](agent/README.md#build-profiles) for details.
 
 ### Run
 
