@@ -1,21 +1,45 @@
-//! CLI enhancements for interactive mode
+//! CLI module
 //!
-//! This module provides slash commands, REPL functionality, and mode management
-//! for the interactive CLI.
+//! This module provides:
+//! - CLI argument definitions (args, mcps_args, workflow_args)
+//! - Slash commands for interactive mode (commands)
+//! - REPL functionality (repl)
+//! - Mode management (modes)
 //!
 //! # Feature Availability
 //!
-//! - `modes` - Always available (no dependencies)
+//! - `modes`, `args` - Always available (no dependencies)
 //! - `commands`, `repl` - Requires `mcp` feature (depends on Agent)
+//! - `mcps_args` - Requires `mcp` feature
+//! - `workflow_args` - Requires `orchestrator` feature
 
 // =============================================================================
-// Always available
+// Always available - CLI argument definitions
 // =============================================================================
+pub mod args;
 pub mod modes;
+
+pub use args::{Cli, Commands};
 pub use modes::Mode;
 
 // =============================================================================
-// Requires MCP feature (depends on Agent)
+// MCP feature - McpsCommands
+// =============================================================================
+#[cfg(feature = "mcp")]
+pub mod mcps_args;
+#[cfg(feature = "mcp")]
+pub use mcps_args::McpsCommands;
+
+// =============================================================================
+// Orchestrator feature - WorkflowCommands
+// =============================================================================
+#[cfg(feature = "orchestrator")]
+pub mod workflow_args;
+#[cfg(feature = "orchestrator")]
+pub use workflow_args::WorkflowCommands;
+
+// =============================================================================
+// Requires MCP feature (depends on Agent) - REPL and slash commands
 // =============================================================================
 #[cfg(feature = "mcp")]
 pub mod commands;
