@@ -96,8 +96,9 @@ impl SearchBackend for SearXNGBackend {
         let results: Vec<SearchResult> = searxng_response
             .results
             .into_iter()
+            // Filter out image-only results (those with actual image URLs, not empty strings)
+            .filter(|r| r.img_src.as_ref().map_or(true, |s| s.is_empty()))
             .take(limit)
-            .filter(|r| r.img_src.is_none()) // Filter out image results
             .map(|r| SearchResult {
                 title: r.title,
                 url: r.url,
