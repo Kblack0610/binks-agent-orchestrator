@@ -2,17 +2,38 @@ use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use agent::agent::Agent;
-use agent::cli::{Repl, ReplConfig};
-use agent::config::{AgentFileConfig, McpConfig};
-use agent::context::EnvironmentContext;
+// Core imports - always available
+use agent::config::AgentFileConfig;
 use agent::llm::{Llm, OllamaClient};
+
+// MCP imports - requires "mcp" feature
+#[cfg(feature = "mcp")]
+use agent::agent::Agent;
+#[cfg(feature = "mcp")]
+use agent::cli::{Repl, ReplConfig};
+#[cfg(feature = "mcp")]
+use agent::config::McpConfig;
+#[cfg(feature = "mcp")]
+use agent::context::EnvironmentContext;
+#[cfg(feature = "mcp")]
 use agent::mcp::{McpClientPool, parse_model_size_with_thresholds, ModelSize};
+#[cfg(feature = "mcp")]
 use agent::mcps::{DaemonClient, McpDaemon, is_daemon_running, default_socket_path, default_pid_path, default_log_dir};
-use agent::monitor::{self, MonitorConfig};
+#[cfg(feature = "mcp")]
 use agent::output::TerminalOutput;
+#[cfg(feature = "mcp")]
 use agent::server::{self, ServerConfig};
+
+// Monitor imports - requires "monitor" feature
+#[cfg(feature = "monitor")]
+use agent::monitor::{self, MonitorConfig};
+
+// Web imports - requires "web" feature
+#[cfg(feature = "web")]
 use agent::web::{self, WebConfig};
+
+// Orchestrator imports - requires "orchestrator" feature
+#[cfg(feature = "orchestrator")]
 use agent::orchestrator::{WorkflowEngine, EngineConfig, AgentRegistry};
 
 #[derive(Parser)]
@@ -37,14 +58,24 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Chat with the LLM
+    // =========================================================================
+    // Core commands - always available
+    // =========================================================================
+    /// Chat with the LLM (single message)
     Chat {
         /// Message to send
         message: String,
     },
     /// Simple chat session (no tools, just LLM conversation)
     Simple,
+    /// List available models from Ollama
+    Models,
+
+    // =========================================================================
+    // MCP commands - requires "mcp" feature
+    // =========================================================================
     /// Run the tool-using agent (LLM decides when to call tools)
+    #[cfg(feature = "mcp")]
     Agent {
         /// Initial message (optional, starts interactive if not provided)
         message: Option<String>,
@@ -57,14 +88,14 @@ enum Commands {
         servers: Option<String>,
     },
     /// List available tools from MCP servers
+    #[cfg(feature = "mcp")]
     Tools {
         /// Only list tools from a specific server
         #[arg(long)]
         server: Option<String>,
     },
-    /// List available models from Ollama
-    Models,
     /// Call a tool directly
+    #[cfg(feature = "mcp")]
     Call {
         /// Tool name
         tool: String,
@@ -73,12 +104,37 @@ enum Commands {
         args: Option<String>,
     },
     /// Run as an MCP server (expose agent as MCP tools)
+    #[cfg(feature = "mcp")]
     Serve {
         /// System prompt for the agent
         #[arg(long, short)]
         system: Option<String>,
     },
+    /// Run health checks on agent components
+    #[cfg(feature = "mcp")]
+    Health {
+        /// Also test LLM connectivity with a simple query
+        #[arg(long)]
+        test_llm: bool,
+        /// Also test tool execution with a simple call
+        #[arg(long)]
+        test_tools: bool,
+        /// Run all tests (equivalent to --test-llm --test-tools)
+        #[arg(long, short)]
+        all: bool,
+    },
+    /// MCP server management
+    #[cfg(feature = "mcp")]
+    Mcps {
+        #[command(subcommand)]
+        command: McpsCommands,
+    },
+
+    // =========================================================================
+    // Monitor commands - requires "monitor" feature
+    // =========================================================================
     /// Run the monitoring agent (poll repos, write to inbox, send notifications)
+    #[cfg(feature = "monitor")]
     Monitor {
         /// Run once instead of continuously
         #[arg(long)]
@@ -93,24 +149,12 @@ enum Commands {
         #[arg(long, short)]
         system: Option<String>,
     },
-    /// Run health checks on agent components
-    Health {
-        /// Also test LLM connectivity with a simple query
-        #[arg(long)]
-        test_llm: bool,
-        /// Also test tool execution with a simple call
-        #[arg(long)]
-        test_tools: bool,
-        /// Run all tests (equivalent to --test-llm --test-tools)
-        #[arg(long, short)]
-        all: bool,
-    },
-    /// MCP server management
-    Mcps {
-        #[command(subcommand)]
-        command: McpsCommands,
-    },
+
+    // =========================================================================
+    // Web commands - requires "web" feature
+    // =========================================================================
     /// Start the web interface server
+    #[cfg(feature = "web")]
     Web {
         /// Port to listen on
         #[arg(short, long, default_value = "3001")]
@@ -125,13 +169,19 @@ enum Commands {
         #[arg(long)]
         open: bool,
     },
+
+    // =========================================================================
+    // Orchestrator commands - requires "orchestrator" feature
+    // =========================================================================
     /// Run multi-agent workflows
+    #[cfg(feature = "orchestrator")]
     Workflow {
         #[command(subcommand)]
         command: WorkflowCommands,
     },
 }
 
+#[cfg(feature = "mcp")]
 #[derive(Subcommand)]
 enum McpsCommands {
     /// Show MCP server status and tool cache
@@ -158,6 +208,7 @@ enum McpsCommands {
     },
 }
 
+#[cfg(feature = "orchestrator")]
 #[derive(Subcommand)]
 enum WorkflowCommands {
     /// List available workflows
@@ -222,6 +273,9 @@ async fn main() -> Result<()> {
     let model = cli.model.unwrap_or_else(|| file_config.llm.model.clone());
 
     match cli.command {
+        // =====================================================================
+        // Core commands - always available
+        // =====================================================================
         Commands::Chat { message } => {
             let llm = OllamaClient::new(&ollama_url, &model);
             let response = llm.chat(&message).await?;
@@ -231,15 +285,6 @@ async fn main() -> Result<()> {
             let llm = OllamaClient::new(&ollama_url, &model);
             run_simple(llm).await?;
         }
-        Commands::Agent { message, system, servers } => {
-            let server_list = servers.map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
-            // Any verbosity (-v or higher) enables timing output
-            let timing_enabled = cli.verbose >= 1;
-            run_agent(&ollama_url, &model, message, system, server_list, timing_enabled, &file_config).await?;
-        }
-        Commands::Tools { server } => {
-            run_tools(server).await?;
-        }
         Commands::Models => {
             let models = agent::llm::list_models(&ollama_url).await?;
             println!("Available models:");
@@ -248,9 +293,25 @@ async fn main() -> Result<()> {
                 println!("  {}{}", m.name, current_marker);
             }
         }
+
+        // =====================================================================
+        // MCP commands - requires "mcp" feature
+        // =====================================================================
+        #[cfg(feature = "mcp")]
+        Commands::Agent { message, system, servers } => {
+            let server_list = servers.map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
+            let timing_enabled = cli.verbose >= 1;
+            run_agent(&ollama_url, &model, message, system, server_list, timing_enabled, &file_config).await?;
+        }
+        #[cfg(feature = "mcp")]
+        Commands::Tools { server } => {
+            run_tools(server).await?;
+        }
+        #[cfg(feature = "mcp")]
         Commands::Call { tool, args } => {
             run_call_tool(&tool, args).await?;
         }
+        #[cfg(feature = "mcp")]
         Commands::Serve { system } => {
             let config = ServerConfig {
                 ollama_url: ollama_url,
@@ -259,8 +320,20 @@ async fn main() -> Result<()> {
             };
             server::serve(config).await?;
         }
+        #[cfg(feature = "mcp")]
+        Commands::Health { test_llm, test_tools, all } => {
+            run_health(&ollama_url, &model, test_llm || all, test_tools || all).await?;
+        }
+        #[cfg(feature = "mcp")]
+        Commands::Mcps { command } => {
+            run_mcps_command(command).await?;
+        }
+
+        // =====================================================================
+        // Monitor commands - requires "monitor" feature
+        // =====================================================================
+        #[cfg(feature = "monitor")]
         Commands::Monitor { once, interval, repos, system } => {
-            // Use repos from CLI, or fall back to config file
             let repos = repos
                 .map(|r| r.split(',').map(|s| s.trim().to_string()).collect())
                 .unwrap_or_else(|| file_config.monitor.repos.clone());
@@ -272,7 +345,6 @@ async fn main() -> Result<()> {
                 std::process::exit(1);
             }
 
-            // Use interval from CLI (300 default), but could also check config
             let config = MonitorConfig {
                 ollama_url: ollama_url,
                 model: model,
@@ -283,13 +355,12 @@ async fn main() -> Result<()> {
             };
             monitor::run_monitor(config).await?;
         }
-        Commands::Health { test_llm, test_tools, all } => {
-            run_health(&ollama_url, &model, test_llm || all, test_tools || all).await?;
-        }
-        Commands::Mcps { command } => {
-            run_mcps_command(command).await?;
-        }
-        Commands::Web { port, system, dev, open } => {
+
+        // =====================================================================
+        // Web commands - requires "web" feature
+        // =====================================================================
+        #[cfg(feature = "web")]
+        Commands::Web { port, system, dev, open: open_browser } => {
             let config = WebConfig {
                 port,
                 ollama_url: ollama_url.clone(),
@@ -298,8 +369,7 @@ async fn main() -> Result<()> {
                 dev_mode: dev,
             };
 
-            if open {
-                // Open browser after a short delay
+            if open_browser {
                 let url = format!("http://localhost:{}", port);
                 tokio::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -311,6 +381,11 @@ async fn main() -> Result<()> {
 
             web::serve(config).await?;
         }
+
+        // =====================================================================
+        // Orchestrator commands - requires "orchestrator" feature
+        // =====================================================================
+        #[cfg(feature = "orchestrator")]
         Commands::Workflow { command } => {
             run_workflow_command(command, &ollama_url, &model, cli.verbose).await?;
         }
@@ -360,6 +435,7 @@ async fn run_simple(llm: OllamaClient) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "mcp")]
 async fn run_tools(server_filter: Option<String>) -> Result<()> {
     let pool = McpClientPool::load()?;
 
@@ -417,6 +493,7 @@ async fn run_tools(server_filter: Option<String>) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "mcp")]
 async fn run_call_tool(tool_name: &str, args: Option<String>) -> Result<()> {
     let mut pool = McpClientPool::load()?
         .ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
@@ -449,6 +526,7 @@ async fn run_call_tool(tool_name: &str, args: Option<String>) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "mcp")]
 async fn run_agent(
     ollama_url: &str,
     model: &str,
@@ -554,6 +632,7 @@ async fn run_agent(
     Ok(())
 }
 
+#[cfg(feature = "mcp")]
 async fn run_health(ollama_url: &str, model: &str, test_llm: bool, test_tools: bool) -> Result<()> {
     println!("=== Agent Health Check ===\n");
 
@@ -737,6 +816,7 @@ async fn run_health(ollama_url: &str, model: &str, test_llm: bool, test_tools: b
     }
 }
 
+#[cfg(feature = "mcp")]
 async fn run_mcps_command(command: McpsCommands) -> Result<()> {
     match command {
         McpsCommands::Status { verbose } => {
@@ -757,6 +837,7 @@ async fn run_mcps_command(command: McpsCommands) -> Result<()> {
     }
 }
 
+#[cfg(feature = "mcp")]
 async fn run_mcps_status(verbose: bool) -> Result<()> {
     println!("=== MCP Server Status ===\n");
 
@@ -822,6 +903,7 @@ async fn run_mcps_status(verbose: bool) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "mcp")]
 async fn run_mcps_refresh() -> Result<()> {
     println!("Refreshing MCP connections...\n");
 
@@ -862,6 +944,7 @@ async fn run_mcps_refresh() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "mcp")]
 async fn run_mcps_start(daemon: bool) -> Result<()> {
     // Check if daemon is already running
     if is_daemon_running().await {
@@ -938,6 +1021,7 @@ async fn run_mcps_start(daemon: bool) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "mcp")]
 async fn run_mcps_stop() -> Result<()> {
     let socket_path = default_socket_path();
     let pid_path = default_pid_path();
@@ -982,6 +1066,7 @@ async fn run_mcps_stop() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "mcp")]
 async fn run_mcps_logs(lines: usize) -> Result<()> {
     let log_dir = default_log_dir();
     let log_file = log_dir.join("daemon.log");
@@ -1034,6 +1119,7 @@ async fn run_mcps_logs(lines: usize) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "orchestrator")]
 async fn run_workflow_command(command: WorkflowCommands, ollama_url: &str, model: &str, verbose: u8) -> Result<()> {
     // Create engine with default registry
     let _file_config = AgentFileConfig::load()?;

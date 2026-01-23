@@ -4,12 +4,39 @@ version = "0.1.0"
 edition = "2021"
 description = "Minimal Rust agent with Ollama and MCP support"
 
+# ==============================================================================
+# FEATURES - Build profiles for different use cases
+# ==============================================================================
+#
+# Profiles:
+#   Minimal:  cargo build --no-default-features
+#   Agent:    cargo build --no-default-features --features mcp
+#   Full:     cargo build (default)
+#
+[features]
+default = ["mcp", "persistence", "web", "orchestrator", "monitor"]
+
+# MCP tool support - enables agent tool-calling loop
+mcp = ["dep:rmcp"]
+
+# SQLite conversation history
+persistence = ["dep:rusqlite", "dep:uuid"]
+
+# Web UI server (requires persistence for conversation storage)
+web = ["persistence", "dep:axum", "dep:tower-http", "dep:axum-extra", "dep:rust-embed", "dep:mime_guess", "dep:open"]
+
+# Multi-agent workflow orchestration (requires mcp)
+orchestrator = ["mcp"]
+
+# Repository monitoring agent (requires mcp)
+monitor = ["mcp"]
+
+# ==============================================================================
+# CORE DEPENDENCIES - Always included
+# ==============================================================================
 [dependencies]
 # LLM - Ollama
 ollama-rs = { version = "0.3", features = ["stream"] }
-
-# MCP (client + server) - same version as github-gh MCP
-rmcp = { version = "0.13", features = ["server", "client", "macros", "transport-io", "transport-child-process"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full", "process", "io-std"] }
@@ -56,26 +83,27 @@ atty = "0.2"
 # Platform directories
 dirs = "6"
 
-# Web server
-axum = { version = "0.7", features = ["ws"] }
-tower-http = { version = "0.5", features = ["fs", "cors"] }
-axum-extra = { version = "0.9", features = ["typed-header"] }
-
-# Database
-rusqlite = { version = "0.32", features = ["bundled"] }
-
-# Static file embedding
-rust-embed = "8"
-mime_guess = "2"
-
-# UUID generation
-uuid = { version = "1", features = ["v4"] }
-
-# Open browser
-open = "5"
-
-# WebSocket utilities
+# WebSocket/streaming utilities
 futures-util = "0.3"
+
+# ==============================================================================
+# OPTIONAL DEPENDENCIES - Enabled by features
+# ==============================================================================
+
+# MCP protocol (optional: mcp feature)
+rmcp = { version = "0.13", features = ["server", "client", "macros", "transport-io", "transport-child-process"], optional = true }
+
+# Database (optional: persistence feature)
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
+
+# Web server (optional: web feature)
+axum = { version = "0.7", features = ["ws"], optional = true }
+tower-http = { version = "0.5", features = ["fs", "cors"], optional = true }
+axum-extra = { version = "0.9", features = ["typed-header"], optional = true }
+rust-embed = { version = "8", optional = true }
+mime_guess = { version = "2", optional = true }
+open = { version = "5", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
