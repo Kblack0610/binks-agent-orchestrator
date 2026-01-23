@@ -20,7 +20,8 @@ use serde_json::Value;
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::config::{McpConfig, McpServerConfig};
+use crate::config::{McpConfig, McpProfile, McpServerConfig};
+use super::model_size::ModelSize;
 use crate::mcps::{DaemonClient, is_daemon_running};
 
 /// A tool from an MCP server
@@ -179,6 +180,45 @@ impl McpClientPool {
             .filter(|name| *name != "agent")
             .cloned()
             .collect()
+    }
+
+    /// Get server names filtered by maximum tier level
+    ///
+    /// Returns servers with tier <= max_tier, excluding "agent"
+    pub fn server_names_for_tier(&self, max_tier: u8) -> Vec<String> {
+        self.config
+            .mcp_servers
+            .iter()
+            .filter(|(name, config)| *name != "agent" && config.tier <= max_tier)
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// Get server names appropriate for a model size class
+    ///
+    /// Uses the default tier mapping for each size class
+    pub fn server_names_for_model_size(&self, size: ModelSize) -> Vec<String> {
+        self.server_names_for_tier(size.default_max_tier())
+    }
+
+    /// Get server names based on an MCP profile configuration
+    ///
+    /// If the profile has an explicit servers list, use that.
+    /// Otherwise, filter by the profile's max_tier.
+    pub fn server_names_for_profile(&self, profile: &McpProfile) -> Vec<String> {
+        if let Some(ref servers) = profile.servers {
+            // Explicit server list - validate against config and filter out "agent"
+            servers
+                .iter()
+                .filter(|name| {
+                    *name != "agent" && self.config.mcp_servers.contains_key(*name)
+                })
+                .cloned()
+                .collect()
+        } else {
+            // Use tier-based filtering
+            self.server_names_for_tier(profile.max_tier)
+        }
     }
 
     /// Get the server config by name

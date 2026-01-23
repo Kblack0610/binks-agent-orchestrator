@@ -7,7 +7,7 @@ use agent::cli::{Repl, ReplConfig};
 use agent::config::{AgentFileConfig, McpConfig};
 use agent::context::EnvironmentContext;
 use agent::llm::{Llm, OllamaClient};
-use agent::mcp::McpClientPool;
+use agent::mcp::{McpClientPool, parse_model_size_with_thresholds, ModelSize};
 use agent::mcps::{DaemonClient, McpDaemon, is_daemon_running, default_socket_path, default_pid_path, default_log_dir};
 use agent::monitor::{self, MonitorConfig};
 use agent::output::TerminalOutput;
@@ -461,6 +461,37 @@ async fn run_agent(
     let pool = McpClientPool::load()?
         .ok_or_else(|| anyhow::anyhow!("No .mcp.json found - agent needs MCP tools"))?;
 
+    // Determine effective server list:
+    // 1. CLI --servers flag (explicit override)
+    // 2. Auto-filter based on model size (if enabled)
+    // 3. All servers (if auto_filter = false)
+    let effective_servers: Option<Vec<String>> = if servers.is_some() {
+        servers // CLI override takes precedence
+    } else if file_config.mcp.auto_filter {
+        // Parse model size and get filtered servers
+        let thresholds = &file_config.mcp.size_thresholds;
+        let model_size = parse_model_size_with_thresholds(model, thresholds.small, thresholds.medium);
+
+        let profile = match model_size {
+            ModelSize::Small | ModelSize::Unknown => &file_config.mcp.profiles.small,
+            ModelSize::Medium => &file_config.mcp.profiles.medium,
+            ModelSize::Large => &file_config.mcp.profiles.large,
+        };
+
+        let filtered = pool.server_names_for_profile(profile);
+
+        if verbose {
+            tracing::info!(
+                "Auto-filter: model={} size={:?} max_tier={} servers={:?}",
+                model, model_size, profile.max_tier, filtered
+            );
+        }
+
+        Some(filtered)
+    } else {
+        None // Use all servers
+    };
+
     let mut agent = Agent::new(ollama_url, model, pool).with_verbose(verbose);
 
     // System prompt precedence: CLI > config file > auto-generated
@@ -481,14 +512,14 @@ async fn run_agent(
 
     println!("Agent mode with {} tools from {} servers", tool_names.len(), server_names.len());
     println!("Servers: {}", server_names.join(", "));
-    if let Some(ref filter) = servers {
+    if let Some(ref filter) = effective_servers {
         println!("Filtered to: {}", filter.join(", "));
     }
     println!("Model: {}", model);
     println!();
 
     // Create server filter as string slices
-    let server_refs: Option<Vec<&str>> = servers.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+    let server_refs: Option<Vec<&str>> = effective_servers.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
 
     if let Some(msg) = message {
         // Single message mode
@@ -512,7 +543,7 @@ async fn run_agent(
         let output = TerminalOutput::auto();
 
         let mut repl_config = ReplConfig::default();
-        if let Some(filter) = servers {
+        if let Some(filter) = effective_servers {
             repl_config.server_filter = Some(filter);
         }
 

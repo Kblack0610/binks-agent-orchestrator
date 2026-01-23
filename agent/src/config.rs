@@ -61,6 +61,14 @@ pub struct McpServerConfig {
     pub args: Vec<String>,
     #[serde(default)]
     pub env: HashMap<String, String>,
+    /// MCP tier level (1=essential, 2=standard, 3=extended, 4=agent-only)
+    /// Used for automatic filtering based on model size
+    #[serde(default = "default_tier")]
+    pub tier: u8,
+}
+
+fn default_tier() -> u8 {
+    2 // Standard tier by default for backwards compatibility
 }
 
 impl McpConfig {
@@ -100,6 +108,8 @@ pub struct AgentFileConfig {
     pub agent: AgentSectionConfig,
     #[serde(default)]
     pub monitor: MonitorSectionConfig,
+    #[serde(default)]
+    pub mcp: McpSectionConfig,
 }
 
 /// LLM configuration section
@@ -153,6 +163,123 @@ impl Default for MonitorSectionConfig {
         Self {
             interval: default_interval(),
             repos: Vec::new(),
+        }
+    }
+}
+
+// ============================================================================
+// MCP Filtering Configuration
+// ============================================================================
+
+/// MCP filtering configuration section
+#[derive(Debug, Deserialize)]
+pub struct McpSectionConfig {
+    /// Enable automatic model-based filtering (default: true)
+    #[serde(default = "default_auto_filter")]
+    pub auto_filter: bool,
+
+    /// Size classification thresholds (in billions of parameters)
+    #[serde(default)]
+    pub size_thresholds: SizeThresholds,
+
+    /// Per-size-class profiles
+    #[serde(default)]
+    pub profiles: McpProfiles,
+}
+
+fn default_auto_filter() -> bool {
+    true
+}
+
+impl Default for McpSectionConfig {
+    fn default() -> Self {
+        Self {
+            auto_filter: default_auto_filter(),
+            size_thresholds: SizeThresholds::default(),
+            profiles: McpProfiles::default(),
+        }
+    }
+}
+
+/// Size classification thresholds
+#[derive(Debug, Deserialize)]
+pub struct SizeThresholds {
+    /// Upper bound for "small" models (inclusive, in billions)
+    #[serde(default = "default_small_threshold")]
+    pub small: u32,
+    /// Upper bound for "medium" models (inclusive, in billions)
+    #[serde(default = "default_medium_threshold")]
+    pub medium: u32,
+}
+
+fn default_small_threshold() -> u32 {
+    8
+}
+fn default_medium_threshold() -> u32 {
+    32
+}
+
+impl Default for SizeThresholds {
+    fn default() -> Self {
+        Self {
+            small: default_small_threshold(),
+            medium: default_medium_threshold(),
+        }
+    }
+}
+
+/// Per-size-class MCP profiles
+#[derive(Debug, Deserialize)]
+pub struct McpProfiles {
+    #[serde(default = "default_small_profile")]
+    pub small: McpProfile,
+    #[serde(default = "default_medium_profile")]
+    pub medium: McpProfile,
+    #[serde(default = "default_large_profile")]
+    pub large: McpProfile,
+}
+
+fn default_small_profile() -> McpProfile {
+    McpProfile { max_tier: 1, servers: None }
+}
+
+fn default_medium_profile() -> McpProfile {
+    McpProfile { max_tier: 2, servers: None }
+}
+
+fn default_large_profile() -> McpProfile {
+    McpProfile { max_tier: 3, servers: None }
+}
+
+impl Default for McpProfiles {
+    fn default() -> Self {
+        Self {
+            small: default_small_profile(),
+            medium: default_medium_profile(),
+            large: default_large_profile(),
+        }
+    }
+}
+
+/// Configuration for a specific model size class
+#[derive(Debug, Deserialize)]
+pub struct McpProfile {
+    /// Maximum tier level for this size class
+    #[serde(default = "default_max_tier")]
+    pub max_tier: u8,
+    /// Optional explicit server list (overrides tier filtering)
+    pub servers: Option<Vec<String>>,
+}
+
+fn default_max_tier() -> u8 {
+    2
+}
+
+impl Default for McpProfile {
+    fn default() -> Self {
+        Self {
+            max_tier: default_max_tier(),
+            servers: None,
         }
     }
 }

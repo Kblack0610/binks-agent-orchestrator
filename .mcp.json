@@ -8,27 +8,31 @@
       ],
       "env": {
         "KUBECONFIG": "${HOME}/.kube/config"
-      }
+      },
+      "tier": 3
     },
     "ssh": {
       "command": "npx",
       "args": [
         "@aiondadotcom/mcp-ssh"
-      ]
+      ],
+      "tier": 3
     },
     "github-gh": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/github-gh/target/release/github-gh-mcp",
       "args": [],
       "env": {
         "RUST_LOG": "info"
-      }
+      },
+      "tier": 2
     },
     "sysinfo": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/sysinfo-mcp/target/release/sysinfo-mcp",
       "args": [],
       "env": {
         "RUST_LOG": "info"
-      }
+      },
+      "tier": 1
     },
     "inbox": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/inbox-mcp/target/release/inbox-mcp",
@@ -36,7 +40,8 @@
       "env": {
         "INBOX_PATH": "${HOME}/.notes/inbox",
         "RUST_LOG": "info"
-      }
+      },
+      "tier": 2
     },
     "notify": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/notify-mcp/target/release/notify-mcp",
@@ -45,7 +50,8 @@
         "SLACK_WEBHOOK_URL": "${SLACK_WEBHOOK_URL}",
         "DISCORD_WEBHOOK_URL": "${DISCORD_WEBHOOK_URL}",
         "RUST_LOG": "info"
-      }
+      },
+      "tier": 2
     },
     "agent": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/agent",
@@ -55,7 +61,8 @@
       "env": {
         "OLLAMA_URL": "http://192.168.1.4:11434",
         "OLLAMA_MODEL": "llama3.1:8b"
-      }
+      },
+      "tier": 4
     },
     "filesystem": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/filesystem-mcp/target/release/filesystem-mcp",
@@ -63,7 +70,8 @@
       "env": {
         "FS_CONFIG_PATH": "${HOME}/.binks/filesystem.toml",
         "RUST_LOG": "info"
-      }
+      },
+      "tier": 1
     },
     "web-search": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/web-search-mcp",
@@ -71,7 +79,8 @@
       "env": {
         "SEARXNG_URL": "http://localhost:8080",
         "RUST_LOG": "info"
-      }
+      },
+      "tier": 3
     }
   }
 }

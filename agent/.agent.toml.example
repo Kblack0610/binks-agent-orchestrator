@@ -30,3 +30,42 @@ repos = [
     # "owner/repo1",
     # "owner/repo2",
 ]
+
+# ============================================================================
+# MCP Filtering Configuration
+# ============================================================================
+# Automatically filter MCP servers based on model size to reduce context
+# overload for smaller models. Larger models get access to more tools.
+#
+# Tier system in .mcp.json:
+#   Tier 1 (Essential)   - filesystem, sysinfo
+#   Tier 2 (Standard)    - github-gh, inbox, notify
+#   Tier 3 (Extended)    - kubernetes, ssh, web-search
+#   Tier 4 (Agent-only)  - agent (reserved for orchestration)
+#
+# Override priority:
+#   1. CLI --servers flag (explicit override, highest)
+#   2. Auto-filter based on model size (if auto_filter = true)
+#   3. All servers (if auto_filter = false)
+
+[mcp]
+# Enable automatic model-based filtering (default: true)
+auto_filter = true
+
+# Size classification thresholds (in billions of parameters)
+# Model names are parsed for size: "llama3.1:8b" → 8B → Small
+[mcp.size_thresholds]
+small = 8    # ≤8B = Small (tier 1 only)
+medium = 32  # ≤32B = Medium (tier 1-2), >32B = Large (tier 1-3)
+
+# Per-size-class profiles
+# Each profile sets max_tier or explicit server list
+[mcp.profiles.small]
+max_tier = 1  # Essential MCPs only (filesystem, sysinfo)
+# servers = ["filesystem", "sysinfo"]  # Optional: explicit override
+
+[mcp.profiles.medium]
+max_tier = 2  # Essential + Standard (adds github-gh, inbox, notify)
+
+[mcp.profiles.large]
+max_tier = 3  # All except agent-only (adds kubernetes, ssh, web-search)

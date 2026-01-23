@@ -7,5 +7,7 @@
 //! 2. `McpConnectionManager` - Channel-based manager for persistent connections (Phase 2)
 
 mod client;
+pub mod model_size;
 
 pub use client::{McpClient, McpClientPool, McpConnectionManager, McpManagerHandle, McpTool};
+pub use model_size::{parse_model_size, parse_model_size_with_thresholds, ModelSize};
