@@ -1,14 +1,40 @@
 //! E2E test: Direct tool execution via MCP client
 
 use agent::mcp::McpClientPool;
+use std::path::PathBuf;
+
+/// Get the workspace root directory (contains target/ and Cargo.toml with [workspace])
+fn workspace_root() -> PathBuf {
+    let mut current = std::env::current_dir().expect("Failed to get cwd");
+
+    loop {
+        // Workspace root has target/ directory and a Cargo.toml
+        // This distinguishes from crate subdirectories like agent/
+        let has_target = current.join("target").is_dir();
+        let has_cargo = current.join("Cargo.toml").exists();
+        let has_agent_subdir = current.join("agent").is_dir();
+
+        if has_target && has_cargo && has_agent_subdir {
+            return current;
+        }
+
+        match current.parent() {
+            Some(parent) => current = parent.to_path_buf(),
+            None => break,
+        }
+    }
+
+    std::env::current_dir().expect("Failed to get cwd")
+}
 
 #[tokio::test]
 #[ignore = "requires MCP servers running"]
 async fn test_mcp_pool_loads() {
     // Change to workspace root for config loading
     let original_dir = std::env::current_dir().expect("Failed to get cwd");
-    let workspace_root = original_dir.parent().expect("No parent dir");
-    std::env::set_current_dir(workspace_root).expect("Failed to change to workspace root");
+    let workspace = workspace_root();
+    println!("Using workspace root: {}", workspace.display());
+    std::env::set_current_dir(&workspace).expect("Failed to change to workspace root");
 
     let result = McpClientPool::load();
 
@@ -16,7 +42,11 @@ async fn test_mcp_pool_loads() {
     std::env::set_current_dir(original_dir).expect("Failed to restore dir");
 
     let pool = result.expect("Failed to load MCP config");
-    assert!(pool.is_some(), "Expected .mcp.json to be found");
+    assert!(
+        pool.is_some(),
+        "Expected .mcp.json to be found at: {}",
+        workspace.join(".mcp.json").display()
+    );
 
     let pool = pool.unwrap();
     println!("Loaded MCP pool with servers");
@@ -30,12 +60,17 @@ async fn test_mcp_pool_loads() {
 async fn test_list_tools_from_sysinfo() {
     // Change to workspace root
     let original_dir = std::env::current_dir().expect("Failed to get cwd");
-    let workspace_root = original_dir.parent().expect("No parent dir");
-    std::env::set_current_dir(workspace_root).expect("Failed to change to workspace root");
+    let workspace = workspace_root();
+    std::env::set_current_dir(&workspace).expect("Failed to change to workspace root");
 
     let pool = McpClientPool::load()
         .expect("Failed to load MCP config")
-        .expect("No .mcp.json found");
+        .unwrap_or_else(|| {
+            panic!(
+                "No .mcp.json found at: {}",
+                workspace.join(".mcp.json").display()
+            )
+        });
 
     // Restore directory
     std::env::set_current_dir(&original_dir).expect("Failed to restore dir");
@@ -72,12 +107,17 @@ async fn test_list_tools_from_sysinfo() {
 async fn test_call_get_uptime_tool() {
     // Change to workspace root
     let original_dir = std::env::current_dir().expect("Failed to get cwd");
-    let workspace_root = original_dir.parent().expect("No parent dir");
-    std::env::set_current_dir(workspace_root).expect("Failed to change to workspace root");
+    let workspace = workspace_root();
+    std::env::set_current_dir(&workspace).expect("Failed to change to workspace root");
 
     let pool = McpClientPool::load()
         .expect("Failed to load MCP config")
-        .expect("No .mcp.json found");
+        .unwrap_or_else(|| {
+            panic!(
+                "No .mcp.json found at: {}",
+                workspace.join(".mcp.json").display()
+            )
+        });
 
     std::env::set_current_dir(&original_dir).expect("Failed to restore dir");
 
