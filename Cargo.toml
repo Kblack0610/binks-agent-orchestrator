@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "agent",
-    "orchestrator",
     # Common crates
     "common/mcp-common",
     # MCP servers

@@ -1,0 +1,140 @@
+# Binks Agent Configuration Example
+#
+# Copy this file to .agent.toml in your project root or ~/.config/binks/
+# Config search order: cwd → parent directories → ~/.config/binks/
+#
+# All sections and values shown are optional with defaults indicated.
+
+# =============================================================================
+# LLM Configuration
+# =============================================================================
+
+[llm]
+# Ollama server URL
+# Default: "http://localhost:11434"
+url = "http://localhost:11434"
+
+# Default model to use
+# Default: "qwen3-coder:30b"
+# Model name determines size classification for MCP tier filtering
+model = "qwen3-coder:30b"
+
+# =============================================================================
+# Agent Configuration
+# =============================================================================
+
+[agent]
+# Custom system prompt (optional)
+# If not set, uses the default system prompt
+# system_prompt = "You are a helpful coding assistant."
+
+# =============================================================================
+# Monitor Configuration (for `agent monitor` command)
+# =============================================================================
+
+[monitor]
+# Poll interval in seconds
+# Default: 300 (5 minutes)
+interval = 300
+
+# GitHub repositories to monitor
+# Format: "owner/repo"
+repos = [
+    # "your-org/your-repo",
+    # "another-org/another-repo",
+]
+
+# =============================================================================
+# MCP Tool Filtering Configuration
+# =============================================================================
+
+[mcp]
+# Enable automatic model-based tool filtering
+# When true, MCP servers are filtered based on model size
+# Default: true
+auto_filter = true
+
+# =============================================================================
+# Model Size Classification Thresholds
+#
+# Models are classified by parameter count (extracted from model name):
+# - Small: ≤ small threshold
+# - Medium: > small AND ≤ medium threshold
+# - Large: > medium threshold
+# - Unknown: No size found in name (treated conservatively as small)
+# =============================================================================
+
+[mcp.size_thresholds]
+# Upper bound for "small" models (billions of parameters)
+# Default: 8
+small = 8
+
+# Upper bound for "medium" models (billions of parameters)
+# Default: 32
+medium = 32
+
+# =============================================================================
+# Per-Size MCP Profiles
+#
+# Each size class can specify:
+# - max_tier: Maximum MCP tier to include (1=essential, 2=standard, 3=extended)
+# - servers: Explicit server list (overrides tier filtering when set)
+#
+# MCP Tiers (set in .mcp.json per server):
+#   1 - Essential: Core tools always needed (e.g., filesystem, sysinfo)
+#   2 - Standard: Common tools for most tasks (default tier)
+#   3 - Extended: Advanced tools for complex tasks
+#   4 - Agent-only: Tools reserved for agent-to-agent use
+# =============================================================================
+
+[mcp.profiles.small]
+# Small models (≤8B) get minimal tools to avoid context overload
+# Default: max_tier = 1
+max_tier = 1
+# Optionally specify exact servers instead of tier-based filtering:
+# servers = ["sysinfo", "filesystem"]
+
+[mcp.profiles.medium]
+# Medium models (8B-32B) get standard tools
+# Default: max_tier = 2
+max_tier = 2
+# servers = ["sysinfo", "filesystem", "github-gh"]
+
+[mcp.profiles.large]
+# Large models (>32B) get extended tools
+# Default: max_tier = 3
+max_tier = 3
+# servers = ["sysinfo", "filesystem", "github-gh", "serena", "kubernetes"]
+
+# =============================================================================
+# Example: Custom Configuration for a Code Review Bot
+# =============================================================================
+#
+# [llm]
+# url = "http://gpu-server:11434"
+# model = "codestral:22b"
+#
+# [agent]
+# system_prompt = """
+# You are a code review assistant. Focus on:
+# - Security vulnerabilities
+# - Performance issues
+# - Code style consistency
+# """
+#
+# [mcp]
+# auto_filter = false  # Use explicit server list
+#
+# [mcp.profiles.medium]
+# servers = ["filesystem", "github-gh", "serena"]
+
+# =============================================================================
+# Example: Minimal Agent with Only Essential Tools
+# =============================================================================
+#
+# [llm]
+# model = "phi3:3b"
+#
+# [mcp.profiles.small]
+# max_tier = 1
+# servers = ["filesystem"]  # Only filesystem access

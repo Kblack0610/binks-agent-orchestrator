@@ -319,3 +319,392 @@ impl AgentFileConfig {
         default_ollama_url()
     }
 }
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    // ============== MCP Config Tests ==============
+
+    #[test]
+    fn test_mcp_config_parse_minimal() {
+        let json = r#"{
+            "mcpServers": {
+                "test": {
+                    "command": "/bin/test"
+                }
+            }
+        }"#;
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        let config = McpConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.mcp_servers.len(), 1);
+        assert_eq!(config.mcp_servers["test"].command, "/bin/test");
+        assert!(config.mcp_servers["test"].args.is_empty());
+        assert!(config.mcp_servers["test"].env.is_empty());
+        // Default tier is 2
+        assert_eq!(config.mcp_servers["test"].tier, 2);
+    }
+
+    #[test]
+    fn test_mcp_config_parse_full() {
+        let json = r#"{
+            "mcpServers": {
+                "sysinfo": {
+                    "command": "./mcps/sysinfo-mcp/target/release/sysinfo-mcp",
+                    "args": ["--verbose"],
+                    "env": {"LOG_LEVEL": "debug"},
+                    "tier": 1
+                },
+                "github": {
+                    "command": "gh",
+                    "args": ["mcp", "serve"],
+                    "tier": 3
+                }
+            }
+        }"#;
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        let config = McpConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.mcp_servers.len(), 2);
+
+        let sysinfo = &config.mcp_servers["sysinfo"];
+        assert_eq!(sysinfo.tier, 1);
+        assert_eq!(sysinfo.args, vec!["--verbose"]);
+        assert_eq!(sysinfo.env.get("LOG_LEVEL").unwrap(), "debug");
+
+        let github = &config.mcp_servers["github"];
+        assert_eq!(github.tier, 3);
+        assert_eq!(github.args, vec!["mcp", "serve"]);
+    }
+
+    #[test]
+    fn test_mcp_config_invalid_json() {
+        let json = r#"{ invalid json "#;
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        let result = McpConfig::load_from_path(file.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mcp_config_missing_required_field() {
+        // Missing "command" field
+        let json = r#"{
+            "mcpServers": {
+                "test": {
+                    "args": []
+                }
+            }
+        }"#;
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        let result = McpConfig::load_from_path(file.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mcp_config_empty_servers() {
+        let json = r#"{"mcpServers": {}}"#;
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        let config = McpConfig::load_from_path(file.path()).unwrap();
+        assert!(config.mcp_servers.is_empty());
+    }
+
+    // ============== Agent Config Tests ==============
+
+    #[test]
+    fn test_agent_config_defaults() {
+        let config = AgentFileConfig::default();
+
+        assert_eq!(config.llm.url, "http://localhost:11434");
+        assert_eq!(config.llm.model, "qwen3-coder:30b");
+        assert_eq!(config.monitor.interval, 300);
+        assert!(config.monitor.repos.is_empty());
+        assert!(config.agent.system_prompt.is_none());
+        assert!(config.mcp.auto_filter);
+    }
+
+    #[test]
+    fn test_agent_config_parse_minimal() {
+        let toml = r#"
+[llm]
+url = "http://192.168.1.4:11434"
+model = "llama3.1:8b"
+"#;
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let config = AgentFileConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.llm.url, "http://192.168.1.4:11434");
+        assert_eq!(config.llm.model, "llama3.1:8b");
+        // Defaults should still apply for unspecified sections
+        assert_eq!(config.monitor.interval, 300);
+    }
+
+    #[test]
+    fn test_agent_config_parse_full() {
+        let toml = r#"
+[llm]
+url = "http://gpu-server:11434"
+model = "codestral:22b"
+
+[agent]
+system_prompt = "You are a helpful coding assistant."
+
+[monitor]
+interval = 60
+repos = ["owner/repo1", "owner/repo2"]
+
+[mcp]
+auto_filter = false
+
+[mcp.size_thresholds]
+small = 7
+medium = 30
+
+[mcp.profiles.small]
+max_tier = 1
+servers = ["sysinfo"]
+
+[mcp.profiles.medium]
+max_tier = 2
+
+[mcp.profiles.large]
+max_tier = 4
+"#;
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let config = AgentFileConfig::load_from_path(file.path()).unwrap();
+
+        // LLM section
+        assert_eq!(config.llm.url, "http://gpu-server:11434");
+        assert_eq!(config.llm.model, "codestral:22b");
+
+        // Agent section
+        assert_eq!(
+            config.agent.system_prompt.as_deref(),
+            Some("You are a helpful coding assistant.")
+        );
+
+        // Monitor section
+        assert_eq!(config.monitor.interval, 60);
+        assert_eq!(config.monitor.repos, vec!["owner/repo1", "owner/repo2"]);
+
+        // MCP section
+        assert!(!config.mcp.auto_filter);
+        assert_eq!(config.mcp.size_thresholds.small, 7);
+        assert_eq!(config.mcp.size_thresholds.medium, 30);
+        assert_eq!(config.mcp.profiles.small.max_tier, 1);
+        assert_eq!(
+            config.mcp.profiles.small.servers.as_ref().unwrap(),
+            &vec!["sysinfo".to_string()]
+        );
+        assert_eq!(config.mcp.profiles.large.max_tier, 4);
+    }
+
+    #[test]
+    fn test_agent_config_invalid_toml() {
+        let toml = r#"[invalid toml syntax"#;
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let result = AgentFileConfig::load_from_path(file.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_agent_config_empty_file() {
+        let toml = "";
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        // Empty file should use all defaults
+        let config = AgentFileConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.llm.url, "http://localhost:11434");
+    }
+
+    #[test]
+    fn test_agent_config_partial_sections() {
+        let toml = r#"
+[llm]
+model = "custom-model"
+# url not specified, should use default
+"#;
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let config = AgentFileConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.llm.model, "custom-model");
+        assert_eq!(config.llm.url, "http://localhost:11434"); // default
+    }
+
+    // ============== Size Threshold Tests ==============
+
+    #[test]
+    fn test_size_thresholds_defaults() {
+        let thresholds = SizeThresholds::default();
+        assert_eq!(thresholds.small, 8);
+        assert_eq!(thresholds.medium, 32);
+    }
+
+    // ============== MCP Profile Tests ==============
+
+    #[test]
+    fn test_mcp_profiles_defaults() {
+        let profiles = McpProfiles::default();
+
+        assert_eq!(profiles.small.max_tier, 1);
+        assert!(profiles.small.servers.is_none());
+
+        assert_eq!(profiles.medium.max_tier, 2);
+        assert!(profiles.medium.servers.is_none());
+
+        assert_eq!(profiles.large.max_tier, 3);
+        assert!(profiles.large.servers.is_none());
+    }
+
+    #[test]
+    fn test_mcp_section_defaults() {
+        let mcp = McpSectionConfig::default();
+        assert!(mcp.auto_filter);
+        assert_eq!(mcp.size_thresholds.small, 8);
+        assert_eq!(mcp.size_thresholds.medium, 32);
+    }
+
+    // ============== Tier Default Tests ==============
+
+    #[test]
+    fn test_tier_defaults_to_two() {
+        assert_eq!(default_tier(), 2);
+    }
+
+    #[test]
+    fn test_max_tier_defaults_to_two() {
+        assert_eq!(default_max_tier(), 2);
+    }
+
+    // ============== Static Method Tests ==============
+
+    #[test]
+    fn test_default_model_value() {
+        assert_eq!(AgentFileConfig::default_model(), "qwen3-coder:30b");
+    }
+
+    #[test]
+    fn test_default_ollama_url_value() {
+        assert_eq!(AgentFileConfig::default_ollama_url(), "http://localhost:11434");
+    }
+
+    // ============== Edge Cases ==============
+
+    #[test]
+    fn test_mcp_config_unicode_server_name() {
+        let json = r#"{
+            "mcpServers": {
+                "服务器": {
+                    "command": "/bin/test"
+                }
+            }
+        }"#;
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        let config = McpConfig::load_from_path(file.path()).unwrap();
+        assert!(config.mcp_servers.contains_key("服务器"));
+    }
+
+    #[test]
+    fn test_agent_config_special_chars_in_prompt() {
+        let toml = r#"
+[agent]
+system_prompt = "Prompt with 'quotes' and \"escapes\" and \nnewlines"
+"#;
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let config = AgentFileConfig::load_from_path(file.path()).unwrap();
+        assert!(config.agent.system_prompt.is_some());
+    }
+
+    #[test]
+    fn test_agent_config_very_large_interval() {
+        let toml = r#"
+[monitor]
+interval = 999999999
+"#;
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let config = AgentFileConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.monitor.interval, 999999999);
+    }
+
+    #[test]
+    fn test_mcp_config_tier_boundaries() {
+        let json = r#"{
+            "mcpServers": {
+                "tier1": {"command": "cmd", "tier": 1},
+                "tier2": {"command": "cmd", "tier": 2},
+                "tier3": {"command": "cmd", "tier": 3},
+                "tier4": {"command": "cmd", "tier": 4}
+            }
+        }"#;
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        let config = McpConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.mcp_servers["tier1"].tier, 1);
+        assert_eq!(config.mcp_servers["tier2"].tier, 2);
+        assert_eq!(config.mcp_servers["tier3"].tier, 3);
+        assert_eq!(config.mcp_servers["tier4"].tier, 4);
+    }
+
+    #[test]
+    fn test_mcp_config_extra_fields_ignored() {
+        let json = r#"{
+            "mcpServers": {
+                "test": {
+                    "command": "cmd",
+                    "unknown_field": "ignored",
+                    "another": 123
+                }
+            },
+            "extraTopLevel": "also ignored"
+        }"#;
+
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+
+        // Should parse successfully, ignoring unknown fields
+        let config = McpConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.mcp_servers["test"].command, "cmd");
+    }
+}

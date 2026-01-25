@@ -160,4 +160,184 @@ Let me know if you need anything else."#;
         assert_eq!(tool_call.function.name, "read_file");
         assert_eq!(tool_call.function.arguments["path"], "/etc/hosts");
     }
+
+    // ============== Edge Case Tests ==============
+
+    #[test]
+    fn test_parse_multiple_parameters() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=create_file>
+<parameter=path>/tmp/test.txt</parameter>
+<parameter=content>Hello World</parameter>
+<parameter=mode>0644</parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.name, "create_file");
+        assert_eq!(result.function.arguments["path"], "/tmp/test.txt");
+        assert_eq!(result.function.arguments["content"], "Hello World");
+        assert_eq!(result.function.arguments["mode"], "0644");
+    }
+
+    #[test]
+    fn test_parse_json_value_in_parameter() {
+        let parser = XmlFunctionParser::new();
+        // Parameter values can be JSON that gets parsed
+        let content = r#"<function=set_config>
+<parameter=value>42</parameter>
+<parameter=enabled>true</parameter>
+<parameter=ratio>3.14</parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        // These should be parsed as JSON values
+        assert_eq!(result.function.arguments["value"], 42);
+        assert_eq!(result.function.arguments["enabled"], true);
+        assert_eq!(result.function.arguments["ratio"], 3.14);
+    }
+
+    #[test]
+    fn test_parse_unicode_in_function_name() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=获取天气>
+<parameter=城市>北京</parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.name, "获取天气");
+        assert_eq!(result.function.arguments["城市"], "北京");
+    }
+
+    #[test]
+    fn test_parse_special_chars_in_value() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=run_command>
+<parameter=cmd>echo "hello world"</parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.arguments["cmd"], r#"echo "hello world""#);
+    }
+
+    #[test]
+    fn test_parse_whitespace_in_function_name() {
+        let parser = XmlFunctionParser::new();
+        // Function name with leading/trailing whitespace should be trimmed
+        let content = r#"<function= read_file >
+<parameter=path>/test</parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.name, "read_file");
+    }
+
+    #[test]
+    fn test_parse_whitespace_in_parameter_value() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=test>
+<parameter=value>  spaces around  </parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        // Values are trimmed
+        assert_eq!(result.function.arguments["value"], "spaces around");
+    }
+
+    #[test]
+    fn test_parse_empty_parameter_value() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=test>
+<parameter=empty></parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.arguments["empty"], "");
+    }
+
+    #[test]
+    fn test_parse_same_line_format() {
+        let parser = XmlFunctionParser::new();
+        // Some models might output on single line
+        let content = r#"<function=test><parameter=a>1</parameter><parameter=b>2</parameter></function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.name, "test");
+        assert_eq!(result.function.arguments["a"], 1);
+        assert_eq!(result.function.arguments["b"], 2);
+    }
+
+    #[test]
+    fn test_parse_with_surrounding_xml_artifacts() {
+        let parser = XmlFunctionParser::new();
+        // Some models add extra XML-like tags
+        let content = r#"<tool_call>
+<function=get_weather>
+<parameter=city>NYC</parameter>
+</function>
+</tool_call>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.name, "get_weather");
+        assert_eq!(result.function.arguments["city"], "NYC");
+    }
+
+    #[test]
+    fn test_parse_path_with_slashes() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=read_file>
+<parameter=path>/home/user/documents/file.txt</parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.arguments["path"], "/home/user/documents/file.txt");
+    }
+
+    #[test]
+    fn test_parse_url_in_parameter() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=fetch_url>
+<parameter=url>https://example.com/api?foo=bar&baz=qux</parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        // Note: & in XML should ideally be &amp; but we handle it gracefully
+        assert!(result.function.arguments["url"].as_str().unwrap().starts_with("https://"));
+    }
+
+    #[test]
+    fn test_parse_multiline_empty_body() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=no_params>
+
+
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.name, "no_params");
+        assert!(result.function.arguments.as_object().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_parse_underscore_tool_name() {
+        let parser = XmlFunctionParser::new();
+        let content = r#"<function=mcp__sysinfo__get_cpu_usage>
+<parameter=per_core>true</parameter>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.name, "mcp__sysinfo__get_cpu_usage");
+    }
+
+    #[test]
+    fn test_parse_first_match_when_multiple() {
+        let parser = XmlFunctionParser::new();
+        // If there are multiple function tags, should get the first one
+        let content = r#"<function=first>
+</function>
+<function=second>
+</function>"#;
+
+        let result = parser.parse(content).unwrap();
+        assert_eq!(result.function.name, "first");
+    }
 }

@@ -32,10 +32,13 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
-    name: Test
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      # Runs deterministic unit tests only.
+      # E2E tests requiring Ollama/MCP servers are marked #[ignore]
+      # and must be run manually. See docs/TESTING.md for details.
       - run: cargo test --workspace

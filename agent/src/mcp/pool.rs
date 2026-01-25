@@ -246,3 +246,423 @@ impl McpClientPool {
         self.tools_cache.clear();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    /// Helper to create a minimal MCP config for testing
+    fn create_test_config(servers: Vec<(&str, u8)>) -> McpConfig {
+        let mut mcp_servers = HashMap::new();
+        for (name, tier) in servers {
+            mcp_servers.insert(
+                name.to_string(),
+                McpServerConfig {
+                    command: format!("/path/to/{}", name),
+                    args: vec![],
+                    env: HashMap::new(),
+                    tier,
+                },
+            );
+        }
+        McpConfig { mcp_servers }
+    }
+
+    // ============== server_names Tests ==============
+
+    #[test]
+    fn test_server_names_returns_all_configured() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names();
+        assert_eq!(names.len(), 3);
+        assert!(names.contains(&"sysinfo".to_string()));
+        assert!(names.contains(&"kubernetes".to_string()));
+        assert!(names.contains(&"github".to_string()));
+    }
+
+    #[test]
+    fn test_server_names_excludes_agent() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("agent", 4), // Should be excluded
+            ("kubernetes", 2),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names();
+        assert_eq!(names.len(), 2);
+        assert!(!names.contains(&"agent".to_string()));
+    }
+
+    #[test]
+    fn test_server_names_empty_config() {
+        let config = create_test_config(vec![]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names();
+        assert!(names.is_empty());
+    }
+
+    // ============== server_names_for_tier Tests ==============
+
+    #[test]
+    fn test_tier_filtering_tier_1_only() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+            ("extended", 4),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names_for_tier(1);
+        assert_eq!(names.len(), 1);
+        assert!(names.contains(&"sysinfo".to_string()));
+    }
+
+    #[test]
+    fn test_tier_filtering_tier_2() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+            ("extended", 4),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names_for_tier(2);
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"sysinfo".to_string()));
+        assert!(names.contains(&"kubernetes".to_string()));
+    }
+
+    #[test]
+    fn test_tier_filtering_tier_3() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+            ("extended", 4),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names_for_tier(3);
+        assert_eq!(names.len(), 3);
+        assert!(!names.contains(&"extended".to_string()));
+    }
+
+    #[test]
+    fn test_tier_filtering_tier_4_includes_all() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+            ("extended", 4),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names_for_tier(4);
+        assert_eq!(names.len(), 4);
+    }
+
+    #[test]
+    fn test_tier_filtering_excludes_agent() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("agent", 1), // Same tier, should still be excluded
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names_for_tier(1);
+        assert_eq!(names.len(), 1);
+        assert!(!names.contains(&"agent".to_string()));
+    }
+
+    #[test]
+    fn test_tier_filtering_zero_excludes_all() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names_for_tier(0);
+        assert!(names.is_empty());
+    }
+
+    #[test]
+    fn test_tier_filtering_max_u8_includes_all() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 255), // Max tier
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names_for_tier(255);
+        assert_eq!(names.len(), 2);
+    }
+
+    #[test]
+    fn test_tier_filtering_same_tier_multiple_servers() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("memory", 1),
+            ("filesystem", 1),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names_for_tier(1);
+        assert_eq!(names.len(), 3);
+    }
+
+    // ============== server_names_for_model_size Tests ==============
+
+    #[test]
+    fn test_model_size_small_gets_tier_1() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        // Small models (≤8B) get tier 1 by default
+        let names = pool.server_names_for_model_size(ModelSize::Small);
+        assert_eq!(names.len(), 1);
+        assert!(names.contains(&"sysinfo".to_string()));
+    }
+
+    #[test]
+    fn test_model_size_medium_gets_tier_2() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        // Medium models (≤32B) get tier 2 by default
+        let names = pool.server_names_for_model_size(ModelSize::Medium);
+        assert_eq!(names.len(), 2);
+    }
+
+    #[test]
+    fn test_model_size_large_gets_tier_3() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+            ("extended", 4),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        // Large models (>32B) get tier 3 by default (all except agent-only)
+        let names = pool.server_names_for_model_size(ModelSize::Large);
+        assert_eq!(names.len(), 3);
+        assert!(!names.contains(&"extended".to_string()));
+    }
+
+    #[test]
+    fn test_model_size_unknown_gets_tier_1() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        // Unknown models get tier 1 by default (conservative - treat as small)
+        let names = pool.server_names_for_model_size(ModelSize::Unknown);
+        assert_eq!(names.len(), 1);
+        assert!(names.contains(&"sysinfo".to_string()));
+    }
+
+    // ============== server_names_for_profile Tests ==============
+
+    #[test]
+    fn test_profile_explicit_servers_list() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let profile = McpProfile {
+            max_tier: 4, // Should be ignored when servers is Some
+            servers: Some(vec!["sysinfo".to_string(), "github".to_string()]),
+        };
+
+        let names = pool.server_names_for_profile(&profile);
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"sysinfo".to_string()));
+        assert!(names.contains(&"github".to_string()));
+        assert!(!names.contains(&"kubernetes".to_string()));
+    }
+
+    #[test]
+    fn test_profile_explicit_servers_filters_invalid() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let profile = McpProfile {
+            max_tier: 4,
+            servers: Some(vec![
+                "sysinfo".to_string(),
+                "nonexistent".to_string(), // Should be filtered out
+            ]),
+        };
+
+        let names = pool.server_names_for_profile(&profile);
+        assert_eq!(names.len(), 1);
+        assert!(names.contains(&"sysinfo".to_string()));
+    }
+
+    #[test]
+    fn test_profile_explicit_servers_excludes_agent() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("agent", 4),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let profile = McpProfile {
+            max_tier: 4,
+            servers: Some(vec![
+                "sysinfo".to_string(),
+                "agent".to_string(), // Should be excluded
+            ]),
+        };
+
+        let names = pool.server_names_for_profile(&profile);
+        assert_eq!(names.len(), 1);
+        assert!(!names.contains(&"agent".to_string()));
+    }
+
+    #[test]
+    fn test_profile_tier_based_when_no_servers() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+            ("github", 3),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let profile = McpProfile {
+            max_tier: 2,
+            servers: None, // Use tier-based filtering
+        };
+
+        let names = pool.server_names_for_profile(&profile);
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"sysinfo".to_string()));
+        assert!(names.contains(&"kubernetes".to_string()));
+    }
+
+    #[test]
+    fn test_profile_empty_servers_list() {
+        let config = create_test_config(vec![
+            ("sysinfo", 1),
+            ("kubernetes", 2),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let profile = McpProfile {
+            max_tier: 4,
+            servers: Some(vec![]), // Empty explicit list
+        };
+
+        let names = pool.server_names_for_profile(&profile);
+        assert!(names.is_empty());
+    }
+
+    // ============== get_server_config Tests ==============
+
+    #[test]
+    fn test_get_server_config_exists() {
+        let config = create_test_config(vec![("sysinfo", 1)]);
+        let pool = McpClientPool::new(config);
+
+        let server_config = pool.get_server_config("sysinfo");
+        assert!(server_config.is_some());
+        assert_eq!(server_config.unwrap().tier, 1);
+    }
+
+    #[test]
+    fn test_get_server_config_not_found() {
+        let config = create_test_config(vec![("sysinfo", 1)]);
+        let pool = McpClientPool::new(config);
+
+        let server_config = pool.get_server_config("nonexistent");
+        assert!(server_config.is_none());
+    }
+
+    // ============== Cache Tests ==============
+
+    #[test]
+    fn test_has_cached_tools_false_initially() {
+        let config = create_test_config(vec![("sysinfo", 1)]);
+        let pool = McpClientPool::new(config);
+
+        assert!(!pool.has_cached_tools("sysinfo"));
+    }
+
+    #[test]
+    fn test_clear_cache() {
+        let config = create_test_config(vec![("sysinfo", 1)]);
+        let mut pool = McpClientPool::new(config);
+
+        // Manually add to cache for testing
+        pool.tools_cache.insert("sysinfo".to_string(), vec![]);
+        assert!(pool.has_cached_tools("sysinfo"));
+
+        pool.clear_cache();
+        assert!(!pool.has_cached_tools("sysinfo"));
+    }
+
+    // ============== Edge Cases ==============
+
+    #[test]
+    fn test_server_names_with_special_characters() {
+        let config = create_test_config(vec![
+            ("mcp__sysinfo__server", 1),
+            ("my-server-name", 2),
+            ("server.with.dots", 3),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        let names = pool.server_names();
+        assert_eq!(names.len(), 3);
+        assert!(names.contains(&"mcp__sysinfo__server".to_string()));
+        assert!(names.contains(&"my-server-name".to_string()));
+        assert!(names.contains(&"server.with.dots".to_string()));
+    }
+
+    #[test]
+    fn test_tier_filtering_preserves_all_tiers() {
+        // Test that servers are correctly categorized at each tier boundary
+        let config = create_test_config(vec![
+            ("tier1a", 1),
+            ("tier1b", 1),
+            ("tier2", 2),
+            ("tier3", 3),
+            ("tier4", 4),
+        ]);
+        let pool = McpClientPool::new(config);
+
+        assert_eq!(pool.server_names_for_tier(1).len(), 2);
+        assert_eq!(pool.server_names_for_tier(2).len(), 3);
+        assert_eq!(pool.server_names_for_tier(3).len(), 4);
+        assert_eq!(pool.server_names_for_tier(4).len(), 5);
+    }
+}
