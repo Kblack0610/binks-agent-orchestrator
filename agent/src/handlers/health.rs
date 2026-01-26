@@ -11,11 +11,7 @@ use crate::llm::{Llm, OllamaClient};
 use crate::mcp::McpClientPool;
 
 /// Handle the `health` command
-pub async fn run_health(
-    ctx: &CommandContext,
-    test_llm: bool,
-    test_tools: bool,
-) -> Result<()> {
+pub async fn run_health(ctx: &CommandContext, test_llm: bool, test_tools: bool) -> Result<()> {
     println!("=== Agent Health Check ===\n");
 
     let mut all_passed = true;
@@ -72,7 +68,11 @@ pub async fn run_health(
 }
 
 fn status(passed: bool) -> &'static str {
-    if passed { "✓" } else { "✗" }
+    if passed {
+        "✓"
+    } else {
+        "✗"
+    }
 }
 
 fn check_agent_config(ctx: &CommandContext, checks_passed: &mut u32) -> bool {
@@ -202,34 +202,32 @@ async fn check_llm_connectivity(ctx: &CommandContext, checks_passed: &mut u32) -
 async fn check_tool_execution(checks_passed: &mut u32) -> bool {
     print!("Tool Execution: ");
     match McpClientPool::load() {
-        Ok(Some(mut pool)) => {
-            match pool.call_tool("get_uptime", None).await {
-                Ok(result) => {
-                    let text = result
-                        .content
-                        .iter()
-                        .filter_map(|c| match &c.raw {
-                            rmcp::model::RawContent::Text(t) => Some(t.text.as_str()),
-                            _ => None,
-                        })
-                        .next()
-                        .unwrap_or("(no text)");
+        Ok(Some(mut pool)) => match pool.call_tool("get_uptime", None).await {
+            Ok(result) => {
+                let text = result
+                    .content
+                    .iter()
+                    .filter_map(|c| match &c.raw {
+                        rmcp::model::RawContent::Text(t) => Some(t.text.as_str()),
+                        _ => None,
+                    })
+                    .next()
+                    .unwrap_or("(no text)");
 
-                    let short_text = if text.len() > 60 {
-                        format!("{}...", &text[..60])
-                    } else {
-                        text.to_string()
-                    };
-                    println!("{} get_uptime returned: {}", status(true), short_text);
-                    *checks_passed += 1;
-                    true
-                }
-                Err(e) => {
-                    println!("{} Failed: {}", status(false), e);
-                    false
-                }
+                let short_text = if text.len() > 60 {
+                    format!("{}...", &text[..60])
+                } else {
+                    text.to_string()
+                };
+                println!("{} get_uptime returned: {}", status(true), short_text);
+                *checks_passed += 1;
+                true
             }
-        }
+            Err(e) => {
+                println!("{} Failed: {}", status(false), e);
+                false
+            }
+        },
         Ok(None) => {
             println!("{} No MCP pool available", status(false));
             false

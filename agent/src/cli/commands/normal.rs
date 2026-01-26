@@ -40,7 +40,10 @@ impl SlashCommand for NormalCommand {
                 }
                 msg
             }
-            Mode::Implement { plan, files_modified } => {
+            Mode::Implement {
+                plan,
+                files_modified,
+            } => {
                 let mut msg = "Exiting implementation mode.".to_string();
                 if plan.is_some() {
                     msg.push_str(" Had plan reference.");

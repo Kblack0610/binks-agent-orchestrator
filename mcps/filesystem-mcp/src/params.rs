@@ -68,7 +68,10 @@ pub struct CreateDirParams {
     pub path: String,
 
     #[schemars(description = "Create parent directories as needed (default: true)")]
-    #[serde(default = "default_true", deserialize_with = "crate::types::deserialize_lenient_bool")]
+    #[serde(
+        default = "default_true",
+        deserialize_with = "crate::types::deserialize_lenient_bool"
+    )]
     pub recursive: bool,
 }
 

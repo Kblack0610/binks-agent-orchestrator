@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct SearchPrsParams {
-    #[schemars(description = "Repository in OWNER/REPO format (optional, searches all repos if not provided)")]
+    #[schemars(
+        description = "Repository in OWNER/REPO format (optional, searches all repos if not provided)"
+    )]
     pub repo: Option<String>,
     #[schemars(description = "Search query (GitHub search syntax)")]
     pub query: String,

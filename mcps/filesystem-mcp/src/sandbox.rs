@@ -20,8 +20,9 @@ pub struct Sandbox {
 impl Sandbox {
     /// Create a new sandbox from configuration
     pub fn new(config: &Config) -> FsResult<Self> {
-        let home_dir = dirs::home_dir()
-            .ok_or_else(|| FsError::ConfigError("Could not determine home directory".to_string()))?;
+        let home_dir = dirs::home_dir().ok_or_else(|| {
+            FsError::ConfigError("Could not determine home directory".to_string())
+        })?;
 
         let read_paths = config
             .paths
@@ -54,8 +55,8 @@ impl Sandbox {
 
     /// Resolve a path string to an absolute path
     fn resolve_path_static(path: &str, home_dir: &Path) -> Option<PathBuf> {
-        let expanded = if path.starts_with("~/") {
-            home_dir.join(&path[2..])
+        let expanded = if let Some(stripped) = path.strip_prefix("~/") {
+            home_dir.join(stripped)
         } else if path == "~" {
             home_dir.to_path_buf()
         } else {
@@ -68,8 +69,8 @@ impl Sandbox {
 
     /// Resolve a user-provided path to a canonical path
     pub fn resolve_path(&self, path: &str) -> FsResult<PathBuf> {
-        let expanded = if path.starts_with("~/") {
-            self.home_dir.join(&path[2..])
+        let expanded = if let Some(stripped) = path.strip_prefix("~/") {
+            self.home_dir.join(stripped)
         } else if path == "~" {
             self.home_dir.clone()
         } else {
@@ -158,8 +159,8 @@ impl Sandbox {
     /// Validate a path for writing, returning the canonical path
     /// For write operations on non-existent files, validates the parent directory
     pub fn validate_write(&self, path: &str) -> FsResult<PathBuf> {
-        let expanded = if path.starts_with("~/") {
-            self.home_dir.join(&path[2..])
+        let expanded = if let Some(stripped) = path.strip_prefix("~/") {
+            self.home_dir.join(stripped)
         } else if path == "~" {
             self.home_dir.clone()
         } else {
@@ -169,14 +170,16 @@ impl Sandbox {
         // For new files, check the parent directory
         if !expanded.exists() {
             if let Some(parent) = expanded.parent() {
-                let canonical_parent = parent.canonicalize().map_err(|e| {
-                    FsError::InvalidPath(format!("Parent directory: {}", e))
-                })?;
+                let canonical_parent = parent
+                    .canonicalize()
+                    .map_err(|e| FsError::InvalidPath(format!("Parent directory: {}", e)))?;
                 self.check_write(&canonical_parent)?;
                 // Return the full intended path
-                return Ok(canonical_parent.join(expanded.file_name().ok_or_else(|| {
-                    FsError::InvalidPath("No filename".to_string())
-                })?));
+                return Ok(canonical_parent.join(
+                    expanded
+                        .file_name()
+                        .ok_or_else(|| FsError::InvalidPath("No filename".to_string()))?,
+                ));
             }
         }
 

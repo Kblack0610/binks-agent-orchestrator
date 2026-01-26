@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Main configuration structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     /// Search configuration
     #[serde(default)]
@@ -61,15 +61,6 @@ fn default_cache_ttl() -> u64 {
 
 fn default_searxng_url() -> String {
     "http://localhost:8080".to_string()
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            search: SearchConfig::default(),
-            searxng: SearXNGConfig::default(),
-        }
-    }
 }
 
 impl Default for SearchConfig {

@@ -6,9 +6,10 @@
 use serde::{Deserialize, Serialize};
 
 /// CLI mode state
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
     /// Normal conversation mode
+    #[default]
     Normal,
 
     /// Planning mode - focus on analysis and planning
@@ -26,12 +27,6 @@ pub enum Mode {
         /// Files modified during implementation
         files_modified: Vec<String>,
     },
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 impl Mode {

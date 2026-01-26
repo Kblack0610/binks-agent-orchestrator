@@ -219,7 +219,13 @@ pub async fn summarize_session(
 
     // Save to persistent storage
     let summary = persistent
-        .save_summary(&session_id, &content, thought_count, started_at, session_end)
+        .save_summary(
+            &session_id,
+            &content,
+            thought_count,
+            started_at,
+            session_end,
+        )
         .await
         .map_err(|e| McpError::internal_error(e.to_string(), None))?;
 

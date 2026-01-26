@@ -44,9 +44,11 @@ impl From<serde_json::Value> for MemoryValue {
             serde_json::Value::Array(arr) => {
                 MemoryValue::Array(arr.into_iter().map(MemoryValue::from).collect())
             }
-            serde_json::Value::Object(obj) => {
-                MemoryValue::Object(obj.into_iter().map(|(k, v)| (k, MemoryValue::from(v))).collect())
-            }
+            serde_json::Value::Object(obj) => MemoryValue::Object(
+                obj.into_iter()
+                    .map(|(k, v)| (k, MemoryValue::from(v)))
+                    .collect(),
+            ),
         }
     }
 }

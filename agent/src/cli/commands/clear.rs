@@ -29,7 +29,9 @@ impl SlashCommand for ClearCommand {
             "" | "history" => {
                 // Clear history
                 ctx.agent.clear_history();
-                ctx.output.write(OutputEvent::Status("Conversation history cleared".to_string()));
+                ctx.output.write(OutputEvent::Status(
+                    "Conversation history cleared".to_string(),
+                ));
                 Ok(CommandResult::Clear)
             }
 
@@ -43,7 +45,9 @@ impl SlashCommand for ClearCommand {
                 // Clear both
                 ctx.agent.clear_history();
                 print!("\x1B[2J\x1B[H");
-                ctx.output.write(OutputEvent::Status("History and screen cleared".to_string()));
+                ctx.output.write(OutputEvent::Status(
+                    "History and screen cleared".to_string(),
+                ));
                 Ok(CommandResult::Clear)
             }
 

@@ -102,7 +102,9 @@ mod tests {
         assert!(parser.parse(r#"{"args": {}}"#).is_none());
 
         // Wrong format (standard format)
-        assert!(parser.parse(r#"{"name": "test", "arguments": {}}"#).is_none());
+        assert!(parser
+            .parse(r#"{"name": "test", "arguments": {}}"#)
+            .is_none());
     }
 
     // ============== Edge Case Tests ==============
@@ -113,7 +115,10 @@ mod tests {
         let content = r#"{"tool": "config", "args": {"settings": {"nested": {"deep": true}}}}"#;
 
         let result = parser.parse(content).unwrap();
-        assert_eq!(result.function.arguments["settings"]["nested"]["deep"], true);
+        assert_eq!(
+            result.function.arguments["settings"]["nested"]["deep"],
+            true
+        );
     }
 
     #[test]
@@ -171,7 +176,9 @@ mod tests {
         assert!(parser.parse(r#"{"tool":"t","args":{}}"#).is_some());
 
         // Extra spaces
-        assert!(parser.parse(r#"{  "tool"  :  "t"  ,  "args"  :  {}  }"#).is_some());
+        assert!(parser
+            .parse(r#"{  "tool"  :  "t"  ,  "args"  :  {}  }"#)
+            .is_some());
 
         // Multiline
         let multiline = "{\n  \"tool\": \"t\",\n  \"args\": {}\n}";

@@ -3,8 +3,8 @@
 //! Structs representing GitHub issue data as returned by gh CLI.
 //! These types mirror the JSON structure from `gh issue list --json`.
 
-use serde::{Deserialize, Serialize};
 use super::common::{Label, Milestone, User};
+use serde::{Deserialize, Serialize};
 
 /// Represents a GitHub issue
 ///

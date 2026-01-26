@@ -151,6 +151,17 @@ export OLLAMA_MODEL=llama3.1:8b
 - [Monitoring](docs/monitoring.md) - Repository monitoring setup
 - [Architecture](docs/ARCHITECTURE.md) - System design and components
 
+## Development
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for running the full stack with binks-chat frontend.
+
+Quick start:
+```bash
+export OLLAMA_URL=http://192.168.1.4:11434
+cargo run --release --bin agent -- web  # Backend on :3001
+# In another terminal: cd ~/dev/bnb/platform && pnpm dev --filter=binks-chat
+```
+
 ## Adding New MCP Servers
 
 1. Create a new Rust project in `mcps/`

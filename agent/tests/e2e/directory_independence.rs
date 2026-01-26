@@ -171,7 +171,7 @@ fn test_verbose_double_shows_debug() {
         output.status.success()
             || stderr.contains("DEBUG")
             || stderr.contains("debug")
-            || stderr.len() > 0,
+            || !stderr.is_empty(),
         "With -vv, should enable DEBUG level or succeed"
     );
 }

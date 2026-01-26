@@ -40,10 +40,8 @@ impl SlashCommand for ToolsCommand {
                         ctx.output.write(OutputEvent::Text(output));
                     }
                     Err(e) => {
-                        ctx.output.write(OutputEvent::Error(format!(
-                            "Error listing tools: {}",
-                            e
-                        )));
+                        ctx.output
+                            .write(OutputEvent::Error(format!("Error listing tools: {}", e)));
                     }
                 }
             }
@@ -62,10 +60,8 @@ impl SlashCommand for ToolsCommand {
                         ctx.output.write(OutputEvent::Text(output));
                     }
                     Err(e) => {
-                        ctx.output.write(OutputEvent::Error(format!(
-                            "Error listing servers: {}",
-                            e
-                        )));
+                        ctx.output
+                            .write(OutputEvent::Error(format!("Error listing servers: {}", e)));
                     }
                 }
             }

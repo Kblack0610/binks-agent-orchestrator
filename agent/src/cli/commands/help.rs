@@ -36,7 +36,14 @@ impl SlashCommand for HelpCommand {
             let alias_str = if aliases.is_empty() {
                 String::new()
             } else {
-                format!(" ({})", aliases.iter().map(|a| format!("/{}", a)).collect::<Vec<_>>().join(", "))
+                format!(
+                    " ({})",
+                    aliases
+                        .iter()
+                        .map(|a| format!("/{}", a))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             };
 
             help_text.push_str(&format!(

@@ -102,7 +102,9 @@ mod tests {
         assert!(parser.parse(r#"{"parameters": {}}"#).is_none());
 
         // Wrong format (standard format)
-        assert!(parser.parse(r#"{"name": "test", "arguments": {}}"#).is_none());
+        assert!(parser
+            .parse(r#"{"name": "test", "arguments": {}}"#)
+            .is_none());
     }
 
     // ============== Edge Case Tests ==============
@@ -174,10 +176,14 @@ mod tests {
         let parser = FunctionParamsParser;
 
         // Compact
-        assert!(parser.parse(r#"{"function":"f","parameters":{}}"#).is_some());
+        assert!(parser
+            .parse(r#"{"function":"f","parameters":{}}"#)
+            .is_some());
 
         // Spaced
-        assert!(parser.parse(r#"{  "function" : "f" , "parameters" : {} }"#).is_some());
+        assert!(parser
+            .parse(r#"{  "function" : "f" , "parameters" : {} }"#)
+            .is_some());
 
         // With newlines and tabs
         let content = "{\n\t\"function\": \"f\",\n\t\"parameters\": {}\n}";
@@ -189,11 +195,17 @@ mod tests {
         let parser = FunctionParamsParser;
         let long_name = "func_".to_string() + &"x".repeat(200);
         let long_value = "v".repeat(5000);
-        let content = format!(r#"{{"function": "{}", "parameters": {{"data": "{}"}}}}"#, long_name, long_value);
+        let content = format!(
+            r#"{{"function": "{}", "parameters": {{"data": "{}"}}}}"#,
+            long_name, long_value
+        );
 
         let result = parser.parse(&content).unwrap();
         assert!(result.function.name.len() > 200);
-        assert_eq!(result.function.arguments["data"].as_str().unwrap().len(), 5000);
+        assert_eq!(
+            result.function.arguments["data"].as_str().unwrap().len(),
+            5000
+        );
     }
 
     #[test]
@@ -208,7 +220,8 @@ mod tests {
     #[test]
     fn test_parse_mcp_style_function_name() {
         let parser = FunctionParamsParser;
-        let content = r#"{"function": "mcp__kubernetes__pods_list", "parameters": {"namespace": "default"}}"#;
+        let content =
+            r#"{"function": "mcp__kubernetes__pods_list", "parameters": {"namespace": "default"}}"#;
 
         let result = parser.parse(content).unwrap();
         assert_eq!(result.function.name, "mcp__kubernetes__pods_list");

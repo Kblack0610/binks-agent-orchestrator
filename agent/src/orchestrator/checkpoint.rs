@@ -98,9 +98,7 @@ impl Checkpoint {
                 }
                 CheckpointResult::Edit(edits.join(""))
             }
-            s if s.starts_with("note ") => {
-                CheckpointResult::ApprovedWithNote(s[5..].to_string())
-            }
+            s if s.starts_with("note ") => CheckpointResult::ApprovedWithNote(s[5..].to_string()),
             _ => {
                 println!("Invalid input, treating as rejection for safety.");
                 CheckpointResult::Rejected
@@ -117,7 +115,10 @@ impl Checkpoint {
         if let Some(content) = &self.content {
             println!("\n{}", content);
         }
-        println!("\n[Checkpoint: {}] Auto-approved (non-interactive mode)", self.message);
+        println!(
+            "\n[Checkpoint: {}] Auto-approved (non-interactive mode)",
+            self.message
+        );
         CheckpointResult::Approved
     }
 }
@@ -151,7 +152,10 @@ pub struct RejectCheckpointHandler;
 
 impl CheckpointHandler for RejectCheckpointHandler {
     fn handle(&self, checkpoint: &Checkpoint) -> CheckpointResult {
-        println!("\n[Checkpoint: {}] Auto-rejected (testing mode)", checkpoint.message);
+        println!(
+            "\n[Checkpoint: {}] Auto-rejected (testing mode)",
+            checkpoint.message
+        );
         CheckpointResult::Rejected
     }
 }
@@ -162,8 +166,7 @@ mod tests {
 
     #[test]
     fn test_checkpoint_creation() {
-        let checkpoint = Checkpoint::new("Approve plan?")
-            .with_content("Here is the plan...");
+        let checkpoint = Checkpoint::new("Approve plan?").with_content("Here is the plan...");
 
         assert_eq!(checkpoint.message, "Approve plan?");
         assert_eq!(checkpoint.content, Some("Here is the plan...".to_string()));

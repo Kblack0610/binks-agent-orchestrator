@@ -12,9 +12,9 @@ use rmcp::model::CallToolResult;
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::config::{McpConfig, McpServerConfig};
 use super::spawn::McpClient;
 use super::types::McpTool;
+use crate::config::{McpConfig, McpServerConfig};
 
 // =============================================================================
 // Request Types
@@ -146,7 +146,12 @@ impl ManagedConnection {
         Ok(tools)
     }
 
-    async fn call_tool(&mut self, name: &str, tool_name: &str, arguments: Option<Value>) -> Result<CallToolResult> {
+    async fn call_tool(
+        &mut self,
+        name: &str,
+        tool_name: &str,
+        arguments: Option<Value>,
+    ) -> Result<CallToolResult> {
         self.touch();
         McpClient::call_tool(name, &self.config, tool_name, arguments).await
     }

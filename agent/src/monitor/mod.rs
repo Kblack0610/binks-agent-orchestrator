@@ -51,7 +51,10 @@ impl Monitor {
     /// Run a single monitoring cycle
     pub async fn run_once(&mut self) -> Result<()> {
         let now = Local::now();
-        println!("[{}] Starting monitor cycle...", now.format("%Y-%m-%d %H:%M:%S"));
+        println!(
+            "[{}] Starting monitor cycle...",
+            now.format("%Y-%m-%d %H:%M:%S")
+        );
 
         // 1. Poll GitHub for each configured repo
         for repo in &self.config.repos.clone() {
@@ -61,7 +64,8 @@ impl Monitor {
                     if !summary.is_empty() {
                         println!("    {}", summary);
                         // Write to inbox
-                        self.write_to_inbox(&format!("Repo check: {}\n{}", repo, summary)).await?;
+                        self.write_to_inbox(&format!("Repo check: {}\n{}", repo, summary))
+                            .await?;
                     } else {
                         println!("    No actionable items");
                     }
@@ -76,15 +80,22 @@ impl Monitor {
         self.write_to_inbox(&format!(
             "Monitor cycle completed. Checked {} repos.",
             self.config.repos.len()
-        )).await?;
+        ))
+        .await?;
 
-        println!("[{}] Monitor cycle complete", Local::now().format("%Y-%m-%d %H:%M:%S"));
+        println!(
+            "[{}] Monitor cycle complete",
+            Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
         Ok(())
     }
 
     /// Run the monitor in a continuous loop
     pub async fn run_loop(&mut self) -> Result<()> {
-        println!("Starting continuous monitor (interval: {}s)", self.config.interval);
+        println!(
+            "Starting continuous monitor (interval: {}s)",
+            self.config.interval
+        );
         println!("Press Ctrl+C to stop\n");
 
         loop {
@@ -140,7 +151,8 @@ impl Monitor {
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text.text) {
                             if let Some(arr) = parsed.as_array() {
                                 for item in arr {
-                                    if let Some(title) = item.get("title").and_then(|t| t.as_str()) {
+                                    if let Some(title) = item.get("title").and_then(|t| t.as_str())
+                                    {
                                         issues.push(title.to_string());
                                     }
                                 }
@@ -173,7 +185,8 @@ impl Monitor {
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text.text) {
                             if let Some(arr) = parsed.as_array() {
                                 for item in arr {
-                                    if let Some(title) = item.get("title").and_then(|t| t.as_str()) {
+                                    if let Some(title) = item.get("title").and_then(|t| t.as_str())
+                                    {
                                         prs.push(title.to_string());
                                     }
                                 }
@@ -207,12 +220,16 @@ impl Monitor {
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text.text) {
                             if let Some(arr) = parsed.as_array() {
                                 for item in arr {
-                                    if let Some(conclusion) = item.get("conclusion").and_then(|c| c.as_str()) {
+                                    if let Some(conclusion) =
+                                        item.get("conclusion").and_then(|c| c.as_str())
+                                    {
                                         if conclusion == "failure" {
                                             failed_count += 1;
                                         }
                                     }
-                                    if let Some(status) = item.get("status").and_then(|s| s.as_str()) {
+                                    if let Some(status) =
+                                        item.get("status").and_then(|s| s.as_str())
+                                    {
                                         if status == "in_progress" || status == "queued" {
                                             in_progress_count += 1;
                                         }
@@ -276,7 +293,11 @@ impl Monitor {
         let discord_args = serde_json::json!({
             "content": message,
         });
-        if let Err(e) = self.pool.call_tool("send_discord", Some(discord_args)).await {
+        if let Err(e) = self
+            .pool
+            .call_tool("send_discord", Some(discord_args))
+            .await
+        {
             tracing::debug!("Discord notification failed (may not be configured): {}", e);
         }
 

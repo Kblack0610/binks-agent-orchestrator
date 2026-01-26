@@ -5,8 +5,8 @@ use rmcp::ErrorData as McpError;
 
 use crate::gh::{execute_gh_action, execute_gh_json, execute_gh_raw};
 use crate::params::{
-    IssueCloseParams, IssueCommentParams, IssueCreateParams, IssueDeleteParams,
-    IssueEditParams, IssueListParams, IssueStatusParams, IssueViewParams,
+    IssueCloseParams, IssueCommentParams, IssueCreateParams, IssueDeleteParams, IssueEditParams,
+    IssueListParams, IssueStatusParams, IssueViewParams,
 };
 use crate::types::Issue;
 
@@ -157,9 +157,13 @@ pub async fn issue_close(params: IssueCloseParams) -> Result<CallToolResult, Mcp
 pub async fn issue_comment(params: IssueCommentParams) -> Result<CallToolResult, McpError> {
     let number_str = params.number.to_string();
     let args = vec![
-        "issue", "comment", &number_str,
-        "-R", &params.repo,
-        "-b", &params.body,
+        "issue",
+        "comment",
+        &number_str,
+        "-R",
+        &params.repo,
+        "-b",
+        &params.body,
     ];
 
     let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;

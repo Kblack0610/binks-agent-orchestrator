@@ -79,21 +79,33 @@ fn test_prerequisites() {
     println!(
         "Ollama ({}): {}",
         ollama_url(),
-        if ollama_ok { "✓ Running" } else { "✗ Not accessible" }
+        if ollama_ok {
+            "✓ Running"
+        } else {
+            "✗ Not accessible"
+        }
     );
 
     // Check binaries
     let binaries_ok = check_binaries_built();
     println!(
         "Workspace binaries: {}",
-        if binaries_ok { "✓ Built" } else { "✗ Not found (run: cargo build --workspace)" }
+        if binaries_ok {
+            "✓ Built"
+        } else {
+            "✗ Not found (run: cargo build --workspace)"
+        }
     );
 
     // Check config
     let config_ok = check_mcp_config();
     println!(
         ".mcp.json config: {}",
-        if config_ok { "✓ Found" } else { "✗ Not found" }
+        if config_ok {
+            "✓ Found"
+        } else {
+            "✗ Not found"
+        }
     );
 
     println!();

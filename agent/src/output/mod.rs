@@ -6,11 +6,11 @@
 
 use std::time::Duration;
 
-mod terminal;
 mod plain;
+mod terminal;
 
-pub use terminal::TerminalOutput;
 pub use plain::PlainOutput;
+pub use terminal::TerminalOutput;
 
 // ============================================================================
 // Output Events
@@ -43,10 +43,7 @@ pub enum OutputEvent {
     Token(String),
 
     /// Progress indicator
-    Progress {
-        message: String,
-        done: bool,
-    },
+    Progress { message: String, done: bool },
 
     /// Status message (informational)
     Status(String),
@@ -131,7 +128,12 @@ mod tests {
     impl MockOutput {
         fn new() -> (Self, Arc<Mutex<Vec<OutputEvent>>>) {
             let events = Arc::new(Mutex::new(Vec::new()));
-            (Self { events: events.clone() }, events)
+            (
+                Self {
+                    events: events.clone(),
+                },
+                events,
+            )
         }
     }
 

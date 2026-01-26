@@ -46,8 +46,8 @@ use serde::Serialize;
 /// }
 /// ```
 pub fn json_success<T: Serialize>(data: &T) -> Result<CallToolResult, McpError> {
-    let json =
-        serde_json::to_string_pretty(data).map_err(|e| McpError::internal_error(e.to_string(), None))?;
+    let json = serde_json::to_string_pretty(data)
+        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
 

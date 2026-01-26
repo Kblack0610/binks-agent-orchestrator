@@ -108,15 +108,14 @@ impl Workflow {
 
     /// Load workflow from TOML file
     pub fn from_toml_file(path: &Path) -> Result<Self, WorkflowError> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| WorkflowError::IoError(e.to_string()))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| WorkflowError::IoError(e.to_string()))?;
         Self::from_toml(&content)
     }
 
     /// Load workflow from TOML string
     pub fn from_toml(toml_str: &str) -> Result<Self, WorkflowError> {
-        toml::from_str(toml_str)
-            .map_err(|e| WorkflowError::ParseError(e.to_string()))
+        toml::from_str(toml_str).map_err(|e| WorkflowError::ParseError(e.to_string()))
     }
 }
 
@@ -201,8 +200,14 @@ pub fn builtin_workflows() -> HashMap<String, Workflow> {
                 message: "Review the plan above. Proceed with implementation?".to_string(),
                 show: Some("plan".to_string()),
             })
-            .with_step(WorkflowStep::agent("implementer", "Implement based on plan:\n\n{plan}"))
-            .with_step(WorkflowStep::agent("reviewer", "Review the changes:\n\n{changes}")),
+            .with_step(WorkflowStep::agent(
+                "implementer",
+                "Implement based on plan:\n\n{plan}",
+            ))
+            .with_step(WorkflowStep::agent(
+                "reviewer",
+                "Review the changes:\n\n{changes}",
+            )),
     );
 
     // Fix Bug workflow
@@ -215,7 +220,10 @@ pub fn builtin_workflows() -> HashMap<String, Workflow> {
                 message: "Review the investigation. Proceed with fix?".to_string(),
                 show: Some("investigation".to_string()),
             })
-            .with_step(WorkflowStep::agent("implementer", "Fix based on investigation:\n\n{investigation}"))
+            .with_step(WorkflowStep::agent(
+                "implementer",
+                "Fix based on investigation:\n\n{investigation}",
+            ))
             .with_step(WorkflowStep::agent("tester", "Test the fix:\n\n{changes}")),
     );
 
@@ -229,8 +237,14 @@ pub fn builtin_workflows() -> HashMap<String, Workflow> {
                 message: "Review the refactoring plan. Proceed?".to_string(),
                 show: Some("plan".to_string()),
             })
-            .with_step(WorkflowStep::agent("implementer", "Execute refactoring:\n\n{plan}"))
-            .with_step(WorkflowStep::agent("reviewer", "Review refactoring:\n\n{changes}")),
+            .with_step(WorkflowStep::agent(
+                "implementer",
+                "Execute refactoring:\n\n{plan}",
+            ))
+            .with_step(WorkflowStep::agent(
+                "reviewer",
+                "Review refactoring:\n\n{changes}",
+            )),
     );
 
     // Quick Fix workflow (no checkpoint)
@@ -238,8 +252,14 @@ pub fn builtin_workflows() -> HashMap<String, Workflow> {
         "quick-fix".to_string(),
         Workflow::new("quick-fix")
             .with_description("Quick fix without planning - for simple changes")
-            .with_step(WorkflowStep::agent("implementer", "Make this change: {task}"))
-            .with_step(WorkflowStep::agent("tester", "Verify the change:\n\n{changes}")),
+            .with_step(WorkflowStep::agent(
+                "implementer",
+                "Make this change: {task}",
+            ))
+            .with_step(WorkflowStep::agent(
+                "tester",
+                "Verify the change:\n\n{changes}",
+            )),
     );
 
     workflows
@@ -253,8 +273,7 @@ pub fn load_custom_workflows(dir: &Path) -> Result<HashMap<String, Workflow>, Wo
         return Ok(workflows);
     }
 
-    let entries = std::fs::read_dir(dir)
-        .map_err(|e| WorkflowError::IoError(e.to_string()))?;
+    let entries = std::fs::read_dir(dir).map_err(|e| WorkflowError::IoError(e.to_string()))?;
 
     for entry in entries.flatten() {
         let path = entry.path();

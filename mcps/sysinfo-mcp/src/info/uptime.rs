@@ -28,7 +28,11 @@ fn format_uptime(seconds: u64) -> String {
         parts.push(format!("{} day{}", days, if days == 1 { "" } else { "s" }));
     }
     if hours > 0 {
-        parts.push(format!("{} hour{}", hours, if hours == 1 { "" } else { "s" }));
+        parts.push(format!(
+            "{} hour{}",
+            hours,
+            if hours == 1 { "" } else { "s" }
+        ));
     }
     if minutes > 0 {
         parts.push(format!(
@@ -38,7 +42,11 @@ fn format_uptime(seconds: u64) -> String {
         ));
     }
     if secs > 0 || parts.is_empty() {
-        parts.push(format!("{} second{}", secs, if secs == 1 { "" } else { "s" }));
+        parts.push(format!(
+            "{} second{}",
+            secs,
+            if secs == 1 { "" } else { "s" }
+        ));
     }
 
     parts.join(", ")

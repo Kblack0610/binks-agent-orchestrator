@@ -2,8 +2,8 @@
 //!
 //! Structs representing GitHub pull request data as returned by gh CLI.
 
-use serde::{Deserialize, Serialize};
 use super::common::{Label, Milestone, User};
+use serde::{Deserialize, Serialize};
 
 /// Represents a GitHub pull request
 #[derive(Debug, Clone, Serialize, Deserialize)]

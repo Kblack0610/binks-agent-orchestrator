@@ -57,9 +57,11 @@ impl DaemonClient {
 
     /// List tools from a specific server
     pub async fn list_tools(&self, server: &str) -> Result<Vec<ToolInfo>> {
-        let response = self.send_request(DaemonRequest::ListTools {
-            server: server.to_string(),
-        }).await?;
+        let response = self
+            .send_request(DaemonRequest::ListTools {
+                server: server.to_string(),
+            })
+            .await?;
         match response {
             DaemonResponse::Tools { tools } => Ok(tools),
             DaemonResponse::Error { message } => anyhow::bail!("{}", message),
@@ -84,11 +86,13 @@ impl DaemonClient {
         tool: &str,
         arguments: Option<serde_json::Value>,
     ) -> Result<ToolCallResult> {
-        let response = self.send_request(DaemonRequest::CallTool {
-            server: server.to_string(),
-            tool: tool.to_string(),
-            arguments,
-        }).await?;
+        let response = self
+            .send_request(DaemonRequest::CallTool {
+                server: server.to_string(),
+                tool: tool.to_string(),
+                arguments,
+            })
+            .await?;
         match response {
             DaemonResponse::ToolResult { result } => Ok(result),
             DaemonResponse::Error { message } => anyhow::bail!("{}", message),
@@ -98,9 +102,11 @@ impl DaemonClient {
 
     /// Refresh a specific server
     pub async fn refresh_server(&self, server: &str) -> Result<()> {
-        let response = self.send_request(DaemonRequest::RefreshServer {
-            server: server.to_string(),
-        }).await?;
+        let response = self
+            .send_request(DaemonRequest::RefreshServer {
+                server: server.to_string(),
+            })
+            .await?;
         match response {
             DaemonResponse::Ok => Ok(()),
             DaemonResponse::Error { message } => anyhow::bail!("{}", message),
@@ -130,8 +136,12 @@ impl DaemonClient {
 
     /// Send a request to the daemon and get a response
     async fn send_request(&self, request: DaemonRequest) -> Result<DaemonResponse> {
-        let stream = UnixStream::connect(&self.socket_path).await
-            .context(format!("Failed to connect to daemon at {:?}", self.socket_path))?;
+        let stream = UnixStream::connect(&self.socket_path)
+            .await
+            .context(format!(
+                "Failed to connect to daemon at {:?}",
+                self.socket_path
+            ))?;
 
         let (reader, mut writer) = stream.into_split();
         let mut reader = BufReader::new(reader);
@@ -146,8 +156,8 @@ impl DaemonClient {
         let mut line = String::new();
         reader.read_line(&mut line).await?;
 
-        let response: DaemonResponse = serde_json::from_str(&line)
-            .context("Failed to parse daemon response")?;
+        let response: DaemonResponse =
+            serde_json::from_str(&line).context("Failed to parse daemon response")?;
 
         Ok(response)
     }

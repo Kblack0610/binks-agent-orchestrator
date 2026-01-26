@@ -94,7 +94,9 @@ impl GitHubMcpServer {
         handlers::issue_delete(params).await
     }
 
-    #[tool(description = "Show status of issues relevant to you - assigned, mentioned, created by you")]
+    #[tool(
+        description = "Show status of issues relevant to you - assigned, mentioned, created by you"
+    )]
     async fn gh_issue_status(
         &self,
         Parameters(params): Parameters<IssueStatusParams>,
@@ -162,7 +164,9 @@ impl GitHubMcpServer {
         handlers::pr_comment(params).await
     }
 
-    #[tool(description = "Show status of your PRs in a repository - open PRs, checks failing, approved, needs review")]
+    #[tool(
+        description = "Show status of your PRs in a repository - open PRs, checks failing, approved, needs review"
+    )]
     async fn gh_pr_status(
         &self,
         Parameters(params): Parameters<PrStatusParams>,
@@ -170,7 +174,9 @@ impl GitHubMcpServer {
         handlers::pr_status(params).await
     }
 
-    #[tool(description = "Submit a review on a pull request - approve, request-changes, or comment")]
+    #[tool(
+        description = "Submit a review on a pull request - approve, request-changes, or comment"
+    )]
     async fn gh_pr_review(
         &self,
         Parameters(params): Parameters<PrReviewParams>,
@@ -278,7 +284,9 @@ impl GitHubMcpServer {
     // Search Tools
     // ========================================================================
 
-    #[tool(description = "Show status of relevant issues, PRs, and notifications across all repositories. Shows mentions, review requests, and assigned items.")]
+    #[tool(
+        description = "Show status of relevant issues, PRs, and notifications across all repositories. Shows mentions, review requests, and assigned items."
+    )]
     async fn gh_status(
         &self,
         Parameters(params): Parameters<StatusParams>,
@@ -330,7 +338,9 @@ impl GitHubMcpServer {
         handlers::release_list(params).await
     }
 
-    #[tool(description = "View release details including changelog and assets. Use 'latest' for the most recent release.")]
+    #[tool(
+        description = "View release details including changelog and assets. Use 'latest' for the most recent release."
+    )]
     async fn gh_release_view(
         &self,
         Parameters(params): Parameters<ReleaseViewParams>,

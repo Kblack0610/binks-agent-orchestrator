@@ -72,9 +72,7 @@ impl FilesystemMcpServer {
         handlers::list_dir(&self.sandbox, &self.config, params).await
     }
 
-    #[tool(
-        description = "Search for files matching a glob pattern. Returns matching file paths."
-    )]
+    #[tool(description = "Search for files matching a glob pattern. Returns matching file paths.")]
     async fn search_files(
         &self,
         Parameters(params): Parameters<SearchFilesParams>,
@@ -112,7 +110,9 @@ impl FilesystemMcpServer {
         handlers::delete_file(&self.sandbox, params).await
     }
 
-    #[tool(description = "Create a directory. Uses recursive=true by default to create parent directories.")]
+    #[tool(
+        description = "Create a directory. Uses recursive=true by default to create parent directories."
+    )]
     async fn create_directory(
         &self,
         Parameters(params): Parameters<CreateDirParams>,
@@ -120,7 +120,9 @@ impl FilesystemMcpServer {
         handlers::create_directory(&self.sandbox, params).await
     }
 
-    #[tool(description = "List allowed directories that this server can access for reading and writing.")]
+    #[tool(
+        description = "List allowed directories that this server can access for reading and writing."
+    )]
     async fn list_allowed_directories(&self) -> Result<CallToolResult, McpError> {
         handlers::list_allowed_directories(&self.sandbox).await
     }

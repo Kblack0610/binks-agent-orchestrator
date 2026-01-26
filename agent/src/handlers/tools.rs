@@ -63,8 +63,7 @@ pub async fn run_tools(server_filter: Option<String>) -> Result<()> {
 
 /// Handle the `call` command - call a tool directly
 pub async fn run_call_tool(tool_name: &str, args: Option<String>) -> Result<()> {
-    let mut pool =
-        McpClientPool::load()?.ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
+    let mut pool = McpClientPool::load()?.ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
 
     let arguments = match args {
         Some(json) => Some(serde_json::from_str(&json)?),

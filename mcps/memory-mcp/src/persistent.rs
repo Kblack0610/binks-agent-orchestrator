@@ -108,7 +108,11 @@ impl PersistentMemory {
     // ========================================================================
 
     /// Create or get an entity by name
-    pub async fn get_or_create_entity(&self, name: &str, entity_type: &str) -> SqliteResult<Entity> {
+    pub async fn get_or_create_entity(
+        &self,
+        name: &str,
+        entity_type: &str,
+    ) -> SqliteResult<Entity> {
         let conn = self.conn.lock().await;
         let now = Utc::now().to_rfc3339();
 
@@ -154,6 +158,7 @@ impl PersistentMemory {
     }
 
     /// Get an entity by name
+    #[allow(dead_code)]
     pub async fn get_entity(&self, name: &str) -> SqliteResult<Option<Entity>> {
         let conn = self.conn.lock().await;
 
@@ -348,20 +353,21 @@ impl PersistentMemory {
                 "SELECT id, name, entity_type, created_at, updated_at FROM entities WHERE name LIKE ?1 ORDER BY updated_at DESC LIMIT 100",
             )?;
 
-            let result = stmt.query_map(params![sql_pattern], |row| {
-                Ok(Entity {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    entity_type: row.get(2)?,
-                    created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(3)?)
-                        .map(|dt| dt.with_timezone(&Utc))
-                        .unwrap_or_else(|_| Utc::now()),
-                    updated_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(4)?)
-                        .map(|dt| dt.with_timezone(&Utc))
-                        .unwrap_or_else(|_| Utc::now()),
-                })
-            })?
-            .collect::<SqliteResult<Vec<_>>>()?;
+            let result = stmt
+                .query_map(params![sql_pattern], |row| {
+                    Ok(Entity {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        entity_type: row.get(2)?,
+                        created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(3)?)
+                            .map(|dt| dt.with_timezone(&Utc))
+                            .unwrap_or_else(|_| Utc::now()),
+                        updated_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(4)?)
+                            .map(|dt| dt.with_timezone(&Utc))
+                            .unwrap_or_else(|_| Utc::now()),
+                    })
+                })?
+                .collect::<SqliteResult<Vec<_>>>()?;
             result
             // stmt and conn dropped at end of this block
         };
@@ -377,6 +383,7 @@ impl PersistentMemory {
     }
 
     /// Get all relations between entities matching a pattern
+    #[allow(dead_code)]
     pub async fn query_relations(&self, entity_pattern: &str) -> SqliteResult<Vec<Relation>> {
         let conn = self.conn.lock().await;
         let sql_pattern = entity_pattern.replace('*', "%");
@@ -444,6 +451,7 @@ impl PersistentMemory {
     }
 
     /// Get recent summaries
+    #[allow(dead_code)]
     pub async fn get_recent_summaries(&self, limit: usize) -> SqliteResult<Vec<Summary>> {
         let conn = self.conn.lock().await;
         let mut stmt = conn.prepare(
@@ -501,16 +509,25 @@ mod tests {
         let memory = PersistentMemory::new(db_path).unwrap();
 
         // Create entity
-        let entity = memory.get_or_create_entity("test:project", "project").await.unwrap();
+        let entity = memory
+            .get_or_create_entity("test:project", "project")
+            .await
+            .unwrap();
         assert_eq!(entity.name, "test:project");
         assert_eq!(entity.entity_type, "project");
 
         // Get same entity again
-        let entity2 = memory.get_or_create_entity("test:project", "project").await.unwrap();
+        let entity2 = memory
+            .get_or_create_entity("test:project", "project")
+            .await
+            .unwrap();
         assert_eq!(entity.id, entity2.id);
 
         // Add fact
-        let fact = memory.add_fact(&entity.id, "language", "Rust", "user", 1.0).await.unwrap();
+        let fact = memory
+            .add_fact(&entity.id, "language", "Rust", "user", 1.0)
+            .await
+            .unwrap();
         assert_eq!(fact.key, "language");
 
         // Query

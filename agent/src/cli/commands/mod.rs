@@ -225,10 +225,7 @@ mod tests {
 
     #[test]
     fn test_parse_command() {
-        assert_eq!(
-            CommandRegistry::parse_command("/help"),
-            Some(("help", ""))
-        );
+        assert_eq!(CommandRegistry::parse_command("/help"), Some(("help", "")));
         assert_eq!(
             CommandRegistry::parse_command("/models list"),
             Some(("models", "list"))

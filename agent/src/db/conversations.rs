@@ -38,8 +38,13 @@ impl Database {
     pub fn create_conversation(&self, params: CreateConversation) -> Result<Conversation> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now();
-        let title = params.title.unwrap_or_else(|| "New Conversation".to_string());
-        let metadata_json = params.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+        let title = params
+            .title
+            .unwrap_or_else(|| "New Conversation".to_string());
+        let metadata_json = params
+            .metadata
+            .as_ref()
+            .map(|m| serde_json::to_string(m).unwrap());
 
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -106,7 +111,11 @@ impl Database {
     }
 
     /// List all conversations, ordered by most recently updated
-    pub fn list_conversations(&self, limit: Option<u32>, offset: Option<u32>) -> Result<Vec<Conversation>> {
+    pub fn list_conversations(
+        &self,
+        limit: Option<u32>,
+        offset: Option<u32>,
+    ) -> Result<Vec<Conversation>> {
         let conn = self.conn.lock().unwrap();
         let limit = limit.unwrap_or(50);
         let offset = offset.unwrap_or(0);
@@ -145,9 +154,16 @@ impl Database {
     }
 
     /// Update a conversation
-    pub fn update_conversation(&self, id: &str, params: UpdateConversation) -> Result<Option<Conversation>> {
+    pub fn update_conversation(
+        &self,
+        id: &str,
+        params: UpdateConversation,
+    ) -> Result<Option<Conversation>> {
         let now = Utc::now();
-        let metadata_json = params.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+        let metadata_json = params
+            .metadata
+            .as_ref()
+            .map(|m| serde_json::to_string(m).unwrap());
 
         let conn = self.conn.lock().unwrap();
 

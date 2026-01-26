@@ -78,7 +78,10 @@ impl SysInfoMcpServer {
     ) -> Result<CallToolResult, McpError> {
         let mut sys = self.system.lock().await;
         sys.refresh_cpu_all();
-        json_success(&info::cpu::get_cpu_info(&sys, params.include_per_core.unwrap_or(false)))
+        json_success(&info::cpu::get_cpu_info(
+            &sys,
+            params.include_per_core.unwrap_or(false),
+        ))
     }
 
     #[tool(description = "Get current CPU usage percentage (global and optionally per-core)")]
@@ -90,7 +93,10 @@ impl SysInfoMcpServer {
         sys.refresh_cpu_usage();
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         sys.refresh_cpu_usage();
-        json_success(&info::cpu::get_cpu_usage(&sys, params.per_core.unwrap_or(false)))
+        json_success(&info::cpu::get_cpu_usage(
+            &sys,
+            params.per_core.unwrap_or(false),
+        ))
     }
 
     #[tool(
@@ -119,7 +125,9 @@ impl SysInfoMcpServer {
         &self,
         Parameters(params): Parameters<NetworkParams>,
     ) -> Result<CallToolResult, McpError> {
-        json_success(&info::network::get_network_interfaces(params.interface.as_deref()))
+        json_success(&info::network::get_network_interfaces(
+            params.interface.as_deref(),
+        ))
     }
 
     #[tool(

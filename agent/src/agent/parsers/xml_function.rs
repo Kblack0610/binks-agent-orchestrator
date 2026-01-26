@@ -186,14 +186,14 @@ Let me know if you need anything else."#;
         let content = r#"<function=set_config>
 <parameter=value>42</parameter>
 <parameter=enabled>true</parameter>
-<parameter=ratio>3.14</parameter>
+<parameter=ratio>3.15</parameter>
 </function>"#;
 
         let result = parser.parse(content).unwrap();
         // These should be parsed as JSON values
         assert_eq!(result.function.arguments["value"], 42);
         assert_eq!(result.function.arguments["enabled"], true);
-        assert_eq!(result.function.arguments["ratio"], 3.14);
+        assert_eq!(result.function.arguments["ratio"], 3.15);
     }
 
     #[test]
@@ -258,7 +258,8 @@ Let me know if you need anything else."#;
     fn test_parse_same_line_format() {
         let parser = XmlFunctionParser::new();
         // Some models might output on single line
-        let content = r#"<function=test><parameter=a>1</parameter><parameter=b>2</parameter></function>"#;
+        let content =
+            r#"<function=test><parameter=a>1</parameter><parameter=b>2</parameter></function>"#;
 
         let result = parser.parse(content).unwrap();
         assert_eq!(result.function.name, "test");
@@ -289,7 +290,10 @@ Let me know if you need anything else."#;
 </function>"#;
 
         let result = parser.parse(content).unwrap();
-        assert_eq!(result.function.arguments["path"], "/home/user/documents/file.txt");
+        assert_eq!(
+            result.function.arguments["path"],
+            "/home/user/documents/file.txt"
+        );
     }
 
     #[test]
@@ -301,7 +305,10 @@ Let me know if you need anything else."#;
 
         let result = parser.parse(content).unwrap();
         // Note: & in XML should ideally be &amp; but we handle it gracefully
-        assert!(result.function.arguments["url"].as_str().unwrap().starts_with("https://"));
+        assert!(result.function.arguments["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("https://"));
     }
 
     #[test]

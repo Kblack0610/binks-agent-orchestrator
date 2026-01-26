@@ -78,12 +78,7 @@ impl SearchBackend for SearXNGBackend {
             params.push(("engines", self.config.engines.clone()));
         }
 
-        let response = self
-            .client
-            .get(&url)
-            .query(&params)
-            .send()
-            .await?;
+        let response = self.client.get(&url).query(&params).send().await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -204,10 +199,7 @@ impl SearchBackend for SearXNGBackend {
                         .and_then(|f| {
                             let parts: Vec<&str> = f.split('x').collect();
                             if parts.len() == 2 {
-                                Some((
-                                    parts[0].parse().ok(),
-                                    parts[1].parse().ok(),
-                                ))
+                                Some((parts[0].parse().ok(), parts[1].parse().ok()))
                             } else {
                                 None
                             }
