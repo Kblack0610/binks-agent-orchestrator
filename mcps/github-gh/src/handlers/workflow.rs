@@ -24,7 +24,7 @@ pub async fn workflow_list(params: WorkflowListParams) -> Result<CallToolResult,
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string_pretty(&workflows)
+    let json = serde_json::to_string(&workflows)
         .map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
@@ -84,7 +84,7 @@ pub async fn run_list(params: RunListParams) -> Result<CallToolResult, McpError>
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string_pretty(&runs)
+    let json = serde_json::to_string(&runs)
         .map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
@@ -98,7 +98,7 @@ pub async fn run_view(params: RunViewParams) -> Result<CallToolResult, McpError>
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string_pretty(&run)
+    let json = serde_json::to_string(&run)
         .map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }

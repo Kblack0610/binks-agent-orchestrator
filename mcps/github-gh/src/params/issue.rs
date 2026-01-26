@@ -15,6 +15,8 @@ pub struct IssueListParams {
     pub label: Option<String>,
     #[schemars(description = "Maximum number of issues to return (default: 30)")]
     pub limit: Option<u32>,
+    #[schemars(description = "Return minimal fields only (number, title, state, author, url)")]
+    pub minimal: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
