@@ -112,6 +112,19 @@ impl PullRequest {
         ]
     }
 
+    /// Returns minimal JSON fields for compact list output
+    pub fn list_fields_minimal() -> &'static [&'static str] {
+        &[
+            "number",
+            "title",
+            "state",
+            "author",
+            "headRefName",
+            "isDraft",
+            "url",
+        ]
+    }
+
     /// Returns the JSON fields to request for detailed view operations
     pub fn view_fields() -> &'static [&'static str] {
         &[

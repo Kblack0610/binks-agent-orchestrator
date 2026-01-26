@@ -78,9 +78,15 @@ impl Issue {
         ]
     }
 
+    /// Returns minimal JSON fields for compact list output
+    pub fn list_fields_minimal() -> &'static [&'static str] {
+        &["number", "title", "state", "author", "url"]
+    }
+
     /// Returns the JSON fields to request for detailed view operations
     ///
     /// Includes body and milestone for complete issue details.
+    /// Note: comments are excluded to reduce context size - use issue_comment tool to fetch separately.
     pub fn view_fields() -> &'static [&'static str] {
         &[
             "number",
@@ -95,7 +101,6 @@ impl Issue {
             "updatedAt",
             "closedAt",
             "url",
-            "comments",
         ]
     }
 }

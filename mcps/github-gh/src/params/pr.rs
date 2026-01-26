@@ -17,6 +17,10 @@ pub struct PrListParams {
     pub label: Option<String>,
     #[schemars(description = "Maximum number of PRs to return")]
     pub limit: Option<u32>,
+    #[schemars(
+        description = "Return minimal fields only (number, title, state, author, headRefName, isDraft, url)"
+    )]
+    pub minimal: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]

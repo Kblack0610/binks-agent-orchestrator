@@ -38,11 +38,16 @@ pub async fn issue_list(params: IssueListParams) -> Result<CallToolResult, McpEr
         args.extend(["-L", &limit_str]);
     }
 
-    let issues: Vec<Issue> = execute_gh_json(&args, Issue::list_fields())
+    let fields = if params.minimal == Some(true) {
+        Issue::list_fields_minimal()
+    } else {
+        Issue::list_fields()
+    };
+    let issues: Vec<Issue> = execute_gh_json(&args, fields)
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string_pretty(&issues)
+    let json = serde_json::to_string(&issues)
         .map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
@@ -56,7 +61,7 @@ pub async fn issue_view(params: IssueViewParams) -> Result<CallToolResult, McpEr
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string_pretty(&issue)
+    let json = serde_json::to_string(&issue)
         .map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
