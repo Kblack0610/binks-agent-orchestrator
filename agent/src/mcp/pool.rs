@@ -43,6 +43,14 @@ impl McpClientPool {
         }
     }
 
+    /// Create an empty pool for testing purposes
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        Self::new(McpConfig {
+            mcp_servers: HashMap::new(),
+        })
+    }
+
     /// Check if daemon is available (with caching)
     async fn check_daemon(&mut self) -> bool {
         if self.daemon_available.is_none() {

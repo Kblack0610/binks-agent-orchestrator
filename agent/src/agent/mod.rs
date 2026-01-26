@@ -7,7 +7,7 @@
 //! 4. If tools are called, results are fed back to LLM
 //! 5. Loop continues until LLM responds without tool calls
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 
@@ -30,8 +30,14 @@ use types::{DirectChatRequest, DirectChatResponse, DirectTool};
 mod tools;
 use tools::mcp_tools_to_direct;
 
-/// Maximum number of tool-calling iterations to prevent infinite loops
-const MAX_ITERATIONS: usize = 10;
+/// Default maximum iterations (used when config not provided)
+const DEFAULT_MAX_ITERATIONS: usize = 10;
+/// Default LLM timeout in seconds (5 minutes)
+const DEFAULT_LLM_TIMEOUT_SECS: u64 = 300;
+/// Default tool timeout in seconds (1 minute)
+const DEFAULT_TOOL_TIMEOUT_SECS: u64 = 60;
+/// Default max history messages
+const DEFAULT_MAX_HISTORY_MESSAGES: usize = 100;
 
 /// An agent that can use tools via MCP
 pub struct Agent {
@@ -44,11 +50,37 @@ pub struct Agent {
     parser_registry: ToolCallParserRegistry,
     verbose: bool,
     event_sender: AgentEventSender,
+    // Stability configuration
+    max_iterations: usize,
+    llm_timeout: Duration,
+    tool_timeout: Duration,
+    max_history_messages: usize,
 }
 
 impl Agent {
-    /// Create a new agent
+    /// Create a new agent with default stability settings
     pub fn new(ollama_url: &str, model: &str, mcp_pool: McpClientPool) -> Self {
+        Self::with_config(
+            ollama_url,
+            model,
+            mcp_pool,
+            DEFAULT_MAX_ITERATIONS,
+            DEFAULT_LLM_TIMEOUT_SECS,
+            DEFAULT_TOOL_TIMEOUT_SECS,
+            DEFAULT_MAX_HISTORY_MESSAGES,
+        )
+    }
+
+    /// Create a new agent with custom stability configuration
+    pub fn with_config(
+        ollama_url: &str,
+        model: &str,
+        mcp_pool: McpClientPool,
+        max_iterations: usize,
+        llm_timeout_secs: u64,
+        tool_timeout_secs: u64,
+        max_history_messages: usize,
+    ) -> Self {
         let url = url::Url::parse(ollama_url)
             .unwrap_or_else(|_| url::Url::parse("http://localhost:11434").unwrap());
 
@@ -56,9 +88,17 @@ impl Agent {
         let port = url.port().unwrap_or(11434);
         let base_url = format!("http://{}:{}", host, port);
 
+        let llm_timeout = Duration::from_secs(llm_timeout_secs);
+
+        // Create HTTP client with configured LLM timeout
+        let http_client = reqwest::Client::builder()
+            .timeout(llm_timeout)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
         Self {
             ollama_url: base_url,
-            http_client: reqwest::Client::new(),
+            http_client,
             model: model.to_string(),
             mcp_pool,
             system_prompt: None,
@@ -66,6 +106,10 @@ impl Agent {
             parser_registry: ToolCallParserRegistry::new(),
             verbose: false,
             event_sender: AgentEventSender::none(),
+            max_iterations,
+            llm_timeout,
+            tool_timeout: Duration::from_secs(tool_timeout_secs),
+            max_history_messages,
         }
     }
 
@@ -157,6 +201,37 @@ impl Agent {
         self.history.clear();
     }
 
+    /// Prune conversation history to stay within max_history_messages limit
+    /// Keeps most recent messages, discarding oldest ones first
+    fn prune_history(&mut self) {
+        if self.history.len() > self.max_history_messages {
+            let excess = self.history.len() - self.max_history_messages;
+            self.history.drain(0..excess);
+            tracing::debug!(
+                "Pruned {} messages from history (now {} messages)",
+                excess,
+                self.history.len()
+            );
+        }
+    }
+
+    /// Get current stability configuration
+    pub fn max_iterations(&self) -> usize {
+        self.max_iterations
+    }
+
+    pub fn llm_timeout(&self) -> Duration {
+        self.llm_timeout
+    }
+
+    pub fn tool_timeout(&self) -> Duration {
+        self.tool_timeout
+    }
+
+    pub fn max_history_messages(&self) -> usize {
+        self.max_history_messages
+    }
+
     /// Get available tool names
     pub async fn tool_names(&mut self) -> Result<Vec<String>> {
         let tools = self.mcp_pool.list_all_tools().await?;
@@ -243,10 +318,10 @@ impl Agent {
         let mut iterations = 0;
         loop {
             iterations += 1;
-            if iterations > MAX_ITERATIONS {
+            if iterations > self.max_iterations {
                 tracing::warn!(
                     "Agent reached max iterations ({}), stopping",
-                    MAX_ITERATIONS
+                    self.max_iterations
                 );
                 break;
             }
@@ -393,6 +468,9 @@ impl Agent {
                     tool_calls: None,
                 });
 
+                // Prune history to stay within limits
+                self.prune_history();
+
                 return Ok(assistant_msg.content);
             }
 
@@ -425,14 +503,25 @@ impl Agent {
                 }
 
                 let tool_start = Instant::now();
-                let (result, is_error) =
-                    match tools::execute_tool_call(&mut self.mcp_pool, tool_call).await {
-                        Ok(r) => (r, false),
-                        Err(e) => (
-                            format!("Error calling tool {}: {}", tool_call.function.name, e),
-                            true,
+                let (result, is_error) = match tokio::time::timeout(
+                    self.tool_timeout,
+                    tools::execute_tool_call(&mut self.mcp_pool, tool_call),
+                )
+                .await
+                {
+                    Ok(Ok(r)) => (r, false),
+                    Ok(Err(e)) => (
+                        format!("Error calling tool {}: {}", tool_call.function.name, e),
+                        true,
+                    ),
+                    Err(_) => (
+                        format!(
+                            "Tool {} timed out after {:?}",
+                            tool_call.function.name, self.tool_timeout
                         ),
-                    };
+                        true,
+                    ),
+                };
                 let tool_elapsed = tool_start.elapsed();
 
                 // Emit tool complete event
@@ -474,7 +563,7 @@ impl Agent {
         // Emit error event for max iterations
         let error_msg = format!(
             "Agent reached maximum iterations ({}) without completing",
-            MAX_ITERATIONS
+            self.max_iterations
         );
         self.event_sender.error(&error_msg);
 
@@ -513,5 +602,122 @@ mod tests {
             direct_tools[0].function.description,
             "Get weather for a city"
         );
+    }
+
+    // ============== Stability Configuration Tests ==============
+
+    #[test]
+    fn test_default_stability_config() {
+        // Default values should match the constants
+        assert_eq!(DEFAULT_MAX_ITERATIONS, 10);
+        assert_eq!(DEFAULT_LLM_TIMEOUT_SECS, 300);
+        assert_eq!(DEFAULT_TOOL_TIMEOUT_SECS, 60);
+        assert_eq!(DEFAULT_MAX_HISTORY_MESSAGES, 100);
+    }
+
+    #[test]
+    fn test_with_config_custom_values() {
+        let pool = McpClientPool::empty();
+        let agent = Agent::with_config(
+            "http://localhost:11434",
+            "test-model",
+            pool,
+            5,   // max_iterations
+            120, // llm_timeout_secs
+            30,  // tool_timeout_secs
+            50,  // max_history_messages
+        );
+
+        assert_eq!(agent.max_iterations(), 5);
+        assert_eq!(agent.llm_timeout(), Duration::from_secs(120));
+        assert_eq!(agent.tool_timeout(), Duration::from_secs(30));
+        assert_eq!(agent.max_history_messages(), 50);
+    }
+
+    #[test]
+    fn test_prune_history_under_limit() {
+        let pool = McpClientPool::empty();
+        let mut agent = Agent::with_config(
+            "http://localhost:11434",
+            "test",
+            pool,
+            10,
+            300,
+            60,
+            100, // max 100 messages
+        );
+
+        // Add 50 messages (under limit)
+        for i in 0..50 {
+            agent.history.push(DirectMessage {
+                role: "user".to_string(),
+                content: format!("message {}", i),
+                tool_calls: None,
+            });
+        }
+
+        agent.prune_history();
+
+        // Should not have pruned anything
+        assert_eq!(agent.history.len(), 50);
+    }
+
+    #[test]
+    fn test_prune_history_over_limit() {
+        let pool = McpClientPool::empty();
+        let mut agent = Agent::with_config(
+            "http://localhost:11434",
+            "test",
+            pool,
+            10,
+            300,
+            60,
+            10, // max 10 messages
+        );
+
+        // Add 15 messages (over limit)
+        for i in 0..15 {
+            agent.history.push(DirectMessage {
+                role: "user".to_string(),
+                content: format!("message {}", i),
+                tool_calls: None,
+            });
+        }
+
+        agent.prune_history();
+
+        // Should have pruned to 10 messages
+        assert_eq!(agent.history.len(), 10);
+        // Should keep the most recent (messages 5-14)
+        assert_eq!(agent.history[0].content, "message 5");
+        assert_eq!(agent.history[9].content, "message 14");
+    }
+
+    #[test]
+    fn test_prune_history_exact_limit() {
+        let pool = McpClientPool::empty();
+        let mut agent = Agent::with_config(
+            "http://localhost:11434",
+            "test",
+            pool,
+            10,
+            300,
+            60,
+            10, // max 10 messages
+        );
+
+        // Add exactly 10 messages
+        for i in 0..10 {
+            agent.history.push(DirectMessage {
+                role: "user".to_string(),
+                content: format!("message {}", i),
+                tool_calls: None,
+            });
+        }
+
+        agent.prune_history();
+
+        // Should not have pruned anything
+        assert_eq!(agent.history.len(), 10);
     }
 }

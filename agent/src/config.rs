@@ -122,9 +122,49 @@ pub struct LlmConfig {
 }
 
 /// Agent configuration section
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct AgentSectionConfig {
     pub system_prompt: Option<String>,
+    /// Maximum number of tool-calling iterations (default: 10)
+    #[serde(default = "default_max_iterations")]
+    pub max_iterations: usize,
+    /// LLM request timeout in seconds (default: 300 = 5 minutes)
+    #[serde(default = "default_llm_timeout_secs")]
+    pub llm_timeout_secs: u64,
+    /// Tool execution timeout in seconds (default: 60 = 1 minute)
+    #[serde(default = "default_tool_timeout_secs")]
+    pub tool_timeout_secs: u64,
+    /// Maximum conversation history messages to keep (default: 100)
+    #[serde(default = "default_max_history_messages")]
+    pub max_history_messages: usize,
+}
+
+fn default_max_iterations() -> usize {
+    10
+}
+
+fn default_llm_timeout_secs() -> u64 {
+    300 // 5 minutes
+}
+
+fn default_tool_timeout_secs() -> u64 {
+    60 // 1 minute
+}
+
+fn default_max_history_messages() -> usize {
+    100
+}
+
+impl Default for AgentSectionConfig {
+    fn default() -> Self {
+        Self {
+            system_prompt: None,
+            max_iterations: default_max_iterations(),
+            llm_timeout_secs: default_llm_timeout_secs(),
+            tool_timeout_secs: default_tool_timeout_secs(),
+            max_history_messages: default_max_history_messages(),
+        }
+    }
 }
 
 /// Monitor configuration section
