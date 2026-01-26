@@ -4,7 +4,8 @@
 # ============================================
 # Stage 1: Build
 # ============================================
-FROM rust:1.83-slim-bookworm AS builder
+# Using nightly for edition2024 support (required by rmcp)
+FROM rustlang/rust:nightly-bookworm-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
