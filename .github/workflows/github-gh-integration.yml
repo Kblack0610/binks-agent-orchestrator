@@ -1,0 +1,54 @@
+name: GitHub MCP Integration Tests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'mcps/github-gh/**'
+      - '.github/workflows/github-gh-integration.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'mcps/github-gh/**'
+      - '.github/workflows/github-gh-integration.yml'
+  workflow_dispatch:  # Allow manual triggers
+
+env:
+  CARGO_TERM_COLOR: always
+  TEST_REPO: ${{ github.repository }}
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # gh CLI is pre-installed on GitHub runners
+      - name: Verify gh CLI
+        run: gh --version
+
+      # Authenticate gh CLI with the GitHub token
+      - name: Authenticate gh CLI
+        run: gh auth status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Run read-only integration tests
+      # These tests only read from the repo, no write operations
+      - name: Run read-only integration tests
+        run: cargo test --test integration -p github-gh-mcp -- --ignored read_
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Write tests are skipped in CI by default (require GITHUB_WRITE_TESTS=1)
+      # Uncomment below to enable write tests (will create/close test issues)
+      # - name: Run write integration tests
+      #   run: cargo test --test integration -p github-gh-mcp -- --ignored write_
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     GITHUB_WRITE_TESTS: 1
