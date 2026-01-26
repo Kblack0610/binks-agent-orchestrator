@@ -108,7 +108,9 @@ impl WebSearchMcpServer {
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
-    #[tool(description = "Search for news articles. Returns titles, URLs, sources, and publication dates.")]
+    #[tool(
+        description = "Search for news articles. Returns titles, URLs, sources, and publication dates."
+    )]
     async fn search_news(
         &self,
         Parameters(params): Parameters<NewsSearchParams>,

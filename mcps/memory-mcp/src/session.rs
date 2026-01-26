@@ -27,6 +27,7 @@ struct SessionMemoryInner {
     tool_results: Vec<CachedToolResult>,
 }
 
+#[allow(dead_code)]
 impl SessionMemory {
     /// Create a new session memory
     pub fn new() -> Self {
@@ -56,7 +57,12 @@ impl SessionMemory {
     // ========================================================================
 
     /// Record a thinking step
-    pub async fn think(&self, content: String, confidence: f32, revises: Option<String>) -> Thought {
+    pub async fn think(
+        &self,
+        content: String,
+        confidence: f32,
+        revises: Option<String>,
+    ) -> Thought {
         let mut inner = self.inner.write().await;
 
         let thought = Thought {
@@ -125,7 +131,12 @@ impl SessionMemory {
     // ========================================================================
 
     /// Cache a tool result
-    pub async fn cache_tool_result(&self, tool_name: String, summary: String, ttl_seconds: Option<u64>) {
+    pub async fn cache_tool_result(
+        &self,
+        tool_name: String,
+        summary: String,
+        ttl_seconds: Option<u64>,
+    ) {
         let result = CachedToolResult {
             tool_name,
             summary,
@@ -195,7 +206,8 @@ impl SessionMemory {
         let mut summary = String::new();
 
         // Collect high-confidence thoughts
-        let key_thoughts: Vec<&Thought> = inner.thoughts
+        let key_thoughts: Vec<&Thought> = inner
+            .thoughts
             .iter()
             .filter(|t| t.confidence >= 0.7)
             .collect();
@@ -203,12 +215,17 @@ impl SessionMemory {
         if !key_thoughts.is_empty() {
             summary.push_str("Key insights:\n");
             for t in key_thoughts {
-                summary.push_str(&format!("- {} (confidence: {:.0}%)\n", t.content, t.confidence * 100.0));
+                summary.push_str(&format!(
+                    "- {} (confidence: {:.0}%)\n",
+                    t.content,
+                    t.confidence * 100.0
+                ));
             }
         }
 
         // Note any revisions
-        let revisions: Vec<&Thought> = inner.thoughts
+        let revisions: Vec<&Thought> = inner
+            .thoughts
             .iter()
             .filter(|t| t.revises.is_some())
             .collect();
@@ -222,7 +239,10 @@ impl SessionMemory {
 
         // Add context summary if non-empty
         if !inner.context.is_empty() {
-            summary.push_str(&format!("\nContext keys: {}\n", inner.context.keys().cloned().collect::<Vec<_>>().join(", ")));
+            summary.push_str(&format!(
+                "\nContext keys: {}\n",
+                inner.context.keys().cloned().collect::<Vec<_>>().join(", ")
+            ));
         }
 
         summary
@@ -243,7 +263,9 @@ mod tests {
     async fn test_think_and_recall() {
         let memory = SessionMemory::new();
 
-        let thought = memory.think("First observation".to_string(), 0.8, None).await;
+        let thought = memory
+            .think("First observation".to_string(), 0.8, None)
+            .await;
         assert_eq!(thought.content, "First observation");
         assert!(thought.confidence - 0.8 < 0.001);
 
@@ -255,7 +277,12 @@ mod tests {
     async fn test_context_operations() {
         let memory = SessionMemory::new();
 
-        memory.remember("key1".to_string(), MemoryValue::String("value1".to_string())).await;
+        memory
+            .remember(
+                "key1".to_string(),
+                MemoryValue::String("value1".to_string()),
+            )
+            .await;
 
         let value = memory.recall("key1").await;
         assert!(matches!(value, Some(MemoryValue::String(s)) if s == "value1"));
@@ -269,7 +296,9 @@ mod tests {
         let memory = SessionMemory::new();
 
         memory.think("Test".to_string(), 0.5, None).await;
-        memory.remember("key".to_string(), MemoryValue::Bool(true)).await;
+        memory
+            .remember("key".to_string(), MemoryValue::Bool(true))
+            .await;
 
         assert_eq!(memory.thought_count().await, 1);
 

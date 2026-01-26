@@ -8,14 +8,14 @@
 
 use serde::{Deserialize, Serialize};
 
+mod function_params;
 mod standard;
 mod tool_args;
-mod function_params;
 mod xml_function;
 
+pub use function_params::FunctionParamsParser;
 pub use standard::StandardParser;
 pub use tool_args::ToolArgsParser;
-pub use function_params::FunctionParamsParser;
 pub use xml_function::XmlFunctionParser;
 
 // ============================================================================
@@ -92,7 +92,7 @@ impl ToolCallParserRegistry {
         ];
 
         // Sort by priority (highest first)
-        parsers.sort_by(|a, b| b.priority().cmp(&a.priority()));
+        parsers.sort_by_key(|p| std::cmp::Reverse(p.priority()));
 
         Self { parsers }
     }

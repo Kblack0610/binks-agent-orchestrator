@@ -100,14 +100,15 @@ impl InboxMcpServer {
 
     /// Get the file path for a given date
     fn get_file_path(&self, date: NaiveDate) -> PathBuf {
-        self.inbox_path.join(format!("{}.md", date.format("%Y-%m-%d")))
+        self.inbox_path
+            .join(format!("{}.md", date.format("%Y-%m-%d")))
     }
 
     /// Ensure the inbox directory exists
     async fn ensure_inbox_dir(&self) -> Result<(), McpError> {
-        fs::create_dir_all(&self.inbox_path)
-            .await
-            .map_err(|e| McpError::internal_error(format!("Failed to create inbox directory: {}", e), None))
+        fs::create_dir_all(&self.inbox_path).await.map_err(|e| {
+            McpError::internal_error(format!("Failed to create inbox directory: {}", e), None)
+        })
     }
 
     // ========================================================================
@@ -153,11 +154,14 @@ impl InboxMcpServer {
             .append(true)
             .open(&file_path)
             .await
-            .map_err(|e| McpError::internal_error(format!("Failed to open inbox file: {}", e), None))?;
+            .map_err(|e| {
+                McpError::internal_error(format!("Failed to open inbox file: {}", e), None)
+            })?;
 
         // Add separator if file is not empty
-        let metadata = file.metadata().await
-            .map_err(|e| McpError::internal_error(format!("Failed to get file metadata: {}", e), None))?;
+        let metadata = file.metadata().await.map_err(|e| {
+            McpError::internal_error(format!("Failed to get file metadata: {}", e), None)
+        })?;
 
         let content = if metadata.len() > 0 {
             format!("\n---\n\n{}\n", markdown)
@@ -165,14 +169,18 @@ impl InboxMcpServer {
             format!("# Inbox - {}\n\n{}\n", now.format("%Y-%m-%d"), markdown)
         };
 
-        file.write_all(content.as_bytes())
-            .await
-            .map_err(|e| McpError::internal_error(format!("Failed to write to inbox: {}", e), None))?;
+        file.write_all(content.as_bytes()).await.map_err(|e| {
+            McpError::internal_error(format!("Failed to write to inbox: {}", e), None)
+        })?;
 
         let response = WriteResponse {
             success: true,
             file_path: file_path.to_string_lossy().to_string(),
-            message_id: format!("{}_{}", now.format("%Y%m%d%H%M%S"), now.timestamp_subsec_millis()),
+            message_id: format!(
+                "{}_{}",
+                now.format("%Y%m%d%H%M%S"),
+                now.timestamp_subsec_millis()
+            ),
         };
 
         let json = serde_json::to_string_pretty(&response)
@@ -205,9 +213,9 @@ impl InboxMcpServer {
             if file_path.exists() {
                 files_read.push(file_path.to_string_lossy().to_string());
 
-                let content = fs::read_to_string(&file_path)
-                    .await
-                    .map_err(|e| McpError::internal_error(format!("Failed to read inbox file: {}", e), None))?;
+                let content = fs::read_to_string(&file_path).await.map_err(|e| {
+                    McpError::internal_error(format!("Failed to read inbox file: {}", e), None)
+                })?;
 
                 // Parse messages from markdown (simple parsing)
                 // Messages start with "## YYYY-MM-DD HH:MM:SS"
@@ -231,7 +239,7 @@ impl InboxMcpServer {
         }
 
         // Sort by timestamp descending (newest first)
-        all_messages.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        all_messages.sort_by_key(|m| std::cmp::Reverse(m.timestamp));
 
         // Apply limit
         let total_count = all_messages.len();
@@ -266,8 +274,8 @@ impl InboxMcpServer {
             return None;
         }
         let timestamp_str = &header[..19];
-        let timestamp = chrono::NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%d %H:%M:%S")
-            .ok()?;
+        let timestamp =
+            chrono::NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%d %H:%M:%S").ok()?;
         let timestamp = timestamp.and_local_timezone(Local).single()?;
 
         let rest = &header[19..].trim();
@@ -350,19 +358,19 @@ impl InboxMcpServer {
 
         // Create archive directory if needed
         if let Some(ref archive) = archive_path {
-            fs::create_dir_all(archive)
-                .await
-                .map_err(|e| McpError::internal_error(format!("Failed to create archive directory: {}", e), None))?;
+            fs::create_dir_all(archive).await.map_err(|e| {
+                McpError::internal_error(format!("Failed to create archive directory: {}", e), None)
+            })?;
         }
 
         // List all .md files in inbox
-        let mut entries = fs::read_dir(&self.inbox_path)
-            .await
-            .map_err(|e| McpError::internal_error(format!("Failed to read inbox directory: {}", e), None))?;
+        let mut entries = fs::read_dir(&self.inbox_path).await.map_err(|e| {
+            McpError::internal_error(format!("Failed to read inbox directory: {}", e), None)
+        })?;
 
-        while let Some(entry) = entries.next_entry().await
-            .map_err(|e| McpError::internal_error(format!("Failed to read directory entry: {}", e), None))?
-        {
+        while let Some(entry) = entries.next_entry().await.map_err(|e| {
+            McpError::internal_error(format!("Failed to read directory entry: {}", e), None)
+        })? {
             let path = entry.path();
             if path.extension().map(|e| e == "md").unwrap_or(false) {
                 // Parse date from filename (YYYY-MM-DD.md)
@@ -372,14 +380,20 @@ impl InboxMcpServer {
                             if let Some(ref archive) = archive_path {
                                 // Move to archive
                                 let dest = archive.join(path.file_name().unwrap());
-                                fs::rename(&path, dest)
-                                    .await
-                                    .map_err(|e| McpError::internal_error(format!("Failed to archive file: {}", e), None))?;
+                                fs::rename(&path, dest).await.map_err(|e| {
+                                    McpError::internal_error(
+                                        format!("Failed to archive file: {}", e),
+                                        None,
+                                    )
+                                })?;
                             } else {
                                 // Delete
-                                fs::remove_file(&path)
-                                    .await
-                                    .map_err(|e| McpError::internal_error(format!("Failed to delete file: {}", e), None))?;
+                                fs::remove_file(&path).await.map_err(|e| {
+                                    McpError::internal_error(
+                                        format!("Failed to delete file: {}", e),
+                                        None,
+                                    )
+                                })?;
                             }
                             archived_count += 1;
                         }

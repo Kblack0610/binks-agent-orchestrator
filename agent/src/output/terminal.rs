@@ -169,7 +169,10 @@ impl OutputWriter for TerminalOutput {
                     } else {
                         self.color(GRAY, &preview)
                     };
-                    self.eprint(&format!("  {} {} {} {}", status, name, time, preview_styled));
+                    self.eprint(&format!(
+                        "  {} {} {} {}",
+                        status, name, time, preview_styled
+                    ));
                 } else {
                     self.eprint(&format!("  {} {} {}", status, name, time));
                 }

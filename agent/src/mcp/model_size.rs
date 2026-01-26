@@ -27,9 +27,8 @@ impl ModelSize {
     }
 }
 
-static SIZE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(\d+)[bB]").expect("Invalid regex")
-});
+static SIZE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(\d+)[bB]").expect("Invalid regex"));
 
 /// Parse model size from an Ollama model name
 ///

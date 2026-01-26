@@ -122,6 +122,7 @@ impl StreamBuffer {
 ///
 /// Some models (especially smaller ones) don't use proper tool call format
 /// and instead emit JSON in the content. This tries to detect that pattern.
+#[allow(dead_code)]
 pub fn detect_embedded_tool_calls(content: &str) -> Option<Vec<StreamToolCall>> {
     let content = content.trim();
 
@@ -231,7 +232,8 @@ mod tests {
 
     #[test]
     fn test_detect_embedded_tool_call() {
-        let content = r#"I'll use this tool: {"name": "read_file", "arguments": {"path": "/test"}}"#;
+        let content =
+            r#"I'll use this tool: {"name": "read_file", "arguments": {"path": "/test"}}"#;
         let calls = detect_embedded_tool_calls(content);
 
         assert!(calls.is_some());

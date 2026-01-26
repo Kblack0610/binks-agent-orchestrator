@@ -15,11 +15,11 @@ use crate::mcp::{McpClientPool, McpTool};
 
 // Modular parser system for handling different tool call formats
 pub mod parsers;
-use parsers::{ToolCall, ToolCallParserRegistry};
+use parsers::ToolCallParserRegistry;
 
 // Agent event emission for real-time visibility
 pub mod events;
-pub use events::{AgentEvent, AgentEventSender, EventReceiver, EventSender, event_channel};
+pub use events::{event_channel, AgentEvent, AgentEventSender, EventReceiver, EventSender};
 
 // Direct HTTP API types for Ollama
 mod types;
@@ -32,7 +32,6 @@ use tools::mcp_tools_to_direct;
 
 /// Maximum number of tool-calling iterations to prevent infinite loops
 const MAX_ITERATIONS: usize = 10;
-
 
 /// An agent that can use tools via MCP
 pub struct Agent {
@@ -50,9 +49,8 @@ pub struct Agent {
 impl Agent {
     /// Create a new agent
     pub fn new(ollama_url: &str, model: &str, mcp_pool: McpClientPool) -> Self {
-        let url = url::Url::parse(ollama_url).unwrap_or_else(|_| {
-            url::Url::parse("http://localhost:11434").unwrap()
-        });
+        let url = url::Url::parse(ollama_url)
+            .unwrap_or_else(|_| url::Url::parse("http://localhost:11434").unwrap());
 
         let host = url.host_str().unwrap_or("localhost").to_string();
         let port = url.port().unwrap_or(11434);
@@ -186,7 +184,11 @@ impl Agent {
 
     /// Run a chat with tools filtered to specific MCP servers
     /// This is useful when you have many tools but only need a subset
-    pub async fn chat_with_servers(&mut self, user_message: &str, servers: &[&str]) -> Result<String> {
+    pub async fn chat_with_servers(
+        &mut self,
+        user_message: &str,
+        servers: &[&str],
+    ) -> Result<String> {
         // Get tools filtered by server
         let all_tools = self.mcp_pool.list_all_tools().await?;
         let filtered_tools: Vec<_> = all_tools
@@ -195,13 +197,21 @@ impl Agent {
             .collect();
 
         let tools = mcp_tools_to_direct(&filtered_tools);
-        tracing::info!("Agent has {} tools available (filtered from servers: {:?})", tools.len(), servers);
+        tracing::info!(
+            "Agent has {} tools available (filtered from servers: {:?})",
+            tools.len(),
+            servers
+        );
 
         self.chat_with_tools(user_message, tools).await
     }
 
     /// Internal method to run chat with a specific set of tools
-    async fn chat_with_tools(&mut self, user_message: &str, tools: Vec<DirectTool>) -> Result<String> {
+    async fn chat_with_tools(
+        &mut self,
+        user_message: &str,
+        tools: Vec<DirectTool>,
+    ) -> Result<String> {
         let total_start = Instant::now();
 
         // Emit processing start event
@@ -234,7 +244,10 @@ impl Agent {
         loop {
             iterations += 1;
             if iterations > MAX_ITERATIONS {
-                tracing::warn!("Agent reached max iterations ({}), stopping", MAX_ITERATIONS);
+                tracing::warn!(
+                    "Agent reached max iterations ({}), stopping",
+                    MAX_ITERATIONS
+                );
                 break;
             }
 
@@ -285,9 +298,12 @@ impl Agent {
                 return Err(anyhow::anyhow!("Ollama API error {}: {}", status, body));
             }
 
-            let raw_body = response.text().await.context("Failed to get response text")?;
-            let response_body: DirectChatResponse = serde_json::from_str(&raw_body)
-                .context("Failed to parse Ollama response")?;
+            let raw_body = response
+                .text()
+                .await
+                .context("Failed to get response text")?;
+            let response_body: DirectChatResponse =
+                serde_json::from_str(&raw_body).context("Failed to parse Ollama response")?;
             let ollama_elapsed = ollama_start.elapsed();
 
             let assistant_msg = response_body.message;
@@ -296,7 +312,10 @@ impl Agent {
             tracing::info!("=== OLLAMA RESPONSE ===");
             tracing::info!("Content length: {}", assistant_msg.content.len());
             if !assistant_msg.content.is_empty() {
-                tracing::info!("Content preview: {}", &assistant_msg.content[..assistant_msg.content.len().min(200)]);
+                tracing::info!(
+                    "Content preview: {}",
+                    &assistant_msg.content[..assistant_msg.content.len().min(200)]
+                );
             }
             tracing::info!("Tool calls count: {}", assistant_msg.tool_calls.len());
 
@@ -307,17 +326,28 @@ impl Agent {
                 } else {
                     format!("{} tool call(s)", assistant_msg.tool_calls.len())
                 };
-                eprintln!("[{:>7}ms] Ollama response ({})", ollama_elapsed.as_millis(), tool_count);
+                eprintln!(
+                    "[{:>7}ms] Ollama response ({})",
+                    ollama_elapsed.as_millis(),
+                    tool_count
+                );
             }
             for (i, tc) in assistant_msg.tool_calls.iter().enumerate() {
-                tracing::info!("Tool call {}: {} args={:?}", i, tc.function.name, tc.function.arguments);
+                tracing::info!(
+                    "Tool call {}: {} args={:?}",
+                    i,
+                    tc.function.name,
+                    tc.function.arguments
+                );
             }
 
             // Check if there are tool calls
             // First check the standard tool_calls array, then fallback to parsing content via registry
             let tool_calls = if !assistant_msg.tool_calls.is_empty() {
                 assistant_msg.tool_calls.clone()
-            } else if let Some((parsed_call, parser_name)) = self.parser_registry.parse(&assistant_msg.content) {
+            } else if let Some((parsed_call, parser_name)) =
+                self.parser_registry.parse(&assistant_msg.content)
+            {
                 // Fallback: model output tool call as JSON in content (common with qwen)
                 tracing::info!(
                     "Parsed tool call from content using {}: {}",
@@ -343,7 +373,8 @@ impl Agent {
                 );
 
                 if self.verbose {
-                    eprintln!("[{:>7}ms] Total ({} iteration{})",
+                    eprintln!(
+                        "[{:>7}ms] Total ({} iteration{})",
                         total_duration.as_millis(),
                         iterations,
                         if iterations == 1 { "" } else { "s" }
@@ -366,10 +397,7 @@ impl Agent {
             }
 
             // Process tool calls
-            tracing::info!(
-                "Agent making {} tool call(s)",
-                tool_calls.len()
-            );
+            tracing::info!("Agent making {} tool call(s)", tool_calls.len());
 
             // Add assistant message with tool calls to messages
             messages.push(DirectMessage {
@@ -381,10 +409,8 @@ impl Agent {
             // Execute each tool call and add results
             for tool_call in &tool_calls {
                 // Emit tool start event
-                self.event_sender.tool_start(
-                    &tool_call.function.name,
-                    &tool_call.function.arguments,
-                );
+                self.event_sender
+                    .tool_start(&tool_call.function.name, &tool_call.function.arguments);
 
                 // Verbose feedback before tool call
                 if self.verbose {
@@ -399,12 +425,14 @@ impl Agent {
                 }
 
                 let tool_start = Instant::now();
-                let (result, is_error) = match tools::execute_tool_call(&mut self.mcp_pool, tool_call).await {
-                    Ok(r) => (r, false),
-                    Err(e) => {
-                        (format!("Error calling tool {}: {}", tool_call.function.name, e), true)
-                    }
-                };
+                let (result, is_error) =
+                    match tools::execute_tool_call(&mut self.mcp_pool, tool_call).await {
+                        Ok(r) => (r, false),
+                        Err(e) => (
+                            format!("Error calling tool {}: {}", tool_call.function.name, e),
+                            true,
+                        ),
+                    };
                 let tool_elapsed = tool_start.elapsed();
 
                 // Emit tool complete event
@@ -416,7 +444,11 @@ impl Agent {
                 );
 
                 if self.verbose {
-                    eprintln!("[{:>7}ms] → {}", tool_elapsed.as_millis(), tool_call.function.name);
+                    eprintln!(
+                        "[{:>7}ms] → {}",
+                        tool_elapsed.as_millis(),
+                        tool_call.function.name
+                    );
                 }
 
                 // Create tool response message
@@ -431,7 +463,8 @@ impl Agent {
         // Final timing summary
         let total_duration = total_start.elapsed();
         if self.verbose {
-            eprintln!("[{:>7}ms] Total ({} iteration{})",
+            eprintln!(
+                "[{:>7}ms] Total ({} iteration{})",
                 total_duration.as_millis(),
                 iterations,
                 if iterations == 1 { "" } else { "s" }

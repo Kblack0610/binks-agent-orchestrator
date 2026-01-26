@@ -74,9 +74,13 @@ pub struct AgentChatParams {
     pub message: String,
     #[schemars(description = "Optional system prompt for the agent")]
     pub system_prompt: Option<String>,
-    #[schemars(description = "Optional list of MCP server names to filter tools (e.g., ['sysinfo', 'kubernetes']). Recommended for smaller models that struggle with many tools.")]
+    #[schemars(
+        description = "Optional list of MCP server names to filter tools (e.g., ['sysinfo', 'kubernetes']). Recommended for smaller models that struggle with many tools."
+    )]
     pub servers: Option<Vec<String>>,
-    #[schemars(description = "Session ID for conversation continuity. Omit for stateless single-turn calls.")]
+    #[schemars(
+        description = "Session ID for conversation continuity. Omit for stateless single-turn calls."
+    )]
     pub session_id: Option<String>,
 }
 
@@ -111,8 +115,7 @@ impl AgentMcpServer {
 
     /// Initialize the agent with MCP pool (call this before serving)
     pub async fn init_agent(&self) -> Result<(), anyhow::Error> {
-        let pool = McpClientPool::load()?
-            .ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
+        let pool = McpClientPool::load()?.ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
 
         let mut agent = Agent::new(&self.config.ollama_url, &self.config.model, pool);
 
@@ -130,7 +133,9 @@ impl AgentMcpServer {
     // Chat Tools
     // ========================================================================
 
-    #[tool(description = "Send a message to the LLM and get a response. This is simple chat without tool access.")]
+    #[tool(
+        description = "Send a message to the LLM and get a response. This is simple chat without tool access."
+    )]
     async fn chat(
         &self,
         Parameters(params): Parameters<ChatParams>,
@@ -163,7 +168,9 @@ impl AgentMcpServer {
             tracing::info!("Lazily initializing agent with MCP tools...");
 
             let pool = McpClientPool::load()
-                .map_err(|e| McpError::internal_error(format!("Failed to load MCP config: {}", e), None))?
+                .map_err(|e| {
+                    McpError::internal_error(format!("Failed to load MCP config: {}", e), None)
+                })?
                 .ok_or_else(|| McpError::internal_error("No .mcp.json found".to_string(), None))?;
 
             let mut agent = Agent::new(&self.config.ollama_url, &self.config.model, pool);
@@ -178,12 +185,19 @@ impl AgentMcpServer {
         Ok(())
     }
 
-    #[tool(description = "Send a message to the AI agent with access to MCP tools. The agent can use tools like kubernetes, ssh, github, sysinfo to accomplish tasks. Use 'servers' to filter to specific tool sets (recommended for smaller models). Use 'session_id' to maintain conversation across calls. Note: First call may take a few seconds to initialize connections.")]
+    #[tool(
+        description = "Send a message to the AI agent with access to MCP tools. The agent can use tools like kubernetes, ssh, github, sysinfo to accomplish tasks. Use 'servers' to filter to specific tool sets (recommended for smaller models). Use 'session_id' to maintain conversation across calls. Note: First call may take a few seconds to initialize connections."
+    )]
     async fn agent_chat(
         &self,
         Parameters(params): Parameters<AgentChatParams>,
     ) -> Result<CallToolResult, McpError> {
-        tracing::info!("agent_chat: {} (servers: {:?}, session: {:?})", params.message, params.servers, params.session_id);
+        tracing::info!(
+            "agent_chat: {} (servers: {:?}, session: {:?})",
+            params.message,
+            params.servers,
+            params.session_id
+        );
 
         // Lazily initialize agent on first call
         self.ensure_agent().await?;
@@ -199,7 +213,11 @@ impl AgentMcpServer {
                 sessions.get(session_id).cloned()
             };
             if let Some(history) = history_to_restore {
-                tracing::info!("Restoring session '{}' with {} messages", session_id, history.len());
+                tracing::info!(
+                    "Restoring session '{}' with {} messages",
+                    session_id,
+                    history.len()
+                );
                 agent.set_history(history);
             } else {
                 tracing::info!("Creating new session '{}'", session_id);
@@ -222,9 +240,7 @@ impl AgentMcpServer {
         // Use filtered servers if provided, otherwise use all tools
         let response = if let Some(ref servers) = params.servers {
             let server_refs: Vec<&str> = servers.iter().map(|s| s.as_str()).collect();
-            agent
-                .chat_with_servers(&params.message, &server_refs)
-                .await
+            agent.chat_with_servers(&params.message, &server_refs).await
         } else {
             agent.chat(&params.message).await
         };
@@ -235,7 +251,11 @@ impl AgentMcpServer {
         if let Some(ref session_id) = params.session_id {
             let mut sessions = self.sessions.lock().await;
             sessions.insert(session_id.clone(), agent.get_history());
-            tracing::info!("Saved session '{}' with {} messages", session_id, agent.get_history().len());
+            tracing::info!(
+                "Saved session '{}' with {} messages",
+                session_id,
+                agent.get_history().len()
+            );
         }
 
         Ok(CallToolResult::success(vec![Content::text(response)]))
@@ -250,13 +270,21 @@ impl AgentMcpServer {
 
         let mut sessions = self.sessions.lock().await;
         if sessions.remove(&params.session_id).is_some() {
-            Ok(CallToolResult::success(vec![Content::text(format!("Session '{}' cleared", params.session_id))]))
+            Ok(CallToolResult::success(vec![Content::text(format!(
+                "Session '{}' cleared",
+                params.session_id
+            ))]))
         } else {
-            Ok(CallToolResult::success(vec![Content::text(format!("Session '{}' not found (already cleared or never existed)", params.session_id))]))
+            Ok(CallToolResult::success(vec![Content::text(format!(
+                "Session '{}' not found (already cleared or never existed)",
+                params.session_id
+            ))]))
         }
     }
 
-    #[tool(description = "List all available MCP tools that the agent can use. Note: First call may take a few seconds to initialize connections.")]
+    #[tool(
+        description = "List all available MCP tools that the agent can use. Note: First call may take a few seconds to initialize connections."
+    )]
     async fn list_tools(
         &self,
         Parameters(params): Parameters<ListToolsParams>,

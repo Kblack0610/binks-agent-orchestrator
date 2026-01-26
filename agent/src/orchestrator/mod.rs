@@ -32,4 +32,4 @@ pub mod workflow;
 pub use agent_config::{AgentConfig, AgentRegistry};
 pub use checkpoint::{Checkpoint, CheckpointResult};
 pub use engine::{EngineConfig, WorkflowEngine};
-pub use workflow::{Workflow, WorkflowStep, WorkflowResult, StepResult};
+pub use workflow::{StepResult, Workflow, WorkflowResult, WorkflowStep};

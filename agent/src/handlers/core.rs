@@ -21,7 +21,11 @@ pub async fn models(ctx: &CommandContext) -> Result<()> {
     let models = llm::list_models(&ctx.ollama_url).await?;
     println!("Available models:");
     for m in models {
-        let current_marker = if m.name == ctx.model { " (current)" } else { "" };
+        let current_marker = if m.name == ctx.model {
+            " (current)"
+        } else {
+            ""
+        };
         println!("  {}{}", m.name, current_marker);
     }
     Ok(())

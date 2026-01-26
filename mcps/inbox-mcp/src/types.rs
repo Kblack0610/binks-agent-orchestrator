@@ -48,7 +48,14 @@ impl InboxMessage {
         let tags_str = if self.tags.is_empty() {
             String::new()
         } else {
-            format!(" {}", self.tags.iter().map(|t| format!("#{}", t)).collect::<Vec<_>>().join(" "))
+            format!(
+                " {}",
+                self.tags
+                    .iter()
+                    .map(|t| format!("#{}", t))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            )
         };
 
         let priority_marker = match self.priority {
@@ -57,7 +64,11 @@ impl InboxMessage {
             _ => "",
         };
 
-        let url_line = self.url.as_ref().map(|u| format!("\n{}", u)).unwrap_or_default();
+        let url_line = self
+            .url
+            .as_ref()
+            .map(|u| format!("\n{}", u))
+            .unwrap_or_default();
 
         format!(
             "## {} [{}]{}{}\n{}{}",

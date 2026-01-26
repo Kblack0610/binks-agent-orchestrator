@@ -253,10 +253,7 @@ mod tests {
         assert!(result.is_ok());
         let chunk = result.unwrap().unwrap();
         assert!(!chunk.done);
-        assert_eq!(
-            chunk.message.unwrap().content.unwrap(),
-            "Hello"
-        );
+        assert_eq!(chunk.message.unwrap().content.unwrap(), "Hello");
     }
 
     #[test]

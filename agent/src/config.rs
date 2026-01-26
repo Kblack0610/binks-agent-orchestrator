@@ -240,15 +240,24 @@ pub struct McpProfiles {
 }
 
 fn default_small_profile() -> McpProfile {
-    McpProfile { max_tier: 1, servers: None }
+    McpProfile {
+        max_tier: 1,
+        servers: None,
+    }
 }
 
 fn default_medium_profile() -> McpProfile {
-    McpProfile { max_tier: 2, servers: None }
+    McpProfile {
+        max_tier: 2,
+        servers: None,
+    }
 }
 
 fn default_large_profile() -> McpProfile {
-    McpProfile { max_tier: 3, servers: None }
+    McpProfile {
+        max_tier: 3,
+        servers: None,
+    }
 }
 
 impl Default for McpProfiles {
@@ -616,7 +625,10 @@ model = "custom-model"
 
     #[test]
     fn test_default_ollama_url_value() {
-        assert_eq!(AgentFileConfig::default_ollama_url(), "http://localhost:11434");
+        assert_eq!(
+            AgentFileConfig::default_ollama_url(),
+            "http://localhost:11434"
+        );
     }
 
     // ============== Edge Cases ==============

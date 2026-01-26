@@ -11,11 +11,11 @@ use anyhow::{Context, Result};
 use rmcp::model::{CallToolResult, RawContent, RawTextContent};
 use serde_json::Value;
 
-use crate::config::{McpConfig, McpProfile, McpServerConfig};
-use crate::mcps::{DaemonClient, is_daemon_running};
 use super::model_size::ModelSize;
 use super::spawn::McpClient;
 use super::types::McpTool;
+use crate::config::{McpConfig, McpProfile, McpServerConfig};
+use crate::mcps::{is_daemon_running, DaemonClient};
 
 /// Pool for managing MCP server access with tool caching
 ///
@@ -106,9 +106,7 @@ impl McpClientPool {
             // Explicit server list - validate against config and filter out "agent"
             servers
                 .iter()
-                .filter(|name| {
-                    *name != "agent" && self.config.mcp_servers.contains_key(*name)
-                })
+                .filter(|name| *name != "agent" && self.config.mcp_servers.contains_key(*name))
                 .cloned()
                 .collect()
         } else {
@@ -182,7 +180,11 @@ impl McpClientPool {
     }
 
     /// Call a tool by name (uses daemon if available, otherwise spawn-per-call)
-    pub async fn call_tool(&mut self, tool_name: &str, arguments: Option<Value>) -> Result<CallToolResult> {
+    pub async fn call_tool(
+        &mut self,
+        tool_name: &str,
+        arguments: Option<Value>,
+    ) -> Result<CallToolResult> {
         // Find which server has this tool
         let server_name = {
             let mut found = None;
@@ -204,18 +206,20 @@ impl McpClientPool {
 
         if self.check_daemon().await {
             // Use daemon for persistent connection
-            let daemon_result = self.daemon_client
+            let daemon_result = self
+                .daemon_client
                 .call_tool(&server_name, tool_name, arguments)
                 .await?;
 
             // Convert daemon result to CallToolResult
             // rmcp types: Content = Annotated<RawContent>, RawContent::Text(RawTextContent)
-            let content: Vec<rmcp::model::Content> = daemon_result.content
+            let content: Vec<rmcp::model::Content> = daemon_result
+                .content
                 .into_iter()
                 .filter_map(|c| {
                     c.text.map(|t| rmcp::model::Content {
                         raw: RawContent::Text(RawTextContent {
-                            text: t.into(),
+                            text: t,
                             meta: Default::default(),
                         }),
                         annotations: None,
@@ -273,11 +277,7 @@ mod tests {
 
     #[test]
     fn test_server_names_returns_all_configured() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-            ("github", 3),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2), ("github", 3)]);
         let pool = McpClientPool::new(config);
 
         let names = pool.server_names();
@@ -387,10 +387,7 @@ mod tests {
 
     #[test]
     fn test_tier_filtering_zero_excludes_all() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2)]);
         let pool = McpClientPool::new(config);
 
         let names = pool.server_names_for_tier(0);
@@ -411,11 +408,7 @@ mod tests {
 
     #[test]
     fn test_tier_filtering_same_tier_multiple_servers() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("memory", 1),
-            ("filesystem", 1),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("memory", 1), ("filesystem", 1)]);
         let pool = McpClientPool::new(config);
 
         let names = pool.server_names_for_tier(1);
@@ -426,11 +419,7 @@ mod tests {
 
     #[test]
     fn test_model_size_small_gets_tier_1() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-            ("github", 3),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2), ("github", 3)]);
         let pool = McpClientPool::new(config);
 
         // Small models (≤8B) get tier 1 by default
@@ -441,11 +430,7 @@ mod tests {
 
     #[test]
     fn test_model_size_medium_gets_tier_2() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-            ("github", 3),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2), ("github", 3)]);
         let pool = McpClientPool::new(config);
 
         // Medium models (≤32B) get tier 2 by default
@@ -471,11 +456,7 @@ mod tests {
 
     #[test]
     fn test_model_size_unknown_gets_tier_1() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-            ("github", 3),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2), ("github", 3)]);
         let pool = McpClientPool::new(config);
 
         // Unknown models get tier 1 by default (conservative - treat as small)
@@ -488,11 +469,7 @@ mod tests {
 
     #[test]
     fn test_profile_explicit_servers_list() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-            ("github", 3),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2), ("github", 3)]);
         let pool = McpClientPool::new(config);
 
         let profile = McpProfile {
@@ -509,10 +486,7 @@ mod tests {
 
     #[test]
     fn test_profile_explicit_servers_filters_invalid() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2)]);
         let pool = McpClientPool::new(config);
 
         let profile = McpProfile {
@@ -530,10 +504,7 @@ mod tests {
 
     #[test]
     fn test_profile_explicit_servers_excludes_agent() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("agent", 4),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("agent", 4)]);
         let pool = McpClientPool::new(config);
 
         let profile = McpProfile {
@@ -551,11 +522,7 @@ mod tests {
 
     #[test]
     fn test_profile_tier_based_when_no_servers() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-            ("github", 3),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2), ("github", 3)]);
         let pool = McpClientPool::new(config);
 
         let profile = McpProfile {
@@ -571,10 +538,7 @@ mod tests {
 
     #[test]
     fn test_profile_empty_servers_list() {
-        let config = create_test_config(vec![
-            ("sysinfo", 1),
-            ("kubernetes", 2),
-        ]);
+        let config = create_test_config(vec![("sysinfo", 1), ("kubernetes", 2)]);
         let pool = McpClientPool::new(config);
 
         let profile = McpProfile {

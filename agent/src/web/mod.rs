@@ -93,8 +93,7 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         // Health
         .route("/health", get(api::health_check));
 
-    let ws_routes = Router::new()
-        .route("/chat/:conversation_id", get(ws::chat_handler));
+    let ws_routes = Router::new().route("/chat/:conversation_id", get(ws::chat_handler));
 
     let mut router = Router::new()
         .nest("/api", api_routes)

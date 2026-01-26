@@ -19,8 +19,8 @@ use uuid::Uuid;
 
 use super::state::AppState;
 use crate::orchestrator::{
+    workflow::{WorkflowStatus, WorkflowStep},
     AgentRegistry, WorkflowEngine,
-    workflow::{WorkflowStep, WorkflowStatus},
 };
 
 /// Error response
@@ -255,7 +255,7 @@ pub async fn run_workflow(
 
     // Create run record
     let run_id = Uuid::new_v4().to_string();
-    let run_info = WorkflowRunInfo {
+    let _run_info = WorkflowRunInfo {
         id: run_id.clone(),
         workflow_name: name.clone(),
         task: req.task.clone(),
@@ -276,7 +276,9 @@ pub async fn run_workflow(
 
         let final_run_info = match result {
             Ok(result) => {
-                let output = result.context.get("changes")
+                let output = result
+                    .context
+                    .get("changes")
                     .or_else(|| result.context.get("plan"))
                     .or_else(|| result.context.get("review"))
                     .cloned();

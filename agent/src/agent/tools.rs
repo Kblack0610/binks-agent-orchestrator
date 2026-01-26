@@ -8,9 +8,9 @@
 use anyhow::{Context, Result};
 use rmcp::model::CallToolResult;
 
-use crate::mcp::{McpClientPool, McpTool};
 use super::parsers::ToolCall;
 use super::types::{DirectTool, DirectToolFunction};
+use crate::mcp::{McpClientPool, McpTool};
 
 /// Clean up a JSON schema for Ollama compatibility
 /// Removes $schema, title, and other fields that confuse Ollama
@@ -94,7 +94,11 @@ pub async fn execute_tool_call(
         }
     }
 
-    tracing::info!("Tool {} returned: {}...", name, &output[..output.len().min(100)]);
+    tracing::info!(
+        "Tool {} returned: {}...",
+        name,
+        &output[..output.len().min(100)]
+    );
 
     Ok(output)
 }

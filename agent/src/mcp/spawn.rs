@@ -12,8 +12,8 @@ use rmcp::{
 use serde_json::Value;
 use tokio::process::Command;
 
-use crate::config::McpServerConfig;
 use super::types::McpTool;
+use crate::config::McpServerConfig;
 
 /// Single MCP client connection - static methods for one-shot operations
 pub struct McpClient;

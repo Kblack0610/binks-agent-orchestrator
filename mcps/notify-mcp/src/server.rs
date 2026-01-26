@@ -129,7 +129,9 @@ impl NotifyMcpServer {
         let discord_webhook = std::env::var("DISCORD_WEBHOOK_URL").ok();
 
         if slack_webhook.is_none() && discord_webhook.is_none() {
-            tracing::warn!("No webhook URLs configured. Set SLACK_WEBHOOK_URL or DISCORD_WEBHOOK_URL");
+            tracing::warn!(
+                "No webhook URLs configured. Set SLACK_WEBHOOK_URL or DISCORD_WEBHOOK_URL"
+            );
         }
 
         Self {
@@ -168,11 +170,16 @@ impl NotifyMcpServer {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| McpError::internal_error(format!("Failed to send Slack message: {}", e), None))?;
+            .map_err(|e| {
+                McpError::internal_error(format!("Failed to send Slack message: {}", e), None)
+            })?;
 
         let status = response.status();
         if !status.is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(McpError::internal_error(
                 format!("Slack API error ({}): {}", status, error_text),
                 None,
@@ -182,7 +189,10 @@ impl NotifyMcpServer {
         let result = NotifyResponse {
             success: true,
             platform: "slack".to_string(),
-            message: format!("Message sent successfully: {}", &params.message[..params.message.len().min(50)]),
+            message: format!(
+                "Message sent successfully: {}",
+                &params.message[..params.message.len().min(50)]
+            ),
         };
 
         let json = serde_json::to_string_pretty(&result)
@@ -218,12 +228,17 @@ impl NotifyMcpServer {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| McpError::internal_error(format!("Failed to send Discord message: {}", e), None))?;
+            .map_err(|e| {
+                McpError::internal_error(format!("Failed to send Discord message: {}", e), None)
+            })?;
 
         let status = response.status();
         // Discord returns 204 No Content on success
         if !status.is_success() && status.as_u16() != 204 {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(McpError::internal_error(
                 format!("Discord API error ({}): {}", status, error_text),
                 None,
@@ -233,7 +248,10 @@ impl NotifyMcpServer {
         let result = NotifyResponse {
             success: true,
             platform: "discord".to_string(),
-            message: format!("Message sent successfully: {}", &params.content[..params.content.len().min(50)]),
+            message: format!(
+                "Message sent successfully: {}",
+                &params.content[..params.content.len().min(50)]
+            ),
         };
 
         let json = serde_json::to_string_pretty(&result)
@@ -273,7 +291,8 @@ impl NotifyMcpServer {
         let full_message = format!("{}\n\n{}", header, items_text.join("\n"));
 
         // Send to Slack if configured and requested
-        if (params.platform == "all" || params.platform == "slack") && self.slack_webhook.is_some() {
+        if (params.platform == "all" || params.platform == "slack") && self.slack_webhook.is_some()
+        {
             let slack_params = SlackMessageParams {
                 message: full_message.clone(),
                 channel: None,
@@ -287,7 +306,9 @@ impl NotifyMcpServer {
         }
 
         // Send to Discord if configured and requested
-        if (params.platform == "all" || params.platform == "discord") && self.discord_webhook.is_some() {
+        if (params.platform == "all" || params.platform == "discord")
+            && self.discord_webhook.is_some()
+        {
             let discord_params = DiscordMessageParams {
                 content: full_message.clone(),
                 username: Some("Binks Monitor".to_string()),
@@ -302,7 +323,10 @@ impl NotifyMcpServer {
 
         if results.is_empty() {
             return Err(McpError::internal_error(
-                format!("No notification platforms configured for '{}'", params.platform),
+                format!(
+                    "No notification platforms configured for '{}'",
+                    params.platform
+                ),
                 None,
             ));
         }

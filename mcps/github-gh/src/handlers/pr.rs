@@ -3,10 +3,12 @@
 use rmcp::model::{CallToolResult, Content};
 use rmcp::ErrorData as McpError;
 
-use crate::gh::{execute_gh_action, execute_gh_json, execute_gh_raw, execute_gh_raw_with_exit_code};
+use crate::gh::{
+    execute_gh_action, execute_gh_json, execute_gh_raw, execute_gh_raw_with_exit_code,
+};
 use crate::params::{
-    PrChecksParams, PrCommentParams, PrCreateParams, PrDiffParams, PrEditParams,
-    PrListParams, PrMergeParams, PrReadyParams, PrReviewParams, PrStatusParams, PrViewParams,
+    PrChecksParams, PrCommentParams, PrCreateParams, PrDiffParams, PrEditParams, PrListParams,
+    PrMergeParams, PrReadyParams, PrReviewParams, PrStatusParams, PrViewParams,
 };
 use crate::types::PullRequest;
 
@@ -148,9 +150,10 @@ pub async fn pr_checks(params: PrChecksParams) -> Result<CallToolResult, McpErro
         Ok((output, exit_code)) => {
             // Exit code 0 or 1 both have valid output
             if output.trim().is_empty() {
-                Ok(CallToolResult::success(vec![Content::text(
-                    format!("No checks reported for PR #{}", params.number)
-                )]))
+                Ok(CallToolResult::success(vec![Content::text(format!(
+                    "No checks reported for PR #{}",
+                    params.number
+                ))]))
             } else {
                 // Add status indicator based on exit code
                 let status_msg = if exit_code == 0 {
@@ -158,17 +161,19 @@ pub async fn pr_checks(params: PrChecksParams) -> Result<CallToolResult, McpErro
                 } else {
                     "✗ Some checks failed"
                 };
-                Ok(CallToolResult::success(vec![Content::text(
-                    format!("{}\n\n{}", status_msg, output)
-                )]))
+                Ok(CallToolResult::success(vec![Content::text(format!(
+                    "{}\n\n{}",
+                    status_msg, output
+                ))]))
             }
         }
         Err(e) => {
             let err_str = e.to_string();
             if err_str.contains("no checks reported") {
-                Ok(CallToolResult::success(vec![Content::text(
-                    format!("No checks reported for PR #{}", params.number)
-                )]))
+                Ok(CallToolResult::success(vec![Content::text(format!(
+                    "No checks reported for PR #{}",
+                    params.number
+                ))]))
             } else {
                 Err(gh_to_mcp_error(e))
             }
@@ -180,9 +185,13 @@ pub async fn pr_checks(params: PrChecksParams) -> Result<CallToolResult, McpErro
 pub async fn pr_comment(params: PrCommentParams) -> Result<CallToolResult, McpError> {
     let number_str = params.number.to_string();
     let args = vec![
-        "pr", "comment", &number_str,
-        "-R", &params.repo,
-        "-b", &params.body,
+        "pr",
+        "comment",
+        &number_str,
+        "-R",
+        &params.repo,
+        "-b",
+        &params.body,
     ];
 
     let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
@@ -225,7 +234,10 @@ pub async fn pr_review(params: PrReviewParams) -> Result<CallToolResult, McpErro
 
     let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
     let msg = if output.is_empty() {
-        format!("Review '{}' submitted for PR #{}", params.action, params.number)
+        format!(
+            "Review '{}' submitted for PR #{}",
+            params.action, params.number
+        )
     } else {
         output
     };

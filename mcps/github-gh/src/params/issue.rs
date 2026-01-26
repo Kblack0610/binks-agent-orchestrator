@@ -89,6 +89,8 @@ pub struct IssueDeleteParams {
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct IssueStatusParams {
-    #[schemars(description = "Repository in OWNER/REPO format (optional, uses current repo if not specified)")]
+    #[schemars(
+        description = "Repository in OWNER/REPO format (optional, uses current repo if not specified)"
+    )]
     pub repo: Option<String>,
 }

@@ -47,11 +47,7 @@ async fn run_show(ctx: &CommandContext, name: &str) -> Result<()> {
 
             for (i, step) in workflow.steps.iter().enumerate() {
                 match step {
-                    WorkflowStep::Agent {
-                        name,
-                        task,
-                        model,
-                    } => {
+                    WorkflowStep::Agent { name, task, model } => {
                         let model_info = model
                             .as_ref()
                             .map(|m| format!(" (model: {})", m))

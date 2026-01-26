@@ -47,7 +47,11 @@ fn default_temperature() -> f32 {
 
 impl AgentConfig {
     /// Create a new agent configuration
-    pub fn new(name: impl Into<String>, model: impl Into<String>, system_prompt: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        model: impl Into<String>,
+        system_prompt: impl Into<String>,
+    ) -> Self {
         let name = name.into();
         Self {
             display_name: name.clone(),
@@ -115,10 +119,7 @@ impl AgentRegistry {
         registry.register(
             AgentConfig::new("planner", &model, prompts::PLANNER_PROMPT)
                 .with_display_name("Planner")
-                .with_tools(vec![
-                    "filesystem".to_string(),
-                    "serena".to_string(),
-                ])
+                .with_tools(vec!["filesystem".to_string(), "serena".to_string()])
                 .with_temperature(0.3)
                 .with_handoffs(vec!["implementer".to_string(), "researcher".to_string()]),
         );
@@ -166,10 +167,7 @@ impl AgentRegistry {
         registry.register(
             AgentConfig::new("tester", &model, prompts::TESTER_PROMPT)
                 .with_display_name("Tester")
-                .with_tools(vec![
-                    "filesystem".to_string(),
-                    "serena".to_string(),
-                ])
+                .with_tools(vec!["filesystem".to_string(), "serena".to_string()])
                 .with_temperature(0.1)
                 .with_handoffs(vec!["implementer".to_string(), "reviewer".to_string()]),
         );

@@ -134,22 +134,13 @@ mod tests {
             extract_repo_name("https://github.com/owner/repo.git"),
             "repo"
         );
-        assert_eq!(
-            extract_repo_name("https://github.com/owner/repo"),
-            "repo"
-        );
+        assert_eq!(extract_repo_name("https://github.com/owner/repo"), "repo");
     }
 
     #[test]
     fn test_extract_repo_name_ssh() {
-        assert_eq!(
-            extract_repo_name("git@github.com:owner/repo.git"),
-            "repo"
-        );
-        assert_eq!(
-            extract_repo_name("git@github.com:owner/repo"),
-            "repo"
-        );
+        assert_eq!(extract_repo_name("git@github.com:owner/repo.git"), "repo");
+        assert_eq!(extract_repo_name("git@github.com:owner/repo"), "repo");
     }
 
     #[test]

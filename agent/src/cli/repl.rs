@@ -125,10 +125,8 @@ impl<'a> Repl<'a> {
                         self.handle_chat(input).await;
                     }
                     Err(e) => {
-                        self.output.write(OutputEvent::Error(format!(
-                            "Command error: {}",
-                            e
-                        )));
+                        self.output
+                            .write(OutputEvent::Error(format!("Command error: {}", e)));
                         self.output.write(OutputEvent::NewLine);
                     }
                 }
@@ -150,7 +148,7 @@ impl<'a> Repl<'a> {
             agent: self.agent,
             output: self.output,
             mode: &self.mode,
-            server_filter: server_filter_refs.as_ref().map(|v| v.as_slice()),
+            server_filter: server_filter_refs.as_deref(),
         };
 
         match self.command_registry.try_execute(input, &mut ctx).await {
@@ -169,7 +167,8 @@ impl<'a> Repl<'a> {
             // Temporarily append to system prompt
             let original_prompt = self.agent.system_prompt().map(|s| s.to_string());
             if let Some(ref base) = original_prompt {
-                self.agent.set_system_prompt(Some(format!("{}{}", base, modifier)));
+                self.agent
+                    .set_system_prompt(Some(format!("{}{}", base, modifier)));
             } else {
                 self.agent.set_system_prompt(Some(modifier));
             }

@@ -2,8 +2,8 @@
 //!
 //! Structs representing GitHub repository data as returned by gh CLI.
 
-use serde::{Deserialize, Serialize};
 use super::common::User;
+use serde::{Deserialize, Serialize};
 
 /// Represents a GitHub repository
 #[derive(Debug, Clone, Serialize, Deserialize)]

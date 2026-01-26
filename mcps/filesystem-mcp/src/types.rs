@@ -114,7 +114,7 @@ where
 // ============================================================================
 
 /// Configuration for filesystem access
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub paths: PathConfig,
@@ -122,16 +122,6 @@ pub struct Config {
     pub limits: Limits,
     #[serde(default)]
     pub safety: SafetyConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            paths: PathConfig::default(),
-            limits: Limits::default(),
-            safety: SafetyConfig::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,7 +142,11 @@ fn default_read_paths() -> Vec<String> {
 }
 
 fn default_write_paths() -> Vec<String> {
-    vec!["~/projects".to_string(), "~/dev".to_string(), "/tmp".to_string()]
+    vec![
+        "~/projects".to_string(),
+        "~/dev".to_string(),
+        "/tmp".to_string(),
+    ]
 }
 
 fn default_deny_paths() -> Vec<String> {
@@ -209,7 +203,7 @@ impl Default for Limits {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SafetyConfig {
     #[serde(default)]
     pub confirm_delete: bool,
@@ -217,16 +211,6 @@ pub struct SafetyConfig {
     pub confirm_overwrite: bool,
     #[serde(default)]
     pub backup_on_overwrite: bool,
-}
-
-impl Default for SafetyConfig {
-    fn default() -> Self {
-        Self {
-            confirm_delete: false,
-            confirm_overwrite: false,
-            backup_on_overwrite: false,
-        }
-    }
 }
 
 // ============================================================================

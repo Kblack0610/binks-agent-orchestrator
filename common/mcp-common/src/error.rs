@@ -147,8 +147,10 @@ mod tests {
 
     #[test]
     fn test_result_ext() {
-        let result: Result<(), std::io::Error> =
-            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "not found"));
+        let result: Result<(), std::io::Error> = Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "not found",
+        ));
         let mcp_result = result.to_mcp_err();
         assert!(mcp_result.is_err());
     }

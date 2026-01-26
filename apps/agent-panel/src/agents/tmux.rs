@@ -207,7 +207,7 @@ impl TmuxMonitor {
             .collect();
 
         // Sort alphabetically by short name
-        result.sort_by(|a, b| a.short_name.cmp(&b.short_name));
+        result.sort_by_key(|a| a.short_name.clone());
 
         result
     }

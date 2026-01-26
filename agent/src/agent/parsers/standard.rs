@@ -101,7 +101,10 @@ mod tests {
 
         let result = parser.parse(content).unwrap();
         assert_eq!(result.function.name, "create_resource");
-        assert_eq!(result.function.arguments["config"]["nested"]["deep"]["value"], 42);
+        assert_eq!(
+            result.function.arguments["config"]["nested"]["deep"]["value"],
+            42
+        );
         assert_eq!(result.function.arguments["config"]["array"][0], 1);
     }
 
@@ -128,12 +131,19 @@ mod tests {
     fn test_parse_special_characters_in_arguments() {
         let parser = StandardParser;
         // Test with newlines and tabs in the value
-        let content = r#"{"name": "run_query", "arguments": {"sql": "SELECT *\nFROM users\tWHERE id = 1"}}"#;
+        let content =
+            r#"{"name": "run_query", "arguments": {"sql": "SELECT *\nFROM users\tWHERE id = 1"}}"#;
 
         let result = parser.parse(content).unwrap();
         assert_eq!(result.function.name, "run_query");
-        assert!(result.function.arguments["sql"].as_str().unwrap().contains("SELECT"));
-        assert!(result.function.arguments["sql"].as_str().unwrap().contains('\n'));
+        assert!(result.function.arguments["sql"]
+            .as_str()
+            .unwrap()
+            .contains("SELECT"));
+        assert!(result.function.arguments["sql"]
+            .as_str()
+            .unwrap()
+            .contains('\n'));
     }
 
     #[test]
@@ -152,7 +162,7 @@ mod tests {
         let content = r#"{"name": "config", "arguments": {
             "string": "hello",
             "number": 42,
-            "float": 3.14,
+            "float": 3.15,
             "bool": true,
             "null_val": null,
             "array": [1, "two", false]
@@ -161,7 +171,7 @@ mod tests {
         let result = parser.parse(content).unwrap();
         assert_eq!(result.function.arguments["string"], "hello");
         assert_eq!(result.function.arguments["number"], 42);
-        assert_eq!(result.function.arguments["float"], 3.14);
+        assert_eq!(result.function.arguments["float"], 3.15);
         assert_eq!(result.function.arguments["bool"], true);
         assert!(result.function.arguments["null_val"].is_null());
     }
@@ -197,10 +207,16 @@ mod tests {
     fn test_parse_long_argument_value() {
         let parser = StandardParser;
         let long_value = "x".repeat(10000);
-        let content = format!(r#"{{"name": "test", "arguments": {{"data": "{}"}}}}"#, long_value);
+        let content = format!(
+            r#"{{"name": "test", "arguments": {{"data": "{}"}}}}"#,
+            long_value
+        );
 
         let result = parser.parse(&content).unwrap();
-        assert_eq!(result.function.arguments["data"].as_str().unwrap().len(), 10000);
+        assert_eq!(
+            result.function.arguments["data"].as_str().unwrap().len(),
+            10000
+        );
     }
 
     #[test]

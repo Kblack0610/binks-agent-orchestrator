@@ -64,7 +64,9 @@ pub async fn read_file(
     config: &Config,
     params: ReadFileParams,
 ) -> Result<CallToolResult, McpError> {
-    let canonical = sandbox.validate_read(&params.path).map_err(fs_error_to_mcp)?;
+    let canonical = sandbox
+        .validate_read(&params.path)
+        .map_err(fs_error_to_mcp)?;
 
     // Check file size before reading
     let metadata = fs::metadata(&canonical)
@@ -98,7 +100,9 @@ pub async fn write_file(
     config: &Config,
     params: WriteFileParams,
 ) -> Result<CallToolResult, McpError> {
-    let canonical = sandbox.validate_write(&params.path).map_err(fs_error_to_mcp)?;
+    let canonical = sandbox
+        .validate_write(&params.path)
+        .map_err(fs_error_to_mcp)?;
 
     // Check content size
     if params.content.len() > config.limits.max_file_size {
@@ -132,7 +136,9 @@ pub async fn list_dir(
     config: &Config,
     params: ListDirParams,
 ) -> Result<CallToolResult, McpError> {
-    let canonical = sandbox.validate_read(&params.path).map_err(fs_error_to_mcp)?;
+    let canonical = sandbox
+        .validate_read(&params.path)
+        .map_err(fs_error_to_mcp)?;
 
     let mut entries = Vec::new();
     let mut count = 0;
@@ -213,7 +219,9 @@ pub async fn search_files(
     config: &Config,
     params: SearchFilesParams,
 ) -> Result<CallToolResult, McpError> {
-    let canonical = sandbox.validate_read(&params.path).map_err(fs_error_to_mcp)?;
+    let canonical = sandbox
+        .validate_read(&params.path)
+        .map_err(fs_error_to_mcp)?;
 
     // Combine base path with pattern
     let full_pattern = canonical.join(&params.pattern);
@@ -223,8 +231,8 @@ pub async fn search_files(
     let mut count = 0;
 
     // Use glob to find matches
-    for entry in glob::glob(&pattern_str)
-        .map_err(|e| McpError::invalid_params(e.to_string(), None))?
+    for entry in
+        glob::glob(&pattern_str).map_err(|e| McpError::invalid_params(e.to_string(), None))?
     {
         if count >= config.limits.max_files_per_list {
             break;
@@ -255,7 +263,9 @@ pub async fn file_info(
     sandbox: &Sandbox,
     params: FileInfoParams,
 ) -> Result<CallToolResult, McpError> {
-    let canonical = sandbox.validate_read(&params.path).map_err(fs_error_to_mcp)?;
+    let canonical = sandbox
+        .validate_read(&params.path)
+        .map_err(fs_error_to_mcp)?;
 
     let response = if canonical.exists() {
         let metadata = fs::metadata(&canonical)
@@ -306,8 +316,12 @@ pub async fn move_file(
     params: MoveFileParams,
 ) -> Result<CallToolResult, McpError> {
     // Source must be readable, destination must be writable
-    let src_canonical = sandbox.validate_read(&params.src).map_err(fs_error_to_mcp)?;
-    let dst_canonical = sandbox.validate_write(&params.dst).map_err(fs_error_to_mcp)?;
+    let src_canonical = sandbox
+        .validate_read(&params.src)
+        .map_err(fs_error_to_mcp)?;
+    let dst_canonical = sandbox
+        .validate_write(&params.dst)
+        .map_err(fs_error_to_mcp)?;
 
     fs::rename(&src_canonical, &dst_canonical)
         .await
@@ -328,7 +342,9 @@ pub async fn delete_file(
     sandbox: &Sandbox,
     params: DeleteFileParams,
 ) -> Result<CallToolResult, McpError> {
-    let canonical = sandbox.validate_write(&params.path).map_err(fs_error_to_mcp)?;
+    let canonical = sandbox
+        .validate_write(&params.path)
+        .map_err(fs_error_to_mcp)?;
 
     if !canonical.exists() {
         return Err(fs_error_to_mcp(FsError::NotFound(
@@ -370,7 +386,9 @@ pub async fn create_directory(
     sandbox: &Sandbox,
     params: CreateDirParams,
 ) -> Result<CallToolResult, McpError> {
-    let canonical = sandbox.validate_write(&params.path).map_err(fs_error_to_mcp)?;
+    let canonical = sandbox
+        .validate_write(&params.path)
+        .map_err(fs_error_to_mcp)?;
 
     if params.recursive {
         fs::create_dir_all(&canonical)

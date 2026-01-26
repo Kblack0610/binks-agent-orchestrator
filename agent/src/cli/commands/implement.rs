@@ -27,7 +27,11 @@ impl SlashCommand for ImplementCommand {
         let args = args.trim();
 
         // If already in implement mode, show status
-        if let Mode::Implement { plan, files_modified } = ctx.mode {
+        if let Mode::Implement {
+            plan,
+            files_modified,
+        } = ctx.mode
+        {
             if args.is_empty() {
                 let mut output = String::new();
                 output.push_str("Currently in implementation mode\n\n");
@@ -84,8 +88,10 @@ impl SlashCommand for ImplementCommand {
             .map(|p| format!(" Plan: {}", p.lines().next().unwrap_or("(none)")))
             .unwrap_or_default();
 
-        ctx.output
-            .write(OutputEvent::System(format!("Entering implementation mode.{}", plan_msg)));
+        ctx.output.write(OutputEvent::System(format!(
+            "Entering implementation mode.{}",
+            plan_msg
+        )));
         ctx.output.write(OutputEvent::System(
             "Focus on writing code. Use /normal when done.".to_string(),
         ));

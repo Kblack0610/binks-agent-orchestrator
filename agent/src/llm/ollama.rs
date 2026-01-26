@@ -25,19 +25,13 @@ struct OllamaTagsResponse {
 
 /// List available models from Ollama
 pub async fn list_models(ollama_url: &str) -> Result<Vec<ModelInfo>> {
-    let url = url::Url::parse(ollama_url).unwrap_or_else(|_| {
-        url::Url::parse("http://localhost:11434").unwrap()
-    });
+    let url = url::Url::parse(ollama_url)
+        .unwrap_or_else(|_| url::Url::parse("http://localhost:11434").unwrap());
 
     let client = reqwest::Client::new();
     let api_url = format!("{}api/tags", url);
 
-    let response: OllamaTagsResponse = client
-        .get(&api_url)
-        .send()
-        .await?
-        .json()
-        .await?;
+    let response: OllamaTagsResponse = client.get(&api_url).send().await?.json().await?;
 
     Ok(response.models)
 }
@@ -52,9 +46,8 @@ impl OllamaClient {
     /// Create a new Ollama client
     pub fn new(url: &str, model: &str) -> Self {
         // Parse URL to extract host and port
-        let url = url::Url::parse(url).unwrap_or_else(|_| {
-            url::Url::parse("http://localhost:11434").unwrap()
-        });
+        let url = url::Url::parse(url)
+            .unwrap_or_else(|_| url::Url::parse("http://localhost:11434").unwrap());
 
         let host = url.host_str().unwrap_or("localhost").to_string();
         let port = url.port().unwrap_or(11434);

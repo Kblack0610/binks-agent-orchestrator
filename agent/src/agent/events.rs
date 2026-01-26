@@ -195,10 +195,7 @@ impl AgentEventSender {
 
     /// Send iteration event
     pub fn iteration(&self, number: usize, tool_calls: usize) {
-        self.send(AgentEvent::Iteration {
-            number,
-            tool_calls,
-        });
+        self.send(AgentEvent::Iteration { number, tool_calls });
     }
 
     /// Send response complete event

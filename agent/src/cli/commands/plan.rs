@@ -43,7 +43,9 @@ impl SlashCommand for PlanCommand {
                     }
                 }
 
-                output.push_str("\nUse /implement to start implementing, /normal to exit plan mode.\n");
+                output.push_str(
+                    "\nUse /implement to start implementing, /normal to exit plan mode.\n",
+                );
                 ctx.output.write(OutputEvent::Text(output));
                 return Ok(CommandResult::Ok);
             }

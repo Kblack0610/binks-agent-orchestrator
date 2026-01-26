@@ -23,9 +23,7 @@ pub fn get_cpu_info(sys: &System, include_per_core: bool) -> CpuInfo {
     };
 
     CpuInfo {
-        brand: first_cpu
-            .map(|c| c.brand().to_string())
-            .unwrap_or_default(),
+        brand: first_cpu.map(|c| c.brand().to_string()).unwrap_or_default(),
         vendor_id: first_cpu
             .map(|c| c.vendor_id().to_string())
             .unwrap_or_default(),

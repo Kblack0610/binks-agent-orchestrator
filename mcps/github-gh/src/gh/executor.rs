@@ -15,9 +15,9 @@
 //! ).await?;
 //! ```
 
+use serde::de::DeserializeOwned;
 use std::process::Stdio;
 use tokio::process::Command;
-use serde::de::DeserializeOwned;
 use tracing::{debug, error, instrument};
 
 use super::error::{GhError, GhResult};
@@ -224,7 +224,10 @@ pub async fn execute_gh_raw_with_exit_code(args: &[&str]) -> GhResult<(String, i
     // For actual command not found or invalid usage, still error
     if exit_code != 0 && stdout.is_empty() && !stderr.is_empty() {
         error!(exit_code, stderr = %stderr, "gh command failed with no output");
-        return Err(GhError::CommandFailed { code: exit_code, stderr });
+        return Err(GhError::CommandFailed {
+            code: exit_code,
+            stderr,
+        });
     }
 
     Ok((stdout, exit_code))

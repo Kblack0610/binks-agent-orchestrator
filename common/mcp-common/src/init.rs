@@ -79,9 +79,7 @@ macro_rules! serve_stdio {
             tracing::info!(concat!("Starting ", $crate_name, " MCP Server"));
 
             let server = <$server_type>::new();
-            let service = server
-                .serve(rmcp::transport::stdio())
-                .await?;
+            let service = server.serve(rmcp::transport::stdio()).await?;
 
             tracing::info!("Server running, waiting for requests...");
 

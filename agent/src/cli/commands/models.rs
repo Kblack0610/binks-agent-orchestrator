@@ -50,10 +50,8 @@ impl SlashCommand for ModelsCommand {
                         "Could not list models: {}",
                         e
                     )));
-                    ctx.output.write(OutputEvent::Text(format!(
-                        "Current model: {}\n",
-                        current
-                    )));
+                    ctx.output
+                        .write(OutputEvent::Text(format!("Current model: {}\n", current)));
                 }
             }
 

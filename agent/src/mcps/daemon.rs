@@ -21,8 +21,8 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
 use tokio::sync::mpsc;
 
-use crate::config::{McpConfig, McpServerConfig};
 use super::protocol::*;
+use crate::config::{McpConfig, McpServerConfig};
 
 /// Idle timeout before stopping an MCP server (5 minutes)
 const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
@@ -75,7 +75,9 @@ impl ManagedServer {
         let transport = TokioChildProcess::new(cmd)
             .context(format!("Failed to spawn MCP server: {}", self.name))?;
 
-        let service = ().serve(transport).await
+        let service = ()
+            .serve(transport)
+            .await
             .context(format!("Failed to initialize MCP server: {}", self.name))?;
 
         self.service = Some(service);
@@ -113,13 +115,16 @@ impl ManagedServer {
             self.start().await?;
         }
 
-        let service = self.service.as_ref()
-            .context("Service not available")?;
+        let service = self.service.as_ref().context("Service not available")?;
 
-        let response = service.list_tools(Default::default()).await
+        let response = service
+            .list_tools(Default::default())
+            .await
             .context("Failed to list tools")?;
 
-        let tools: Vec<ToolInfo> = response.tools.into_iter()
+        let tools: Vec<ToolInfo> = response
+            .tools
+            .into_iter()
             .map(|t| ToolInfo {
                 server: self.name.clone(),
                 name: t.name.to_string(),
@@ -136,22 +141,27 @@ impl ManagedServer {
     }
 
     /// Call a tool on this server
-    async fn call_tool(&mut self, tool_name: &str, arguments: Option<Value>) -> Result<CallToolResult> {
+    async fn call_tool(
+        &mut self,
+        tool_name: &str,
+        arguments: Option<Value>,
+    ) -> Result<CallToolResult> {
         // Ensure server is running
         if self.state != ServerState::Running {
             self.start().await?;
         }
 
-        let service = self.service.as_ref()
-            .context("Service not available")?;
+        let service = self.service.as_ref().context("Service not available")?;
 
         let args = arguments.and_then(|v| v.as_object().cloned());
-        let result = service.call_tool(CallToolRequestParam {
-            name: tool_name.to_string().into(),
-            arguments: args,
-            task: None,
-        }).await
-        .context("Failed to call tool")?;
+        let result = service
+            .call_tool(CallToolRequestParam {
+                name: tool_name.to_string().into(),
+                arguments: args,
+                task: None,
+            })
+            .await
+            .context("Failed to call tool")?;
 
         self.last_used = Some(Instant::now());
         Ok(result)
@@ -195,7 +205,10 @@ impl McpDaemon {
             .map(|(name, cfg)| (name.clone(), ManagedServer::new(name, cfg)))
             .collect();
 
-        Self { servers, socket_path }
+        Self {
+            servers,
+            socket_path,
+        }
     }
 
     /// Run the daemon - listens on Unix socket for requests
@@ -280,8 +293,8 @@ impl McpDaemon {
             return Ok(());
         }
 
-        let request: DaemonRequest = serde_json::from_str(&line)
-            .context("Failed to parse request")?;
+        let request: DaemonRequest =
+            serde_json::from_str(&line).context("Failed to parse request")?;
 
         let response = self.handle_request(request).await;
 
@@ -300,25 +313,22 @@ impl McpDaemon {
             DaemonRequest::Ping => DaemonResponse::Pong,
 
             DaemonRequest::Status => {
-                let servers: Vec<ServerStatus> = self.servers.values()
-                    .map(|s| s.status())
-                    .collect();
+                let servers: Vec<ServerStatus> =
+                    self.servers.values().map(|s| s.status()).collect();
                 DaemonResponse::Status { servers }
             }
 
-            DaemonRequest::ListTools { server } => {
-                match self.servers.get_mut(&server) {
-                    Some(s) => {
-                        match s.list_tools().await {
-                            Ok(tools) => DaemonResponse::Tools { tools },
-                            Err(e) => DaemonResponse::Error { message: e.to_string() },
-                        }
-                    }
-                    None => DaemonResponse::Error {
-                        message: format!("Server '{}' not found", server)
+            DaemonRequest::ListTools { server } => match self.servers.get_mut(&server) {
+                Some(s) => match s.list_tools().await {
+                    Ok(tools) => DaemonResponse::Tools { tools },
+                    Err(e) => DaemonResponse::Error {
+                        message: e.to_string(),
                     },
-                }
-            }
+                },
+                None => DaemonResponse::Error {
+                    message: format!("Server '{}' not found", server),
+                },
+            },
 
             DaemonRequest::ListAllTools => {
                 let mut all_tools = Vec::new();
@@ -338,54 +348,58 @@ impl McpDaemon {
                 DaemonResponse::Tools { tools: all_tools }
             }
 
-            DaemonRequest::CallTool { server, tool, arguments } => {
-                match self.servers.get_mut(&server) {
-                    Some(s) => {
-                        match s.call_tool(&tool, arguments).await {
-                            Ok(result) => {
-                                let content: Vec<ToolContent> = result.content.into_iter()
-                                    .map(|c| {
-                                        let text = match &c.raw {
-                                            rmcp::model::RawContent::Text(t) => Some(t.text.to_string()),
-                                            _ => None,
-                                        };
-                                        ToolContent {
-                                            content_type: "text".to_string(),
-                                            text,
-                                        }
-                                    })
-                                    .collect();
-
-                                DaemonResponse::ToolResult {
-                                    result: ToolCallResult {
-                                        content,
-                                        is_error: result.is_error.unwrap_or(false),
-                                    }
+            DaemonRequest::CallTool {
+                server,
+                tool,
+                arguments,
+            } => match self.servers.get_mut(&server) {
+                Some(s) => match s.call_tool(&tool, arguments).await {
+                    Ok(result) => {
+                        let content: Vec<ToolContent> = result
+                            .content
+                            .into_iter()
+                            .map(|c| {
+                                let text = match &c.raw {
+                                    rmcp::model::RawContent::Text(t) => Some(t.text.to_string()),
+                                    _ => None,
+                                };
+                                ToolContent {
+                                    content_type: "text".to_string(),
+                                    text,
                                 }
-                            }
-                            Err(e) => DaemonResponse::Error { message: e.to_string() },
-                        }
-                    }
-                    None => DaemonResponse::Error {
-                        message: format!("Server '{}' not found", server)
-                    },
-                }
-            }
+                            })
+                            .collect();
 
-            DaemonRequest::RefreshServer { server } => {
-                match self.servers.get_mut(&server) {
-                    Some(s) => {
-                        let _ = s.stop().await;
-                        match s.start().await {
-                            Ok(()) => DaemonResponse::Ok,
-                            Err(e) => DaemonResponse::Error { message: e.to_string() },
+                        DaemonResponse::ToolResult {
+                            result: ToolCallResult {
+                                content,
+                                is_error: result.is_error.unwrap_or(false),
+                            },
                         }
                     }
-                    None => DaemonResponse::Error {
-                        message: format!("Server '{}' not found", server)
+                    Err(e) => DaemonResponse::Error {
+                        message: e.to_string(),
                     },
+                },
+                None => DaemonResponse::Error {
+                    message: format!("Server '{}' not found", server),
+                },
+            },
+
+            DaemonRequest::RefreshServer { server } => match self.servers.get_mut(&server) {
+                Some(s) => {
+                    let _ = s.stop().await;
+                    match s.start().await {
+                        Ok(()) => DaemonResponse::Ok,
+                        Err(e) => DaemonResponse::Error {
+                            message: e.to_string(),
+                        },
+                    }
                 }
-            }
+                None => DaemonResponse::Error {
+                    message: format!("Server '{}' not found", server),
+                },
+            },
 
             DaemonRequest::RefreshAll => {
                 let server_names: Vec<String> = self.servers.keys().cloned().collect();
@@ -411,7 +425,9 @@ impl McpDaemon {
 
     /// Stop idle servers
     async fn cleanup_idle_servers(&mut self) {
-        let idle_names: Vec<String> = self.servers.iter()
+        let idle_names: Vec<String> = self
+            .servers
+            .iter()
             .filter(|(_, s)| s.is_idle_expired())
             .map(|(n, _)| n.clone())
             .collect();
@@ -446,7 +462,8 @@ pub async fn is_daemon_running() -> bool {
 
 /// Ping the daemon to check if it's alive
 pub async fn ping_daemon(socket_path: &std::path::Path) -> Result<()> {
-    let stream = UnixStream::connect(socket_path).await
+    let stream = UnixStream::connect(socket_path)
+        .await
         .context("Failed to connect to daemon")?;
 
     let (reader, mut writer) = stream.into_split();

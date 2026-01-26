@@ -17,7 +17,9 @@ use crate::config::{AgentFileConfig, McpConfig};
 use crate::mcp::McpClientPool;
 
 use super::agent_config::AgentRegistry;
-use super::checkpoint::{Checkpoint, CheckpointHandler, CheckpointResult, InteractiveCheckpointHandler};
+use super::checkpoint::{
+    Checkpoint, CheckpointHandler, CheckpointResult, InteractiveCheckpointHandler,
+};
 use super::workflow::{
     builtin_workflows, load_custom_workflows, StepResult, Workflow, WorkflowError, WorkflowResult,
     WorkflowStatus, WorkflowStep,
@@ -202,11 +204,7 @@ impl WorkflowEngine {
         for (step_index, step) in workflow.steps.iter().enumerate() {
             let step_start = Instant::now();
 
-            println!(
-                "\n[Step {}/{}]",
-                step_index + 1,
-                workflow.steps.len()
-            );
+            println!("\n[Step {}/{}]", step_index + 1, workflow.steps.len());
 
             match step {
                 WorkflowStep::Agent {
@@ -215,14 +213,13 @@ impl WorkflowEngine {
                     model: model_override,
                 } => {
                     // Get agent config
-                    let agent_config = self.registry.get(name).ok_or_else(|| {
-                        WorkflowError::AgentNotFound(name.clone())
-                    })?;
+                    let agent_config = self
+                        .registry
+                        .get(name)
+                        .ok_or_else(|| WorkflowError::AgentNotFound(name.clone()))?;
 
                     // Determine model to use
-                    let model = model_override
-                        .as_ref()
-                        .unwrap_or(&agent_config.model);
+                    let model = model_override.as_ref().unwrap_or(&agent_config.model);
 
                     println!("  Agent: {} ({})", agent_config.display_name, model);
 
@@ -241,7 +238,8 @@ impl WorkflowEngine {
                     let output = if agent_config.tools.is_empty() {
                         agent.chat(&task_text).await?
                     } else {
-                        let servers: Vec<&str> = agent_config.tools.iter().map(|s| s.as_str()).collect();
+                        let servers: Vec<&str> =
+                            agent_config.tools.iter().map(|s| s.as_str()).collect();
                         agent.chat_with_servers(&task_text, &servers).await?
                     };
 
@@ -390,7 +388,9 @@ mod tests {
             config: EngineConfig::default(),
             builtin_workflows: HashMap::new(),
             custom_workflows: HashMap::new(),
-            checkpoint_handler: Box::new(crate::orchestrator::checkpoint::AutoApproveCheckpointHandler),
+            checkpoint_handler: Box::new(
+                crate::orchestrator::checkpoint::AutoApproveCheckpointHandler,
+            ),
         };
 
         let mut context = HashMap::new();
