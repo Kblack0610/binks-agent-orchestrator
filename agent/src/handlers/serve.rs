@@ -13,6 +13,7 @@ pub async fn run_serve(ctx: &CommandContext, system: Option<String>) -> Result<(
         ollama_url: ctx.ollama_url.clone(),
         model: ctx.model.clone(),
         system_prompt: system,
+        enable_runs: true,
     };
     server::serve(config).await
 }

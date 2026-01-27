@@ -21,6 +21,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::agent::{Agent, DirectMessage};
+use crate::db::runs::{ImprovementFilter, Run, RunEvent, RunFilter, RunMetrics, RunStatus};
+use crate::db::Database;
 use crate::llm::{Llm, OllamaClient};
 use crate::mcp::McpClientPool;
 
@@ -30,6 +32,8 @@ pub struct ServerConfig {
     pub ollama_url: String,
     pub model: String,
     pub system_prompt: Option<String>,
+    /// Enable run tracking/analysis tools (requires database)
+    pub enable_runs: bool,
 }
 
 impl Default for ServerConfig {
@@ -38,6 +42,7 @@ impl Default for ServerConfig {
             ollama_url: "http://localhost:11434".to_string(),
             model: "qwen3-coder:30b".to_string(),
             system_prompt: None,
+            enable_runs: true,
         }
     }
 }
@@ -54,6 +59,8 @@ pub struct AgentMcpServer {
     llm: OllamaClient,
     /// Session storage for conversation history
     sessions: Arc<Mutex<HashMap<String, Vec<DirectMessage>>>>,
+    /// Database for run tracking (optional)
+    db: Option<Database>,
 }
 
 // ============================================================================
@@ -97,6 +104,48 @@ pub struct ListToolsParams {
 }
 
 // ============================================================================
+// Run Analysis Parameter Types
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ListRunsParams {
+    #[schemars(description = "Filter by workflow name")]
+    pub workflow: Option<String>,
+    #[schemars(description = "Filter by status (running, completed, failed, cancelled)")]
+    pub status: Option<String>,
+    #[schemars(description = "Maximum number of runs to return (default: 20)")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct GetRunParams {
+    #[schemars(description = "Run ID or prefix (minimum 8 characters)")]
+    pub id: String,
+    #[schemars(description = "Include events in the response")]
+    pub include_events: Option<bool>,
+    #[schemars(description = "Include metrics in the response")]
+    pub include_metrics: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ExportRunParams {
+    #[schemars(description = "Run ID or prefix (minimum 8 characters)")]
+    pub id: String,
+    #[schemars(description = "Export format: 'markdown' or 'json' (default: markdown)")]
+    pub format: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ListImprovementsParams {
+    #[schemars(description = "Filter by category (prompt, workflow, agent, tool, other)")]
+    pub category: Option<String>,
+    #[schemars(description = "Filter by status (proposed, applied, verified, rejected)")]
+    pub status: Option<String>,
+    #[schemars(description = "Maximum number of improvements to return (default: 20)")]
+    pub limit: Option<u32>,
+}
+
+// ============================================================================
 // Tool Router Implementation
 // ============================================================================
 
@@ -104,12 +153,30 @@ pub struct ListToolsParams {
 impl AgentMcpServer {
     pub fn new(config: ServerConfig) -> Self {
         let llm = OllamaClient::new(&config.ollama_url, &config.model);
+
+        // Initialize database for runs if enabled
+        let db = if config.enable_runs {
+            match Database::open() {
+                Ok(db) => {
+                    tracing::info!("Run tracking database initialized");
+                    Some(db)
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to open runs database: {} - run tools will be unavailable", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Self {
             tool_router: Self::tool_router(),
             config,
             agent: Arc::new(Mutex::new(None)),
             llm,
             sessions: Arc::new(Mutex::new(HashMap::new())),
+            db,
         }
     }
 
@@ -314,6 +381,424 @@ impl AgentMcpServer {
         let output = tools.join("\n");
         Ok(CallToolResult::success(vec![Content::text(output)]))
     }
+
+    // ========================================================================
+    // Run Analysis Tools
+    // ========================================================================
+
+    /// Helper to ensure database is available
+    fn ensure_db(&self) -> Result<&Database, McpError> {
+        self.db.as_ref().ok_or_else(|| {
+            McpError::internal_error(
+                "Run tracking is not available. Enable with `enable_runs: true` in config.".to_string(),
+                None,
+            )
+        })
+    }
+
+    /// Helper to find run by ID prefix
+    fn find_run_by_prefix(&self, prefix: &str) -> Result<Run, McpError> {
+        let db = self.ensure_db()?;
+
+        // First try exact match
+        if let Ok(Some(run)) = db.get_run(prefix) {
+            return Ok(run);
+        }
+
+        // Then try prefix match
+        let filter = RunFilter {
+            limit: Some(100),
+            ..Default::default()
+        };
+        let runs = db
+            .list_runs(&filter)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        let matches: Vec<_> = runs.iter().filter(|r| r.id.starts_with(prefix)).collect();
+
+        match matches.len() {
+            0 => Err(McpError::invalid_params(
+                format!("No run found matching prefix: {}", prefix),
+                None,
+            )),
+            1 => {
+                // Get full run data
+                db.get_run(&matches[0].id)
+                    .map_err(|e| McpError::internal_error(e.to_string(), None))?
+                    .ok_or_else(|| McpError::internal_error("Run disappeared".to_string(), None))
+            }
+            _ => Err(McpError::invalid_params(
+                format!(
+                    "Multiple runs match prefix '{}': {}",
+                    prefix,
+                    matches.iter().map(|r| &r.id[..8]).collect::<Vec<_>>().join(", ")
+                ),
+                None,
+            )),
+        }
+    }
+
+    #[tool(description = "List workflow runs with optional filtering by workflow name and status.")]
+    async fn list_runs(
+        &self,
+        Parameters(params): Parameters<ListRunsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!(
+            "list_runs: workflow={:?}, status={:?}, limit={:?}",
+            params.workflow,
+            params.status,
+            params.limit
+        );
+
+        let db = self.ensure_db()?;
+
+        let status = params
+            .status
+            .as_ref()
+            .map(|s| {
+                s.parse::<RunStatus>()
+                    .map_err(|e| McpError::invalid_params(e.to_string(), None))
+            })
+            .transpose()?;
+
+        let filter = RunFilter {
+            workflow_name: params.workflow,
+            status,
+            limit: Some(params.limit.unwrap_or(20)),
+            ..Default::default()
+        };
+
+        let runs = db
+            .list_runs(&filter)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        if runs.is_empty() {
+            return Ok(CallToolResult::success(vec![Content::text(
+                "No runs found matching the filter criteria.",
+            )]));
+        }
+
+        // Format as a table
+        let mut output = String::from("| ID | Workflow | Status | Duration | Started |\n");
+        output.push_str("|----------|----------|----------|----------|----------|\n");
+
+        for run in &runs {
+            let duration = run
+                .duration_ms
+                .map(|ms| format_duration(ms))
+                .unwrap_or_else(|| "running".to_string());
+            let started = run.started_at.format("%Y-%m-%d %H:%M").to_string();
+
+            output.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                &run.id[..8],
+                run.workflow_name,
+                run.status,
+                duration,
+                started
+            ));
+        }
+
+        output.push_str(&format!("\nTotal: {} runs", runs.len()));
+
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(
+        description = "Get detailed information about a specific run, optionally including events and metrics."
+    )]
+    async fn get_run(
+        &self,
+        Parameters(params): Parameters<GetRunParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!(
+            "get_run: id={}, events={:?}, metrics={:?}",
+            params.id,
+            params.include_events,
+            params.include_metrics
+        );
+
+        let db = self.ensure_db()?;
+        let run = self.find_run_by_prefix(&params.id)?;
+
+        let mut output = serde_json::json!({
+            "id": run.id,
+            "workflow": run.workflow_name,
+            "task": run.task,
+            "status": run.status.to_string(),
+            "model": run.model,
+            "started_at": run.started_at.to_rfc3339(),
+            "completed_at": run.completed_at.map(|t| t.to_rfc3339()),
+            "duration_ms": run.duration_ms,
+            "error": run.error,
+        });
+
+        if params.include_events.unwrap_or(false) {
+            let events = db
+                .get_run_events(&run.id)
+                .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            output["events"] = serde_json::to_value(&events).unwrap_or_default();
+            output["event_count"] = serde_json::json!(events.len());
+        }
+
+        if params.include_metrics.unwrap_or(false) {
+            let metrics = db
+                .get_run_metrics(&run.id)
+                .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            if let Some(m) = metrics {
+                output["metrics"] = serde_json::to_value(&m).unwrap_or_default();
+            }
+        }
+
+        let json_str = serde_json::to_string_pretty(&output)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json_str)]))
+    }
+
+    #[tool(
+        description = "Export a run as a detailed analysis report in markdown or JSON format for review."
+    )]
+    async fn export_run(
+        &self,
+        Parameters(params): Parameters<ExportRunParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!("export_run: id={}, format={:?}", params.id, params.format);
+
+        let db = self.ensure_db()?;
+        let run = self.find_run_by_prefix(&params.id)?;
+
+        let events = db
+            .get_run_events(&run.id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        let metrics = db
+            .get_run_metrics(&run.id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        let format = params.format.as_deref().unwrap_or("markdown");
+
+        let output = match format {
+            "json" => {
+                let export = serde_json::json!({
+                    "run": run,
+                    "events": events,
+                    "metrics": metrics,
+                });
+                serde_json::to_string_pretty(&export)
+                    .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            }
+            _ => export_markdown(&run, &events, metrics.as_ref()),
+        };
+
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(description = "List recorded improvements and their impact on workflow execution.")]
+    async fn list_improvements(
+        &self,
+        Parameters(params): Parameters<ListImprovementsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!(
+            "list_improvements: category={:?}, status={:?}, limit={:?}",
+            params.category,
+            params.status,
+            params.limit
+        );
+
+        let db = self.ensure_db()?;
+
+        let category = params
+            .category
+            .as_ref()
+            .map(|c| {
+                c.parse()
+                    .map_err(|e: anyhow::Error| McpError::invalid_params(e.to_string(), None))
+            })
+            .transpose()?;
+
+        let status = params
+            .status
+            .as_ref()
+            .map(|s| {
+                s.parse()
+                    .map_err(|e: anyhow::Error| McpError::invalid_params(e.to_string(), None))
+            })
+            .transpose()?;
+
+        let filter = ImprovementFilter {
+            category,
+            status,
+            limit: Some(params.limit.unwrap_or(20)),
+            ..Default::default()
+        };
+
+        let improvements = db
+            .list_improvements(&filter)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        if improvements.is_empty() {
+            return Ok(CallToolResult::success(vec![Content::text(
+                "No improvements found matching the filter criteria.",
+            )]));
+        }
+
+        let mut output = String::from("| ID | Category | Status | Description | Created |\n");
+        output.push_str("|----------|----------|----------|----------|----------|\n");
+
+        for imp in &improvements {
+            let created = imp.created_at.format("%Y-%m-%d").to_string();
+            let desc = if imp.description.len() > 40 {
+                format!("{}...", &imp.description[..37])
+            } else {
+                imp.description.clone()
+            };
+
+            output.push_str(&format!(
+                "| {} | {} | {} | {} | {} |\n",
+                &imp.id[..8],
+                imp.category,
+                imp.status,
+                desc,
+                created
+            ));
+        }
+
+        output.push_str(&format!("\nTotal: {} improvements", improvements.len()));
+
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Format duration in milliseconds to human-readable string
+fn format_duration(ms: i64) -> String {
+    let seconds = ms / 1000;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+
+    if hours > 0 {
+        format!("{}h {}m", hours, minutes % 60)
+    } else if minutes > 0 {
+        format!("{}m {}s", minutes, seconds % 60)
+    } else if seconds > 0 {
+        format!("{}s", seconds)
+    } else {
+        format!("{}ms", ms)
+    }
+}
+
+/// Export run as markdown analysis report
+fn export_markdown(run: &Run, events: &[RunEvent], metrics: Option<&RunMetrics>) -> String {
+    let mut output = String::new();
+
+    // Header
+    output.push_str(&format!("# Run Analysis: {}\n\n", &run.id[..8]));
+
+    // Overview
+    output.push_str("## Overview\n\n");
+    output.push_str(&format!("- **Workflow:** {}\n", run.workflow_name));
+    output.push_str(&format!("- **Task:** {}\n", run.task));
+    output.push_str(&format!("- **Status:** {}\n", run.status));
+    if let Some(ms) = run.duration_ms {
+        output.push_str(&format!("- **Duration:** {}\n", format_duration(ms)));
+    }
+    output.push_str(&format!("- **Model:** {}\n", run.model));
+    output.push_str(&format!(
+        "- **Started:** {}\n",
+        run.started_at.format("%Y-%m-%d %H:%M:%S")
+    ));
+    if let Some(completed) = run.completed_at {
+        output.push_str(&format!(
+            "- **Completed:** {}\n",
+            completed.format("%Y-%m-%d %H:%M:%S")
+        ));
+    }
+    output.push('\n');
+
+    // Error (if any)
+    if let Some(ref error) = run.error {
+        output.push_str("## Error\n\n");
+        output.push_str(&format!("```\n{}\n```\n\n", error));
+    }
+
+    // Metrics
+    if let Some(m) = metrics {
+        output.push_str("## Metrics\n\n");
+        output.push_str(&format!("- **Total Tool Calls:** {}\n", m.total_tool_calls));
+        output.push_str(&format!("- **Successful:** {}\n", m.successful_tool_calls));
+        output.push_str(&format!("- **Failed:** {}\n", m.failed_tool_calls));
+        output.push_str(&format!("- **Files Read:** {}\n", m.files_read));
+        output.push_str(&format!("- **Files Modified:** {}\n", m.files_modified));
+        if let (Some(tokens_in), Some(tokens_out)) = (m.total_tokens_in, m.total_tokens_out) {
+            output.push_str(&format!("- **Tokens (in/out):** {} / {}\n", tokens_in, tokens_out));
+        }
+        output.push('\n');
+    }
+
+    // Events Summary
+    if !events.is_empty() {
+        output.push_str("## Events\n\n");
+
+        // Group by step
+        let mut current_step: Option<usize> = None;
+        for event in events {
+            if current_step != Some(event.step_index) {
+                current_step = Some(event.step_index);
+                output.push_str(&format!("\n### Step {}\n\n", event.step_index + 1));
+            }
+
+            let timestamp = event.timestamp.format("%H:%M:%S").to_string();
+            output.push_str(&format!(
+                "- `{}` **{}**: ",
+                timestamp, event.event_type
+            ));
+
+            // Extract meaningful info from event data (already a Value)
+            if let Some(name) = event.event_data.get("name") {
+                output.push_str(&format!("{}", name.as_str().unwrap_or("?")));
+            }
+            if let Some(is_error) = event.event_data.get("is_error") {
+                if is_error.as_bool().unwrap_or(false) {
+                    output.push_str(" [ERROR]");
+                }
+            }
+            output.push('\n');
+        }
+        output.push('\n');
+    }
+
+    // Context (if available and non-empty)
+    if let Some(ref context) = run.context {
+        // Check if context is a non-empty object or array
+        let has_content = match context {
+            serde_json::Value::Object(map) => !map.is_empty(),
+            serde_json::Value::Array(arr) => !arr.is_empty(),
+            serde_json::Value::Null => false,
+            _ => true,
+        };
+        if has_content {
+            output.push_str("## Context\n\n");
+            output.push_str("```json\n");
+            if let Ok(pretty) = serde_json::to_string_pretty(&context) {
+                output.push_str(&pretty);
+            } else {
+                output.push_str(&context.to_string());
+            }
+            output.push_str("\n```\n\n");
+        }
+    }
+
+    // Analysis Questions
+    output.push_str("## Analysis Questions\n\n");
+    output.push_str("1. Were there any unexpected tool failures?\n");
+    output.push_str("2. Could the workflow be optimized to reduce duration?\n");
+    output.push_str("3. Were the right tools used for each step?\n");
+    output.push_str("4. Any patterns that suggest prompt improvements?\n");
+
+    output
 }
 
 // ============================================================================

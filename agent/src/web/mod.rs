@@ -3,6 +3,7 @@
 //! Provides an HTTP server with REST API and WebSocket support for the chat UI.
 
 pub mod api;
+pub mod runs;
 pub mod state;
 pub mod workflows;
 pub mod ws;
@@ -90,6 +91,13 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         .route("/workflows/runs/:id/checkpoint", post(workflows::submit_checkpoint))
         // Agents (orchestrator agents)
         .route("/agents", get(workflows::list_agents))
+        // Runs (analysis)
+        .route("/runs", get(runs::list_runs))
+        .route("/runs/:id", get(runs::get_run))
+        .route("/runs/:id/events", get(runs::get_run_events))
+        .route("/runs/:id/metrics", get(runs::get_run_metrics))
+        .route("/runs/:id/export", get(runs::export_run))
+        .route("/improvements", get(runs::list_improvements).post(runs::create_improvement))
         // Health
         .route("/health", get(api::health_check));
 
@@ -204,6 +212,16 @@ pnpm dev</pre>
         <li><code>GET /api/workflows/runs/:id</code> - Get workflow run status</li>
         <li><code>POST /api/workflows/runs/:id/checkpoint</code> - Respond to checkpoint</li>
         <li><code>GET /api/agents</code> - List orchestrator agents</li>
+    </ul>
+    <h2>Run Analysis Endpoints</h2>
+    <ul>
+        <li><code>GET /api/runs</code> - List workflow runs (filter: ?limit, ?workflow, ?status, ?model)</li>
+        <li><code>GET /api/runs/:id</code> - Get run details</li>
+        <li><code>GET /api/runs/:id/events</code> - Get run events (tool calls, etc.)</li>
+        <li><code>GET /api/runs/:id/metrics</code> - Get run metrics</li>
+        <li><code>GET /api/runs/:id/export</code> - Export run as markdown</li>
+        <li><code>GET /api/improvements</code> - List improvements (filter: ?category, ?run_id)</li>
+        <li><code>POST /api/improvements</code> - Create improvement</li>
     </ul>
 </body>
 </html>"#,
