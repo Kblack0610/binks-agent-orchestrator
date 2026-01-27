@@ -61,8 +61,8 @@ pub async fn issue_view(params: IssueViewParams) -> Result<CallToolResult, McpEr
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string(&issue)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+    let json =
+        serde_json::to_string(&issue).map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
 

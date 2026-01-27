@@ -54,8 +54,8 @@ pub async fn pr_list(params: PrListParams) -> Result<CallToolResult, McpError> {
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string(&prs)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+    let json =
+        serde_json::to_string(&prs).map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
 
@@ -68,8 +68,8 @@ pub async fn pr_view(params: PrViewParams) -> Result<CallToolResult, McpError> {
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string(&pr)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+    let json =
+        serde_json::to_string(&pr).map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
 

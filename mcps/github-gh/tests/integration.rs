@@ -65,10 +65,14 @@ fn read_issue_list() {
 
     let repo = test_repo();
     let result = gh_exec(&[
-        "issue", "list",
-        "-R", &repo,
-        "-L", "5",
-        "--json", "number,title,state,author,url",
+        "issue",
+        "list",
+        "-R",
+        &repo,
+        "-L",
+        "5",
+        "--json",
+        "number,title,state,author,url",
     ]);
 
     assert!(result.is_ok(), "gh issue list failed: {:?}", result.err());
@@ -93,17 +97,25 @@ fn read_issue_list_minimal_fields() {
 
     // Test minimal fields (matches our list_fields_minimal)
     let result = gh_exec(&[
-        "issue", "list",
-        "-R", &repo,
-        "-L", "3",
-        "--json", "number,title,state,author,url",
+        "issue",
+        "list",
+        "-R",
+        &repo,
+        "-L",
+        "3",
+        "--json",
+        "number,title,state,author,url",
     ]);
 
-    assert!(result.is_ok(), "gh issue list (minimal) failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "gh issue list (minimal) failed: {:?}",
+        result.err()
+    );
     let output = result.unwrap();
 
-    let parsed: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Output is not valid JSON");
+    let parsed: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Output is not valid JSON");
 
     // Verify minimal fields are present
     if let Some(issue) = parsed.first() {
@@ -124,11 +136,16 @@ fn read_pr_list() {
 
     let repo = test_repo();
     let result = gh_exec(&[
-        "pr", "list",
-        "-R", &repo,
-        "-L", "5",
-        "-s", "all",
-        "--json", "number,title,state,author,headRefName,isDraft,url",
+        "pr",
+        "list",
+        "-R",
+        &repo,
+        "-L",
+        "5",
+        "-s",
+        "all",
+        "--json",
+        "number,title,state,author,headRefName,isDraft,url",
     ]);
 
     assert!(result.is_ok(), "gh pr list failed: {:?}", result.err());
@@ -152,25 +169,37 @@ fn read_pr_list_minimal_fields() {
 
     // Test minimal fields (matches our list_fields_minimal)
     let result = gh_exec(&[
-        "pr", "list",
-        "-R", &repo,
-        "-L", "3",
-        "-s", "all",
-        "--json", "number,title,state,author,headRefName,isDraft,url",
+        "pr",
+        "list",
+        "-R",
+        &repo,
+        "-L",
+        "3",
+        "-s",
+        "all",
+        "--json",
+        "number,title,state,author,headRefName,isDraft,url",
     ]);
 
-    assert!(result.is_ok(), "gh pr list (minimal) failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "gh pr list (minimal) failed: {:?}",
+        result.err()
+    );
     let output = result.unwrap();
 
-    let parsed: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Output is not valid JSON");
+    let parsed: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Output is not valid JSON");
 
     // Verify minimal fields are present
     if let Some(pr) = parsed.first() {
         assert!(pr.get("number").is_some(), "Missing 'number' field");
         assert!(pr.get("title").is_some(), "Missing 'title' field");
         assert!(pr.get("state").is_some(), "Missing 'state' field");
-        assert!(pr.get("headRefName").is_some(), "Missing 'headRefName' field");
+        assert!(
+            pr.get("headRefName").is_some(),
+            "Missing 'headRefName' field"
+        );
         assert!(pr.get("url").is_some(), "Missing 'url' field");
     }
 }
@@ -185,16 +214,18 @@ fn read_repo_view() {
 
     let repo = test_repo();
     let result = gh_exec(&[
-        "repo", "view",
+        "repo",
+        "view",
         &repo,
-        "--json", "name,owner,description,url,defaultBranchRef",
+        "--json",
+        "name,owner,description,url,defaultBranchRef",
     ]);
 
     assert!(result.is_ok(), "gh repo view failed: {:?}", result.err());
     let output = result.unwrap();
 
-    let parsed: serde_json::Value = serde_json::from_str(&output)
-        .expect("Output is not valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&output).expect("Output is not valid JSON");
 
     assert!(parsed.get("name").is_some(), "Missing 'name' field");
     assert!(parsed.get("url").is_some(), "Missing 'url' field");
@@ -211,13 +242,13 @@ fn read_workflow_list() {
     }
 
     let repo = test_repo();
-    let result = gh_exec(&[
-        "workflow", "list",
-        "-R", &repo,
-        "--json", "name,id,state",
-    ]);
+    let result = gh_exec(&["workflow", "list", "-R", &repo, "--json", "name,id,state"]);
 
-    assert!(result.is_ok(), "gh workflow list failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "gh workflow list failed: {:?}",
+        result.err()
+    );
     let output = result.unwrap();
 
     let parsed: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&output);
@@ -238,11 +269,7 @@ fn read_pr_checks() {
 
     // First get the latest PR number
     let pr_list = gh_exec(&[
-        "pr", "list",
-        "-R", &repo,
-        "-L", "1",
-        "-s", "all",
-        "--json", "number",
+        "pr", "list", "-R", &repo, "-L", "1", "-s", "all", "--json", "number",
     ]);
 
     if pr_list.is_err() {
@@ -250,8 +277,7 @@ fn read_pr_checks() {
         return;
     }
 
-    let prs: Vec<serde_json::Value> = serde_json::from_str(&pr_list.unwrap())
-        .unwrap_or_default();
+    let prs: Vec<serde_json::Value> = serde_json::from_str(&pr_list.unwrap()).unwrap_or_default();
 
     if prs.is_empty() {
         eprintln!("Skipping: No PRs found in repo");
@@ -273,7 +299,11 @@ fn read_pr_checks() {
         "gh pr checks returned unexpected exit code"
     );
 
-    println!("PR #{} checks output length: {} bytes", pr_number, output.stdout.len());
+    println!(
+        "PR #{} checks output length: {} bytes",
+        pr_number,
+        output.stdout.len()
+    );
 }
 
 // ============================================================================
@@ -290,18 +320,22 @@ fn read_json_is_compact() {
 
     let repo = test_repo();
     let result = gh_exec(&[
-        "issue", "list",
-        "-R", &repo,
-        "-L", "1",
-        "--json", "number,title",
+        "issue",
+        "list",
+        "-R",
+        &repo,
+        "-L",
+        "1",
+        "--json",
+        "number,title",
     ]);
 
     assert!(result.is_ok());
     let output = result.unwrap();
 
     // Verify JSON is parseable
-    let _: Vec<serde_json::Value> = serde_json::from_str(&output)
-        .expect("Output is not valid JSON");
+    let _: Vec<serde_json::Value> =
+        serde_json::from_str(&output).expect("Output is not valid JSON");
 
     // Note: gh CLI returns compact JSON by default, our MCP now does too
     println!("JSON output: {}", output.trim());
@@ -329,33 +363,49 @@ fn write_issue_create_and_close() {
 
     // Create test issue
     let create_result = gh_exec(&[
-        "issue", "create",
-        "-R", &repo,
-        "-t", "[TEST] Integration test issue - please ignore",
-        "-b", "This issue was created by an automated integration test and should be deleted.",
+        "issue",
+        "create",
+        "-R",
+        &repo,
+        "-t",
+        "[TEST] Integration test issue - please ignore",
+        "-b",
+        "This issue was created by an automated integration test and should be deleted.",
     ]);
 
-    assert!(create_result.is_ok(), "Failed to create issue: {:?}", create_result.err());
+    assert!(
+        create_result.is_ok(),
+        "Failed to create issue: {:?}",
+        create_result.err()
+    );
     let url = create_result.unwrap();
     println!("Created issue: {}", url.trim());
 
     // Extract issue number from URL
-    let number: u32 = url.trim()
+    let number: u32 = url
+        .trim()
         .split('/')
-        .last()
+        .next_back()
         .and_then(|s| s.parse().ok())
         .expect("Could not parse issue number from URL");
 
     // Close the issue
     let number_str = number.to_string();
     let close_result = gh_exec(&[
-        "issue", "close",
+        "issue",
+        "close",
         &number_str,
-        "-R", &repo,
-        "-c", "Closing test issue",
+        "-R",
+        &repo,
+        "-c",
+        "Closing test issue",
     ]);
 
-    assert!(close_result.is_ok(), "Failed to close issue: {:?}", close_result.err());
+    assert!(
+        close_result.is_ok(),
+        "Failed to close issue: {:?}",
+        close_result.err()
+    );
     println!("Closed issue #{}", number);
 }
 
@@ -377,11 +427,7 @@ fn write_issue_comment() {
 
     // Get first open issue to comment on
     let list_result = gh_exec(&[
-        "issue", "list",
-        "-R", &repo,
-        "-L", "1",
-        "-s", "open",
-        "--json", "number",
+        "issue", "list", "-R", &repo, "-L", "1", "-s", "open", "--json", "number",
     ]);
 
     if list_result.is_err() {
@@ -389,8 +435,8 @@ fn write_issue_comment() {
         return;
     }
 
-    let issues: Vec<serde_json::Value> = serde_json::from_str(&list_result.unwrap())
-        .unwrap_or_default();
+    let issues: Vec<serde_json::Value> =
+        serde_json::from_str(&list_result.unwrap()).unwrap_or_default();
 
     if issues.is_empty() {
         eprintln!("Skipping: No open issues to comment on");
@@ -401,12 +447,19 @@ fn write_issue_comment() {
     let number_str = number.to_string();
 
     let comment_result = gh_exec(&[
-        "issue", "comment",
+        "issue",
+        "comment",
         &number_str,
-        "-R", &repo,
-        "-b", "Integration test comment - please ignore",
+        "-R",
+        &repo,
+        "-b",
+        "Integration test comment - please ignore",
     ]);
 
-    assert!(comment_result.is_ok(), "Failed to add comment: {:?}", comment_result.err());
+    assert!(
+        comment_result.is_ok(),
+        "Failed to add comment: {:?}",
+        comment_result.err()
+    );
     println!("Added comment to issue #{}", number);
 }

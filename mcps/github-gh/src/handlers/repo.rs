@@ -39,8 +39,8 @@ pub async fn repo_list(params: RepoListParams) -> Result<CallToolResult, McpErro
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string(&repos)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+    let json =
+        serde_json::to_string(&repos).map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
 
@@ -52,7 +52,7 @@ pub async fn repo_view(params: RepoViewParams) -> Result<CallToolResult, McpErro
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string(&repo)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+    let json =
+        serde_json::to_string(&repo).map_err(|e| McpError::internal_error(e.to_string(), None))?;
     Ok(CallToolResult::success(vec![Content::text(json)]))
 }
