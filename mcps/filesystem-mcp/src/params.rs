@@ -91,6 +91,21 @@ pub struct EditFileParams {
     pub new_string: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ReadMultipleFilesParams {
+    #[schemars(description = "Array of file paths to read. Each file is read independently; failures for individual files don't affect others.")]
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct DirectoryTreeParams {
+    #[schemars(description = "Path to the root directory for the tree")]
+    pub path: String,
+
+    #[schemars(description = "Maximum depth to traverse (default: 3, max: 10)")]
+    pub depth: Option<u32>,
+}
+
 fn default_true() -> bool {
     true
 }

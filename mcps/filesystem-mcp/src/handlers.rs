@@ -11,8 +11,10 @@ use tokio::io::AsyncWriteExt;
 use crate::params::*;
 use crate::sandbox::Sandbox;
 use crate::types::{
-    Config, DeleteFileResponse, EditFileResponse, FileEntry, FileInfoResponse, FsError,
-    ListDirResponse, MoveFileResponse, ReadFileResponse, SearchFilesResponse, WriteFileResponse,
+    Config, DeleteFileResponse, DirectoryTreeResponse, EditFileResponse, FileEntry,
+    FileInfoResponse, FileReadResult, FsError, ListDirResponse, MoveFileResponse,
+    ReadFileResponse, ReadMultipleFilesResponse, SearchFilesResponse, TreeEntry,
+    WriteFileResponse,
 };
 
 // ============================================================================
@@ -109,13 +111,46 @@ pub async fn write_file(
         }));
     }
 
-    let mut file = fs::File::create(&canonical)
-        .await
-        .map_err(|e| internal_error(e.to_string()))?;
+    // Atomic write: write to temp file then rename to target
+    let parent = canonical
+        .parent()
+        .ok_or_else(|| internal_error("Cannot determine parent directory".to_string()))?;
+    let file_name = canonical
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "file".to_string());
+    let temp_path = parent.join(format!(
+        ".{}.tmp.{}",
+        file_name,
+        std::process::id()
+    ));
 
-    file.write_all(params.content.as_bytes())
-        .await
-        .map_err(|e| internal_error(e.to_string()))?;
+    // Write to temp file
+    let write_result = async {
+        let mut file = fs::File::create(&temp_path)
+            .await
+            .map_err(|e| internal_error(format!("Failed to create temp file: {}", e)))?;
+        file.write_all(params.content.as_bytes())
+            .await
+            .map_err(|e| internal_error(format!("Failed to write temp file: {}", e)))?;
+        file.sync_all()
+            .await
+            .map_err(|e| internal_error(format!("Failed to sync temp file: {}", e)))?;
+        Ok::<(), McpError>(())
+    }
+    .await;
+
+    // If write failed, clean up temp file
+    if let Err(e) = write_result {
+        let _ = fs::remove_file(&temp_path).await;
+        return Err(e);
+    }
+
+    // Atomic rename
+    if let Err(e) = fs::rename(&temp_path, &canonical).await {
+        let _ = fs::remove_file(&temp_path).await;
+        return Err(internal_error(format!("Failed to rename temp file: {}", e)));
+    }
 
     let response = WriteFileResponse {
         path: canonical.display().to_string(),
@@ -501,4 +536,171 @@ pub async fn list_allowed_directories(sandbox: &Sandbox) -> Result<CallToolResul
     });
 
     json_success(&response)
+}
+
+pub async fn read_multiple_files(
+    sandbox: &Sandbox,
+    config: &Config,
+    params: ReadMultipleFilesParams,
+) -> Result<CallToolResult, McpError> {
+    let mut results = Vec::with_capacity(params.paths.len());
+    let mut succeeded = 0usize;
+    let mut failed = 0usize;
+
+    for path_str in &params.paths {
+        match read_single_file(sandbox, config, path_str).await {
+            Ok((content, size)) => {
+                results.push(FileReadResult {
+                    path: path_str.clone(),
+                    content: Some(content),
+                    size: Some(size),
+                    error: None,
+                });
+                succeeded += 1;
+            }
+            Err(e) => {
+                results.push(FileReadResult {
+                    path: path_str.clone(),
+                    content: None,
+                    size: None,
+                    error: Some(e),
+                });
+                failed += 1;
+            }
+        }
+    }
+
+    let total = results.len();
+    let response = ReadMultipleFilesResponse {
+        results,
+        total,
+        succeeded,
+        failed,
+    };
+
+    json_success(&response)
+}
+
+/// Read a single file, returning (content, size) or an error string
+async fn read_single_file(
+    sandbox: &Sandbox,
+    config: &Config,
+    path: &str,
+) -> Result<(String, u64), String> {
+    let canonical = sandbox.validate_read(path).map_err(|e| e.to_string())?;
+
+    let metadata = fs::metadata(&canonical)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if metadata.len() > config.limits.max_file_size as u64 {
+        return Err(format!(
+            "File too large: {} bytes (max {})",
+            metadata.len(),
+            config.limits.max_file_size
+        ));
+    }
+
+    let content = fs::read_to_string(&canonical)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok((content, metadata.len()))
+}
+
+pub async fn directory_tree(
+    sandbox: &Sandbox,
+    config: &Config,
+    params: DirectoryTreeParams,
+) -> Result<CallToolResult, McpError> {
+    let canonical = sandbox
+        .validate_read(&params.path)
+        .map_err(fs_error_to_mcp)?;
+
+    let max_depth = params.depth.unwrap_or(3).min(10) as usize;
+    let mut total_entries = 0usize;
+
+    let tree = build_tree_entry(
+        sandbox,
+        &canonical,
+        0,
+        max_depth,
+        config.limits.max_files_per_list,
+        &mut total_entries,
+    )
+    .await
+    .map_err(|e| internal_error(e.to_string()))?;
+
+    let response = DirectoryTreeResponse {
+        tree,
+        total_entries,
+    };
+
+    json_success(&response)
+}
+
+/// Recursively build a tree of directory entries
+async fn build_tree_entry(
+    sandbox: &Sandbox,
+    path: &Path,
+    current_depth: usize,
+    max_depth: usize,
+    max_entries: usize,
+    total_entries: &mut usize,
+) -> Result<TreeEntry, std::io::Error> {
+    let metadata = fs::metadata(path).await?;
+    let is_dir = metadata.is_dir();
+
+    let mut entry = TreeEntry {
+        name: path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.display().to_string()),
+        path: path.display().to_string(),
+        entry_type: if is_dir {
+            "directory".to_string()
+        } else {
+            "file".to_string()
+        },
+        size: if is_dir { None } else { Some(metadata.len()) },
+        children: None,
+    };
+
+    *total_entries += 1;
+
+    if is_dir && current_depth < max_depth && *total_entries < max_entries {
+        let mut children = Vec::new();
+        let mut read_dir = fs::read_dir(path).await?;
+
+        while let Some(child) = read_dir.next_entry().await? {
+            if *total_entries >= max_entries {
+                break;
+            }
+
+            let child_path = child.path();
+
+            // Skip paths not allowed by sandbox
+            if sandbox.check_read(&child_path).is_err() {
+                continue;
+            }
+
+            match Box::pin(build_tree_entry(
+                sandbox,
+                &child_path,
+                current_depth + 1,
+                max_depth,
+                max_entries,
+                total_entries,
+            ))
+            .await
+            {
+                Ok(child_entry) => children.push(child_entry),
+                Err(_) => continue, // Skip unreadable entries
+            }
+        }
+
+        entry.children = Some(children);
+    }
+
+    Ok(entry)
 }
