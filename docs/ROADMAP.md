@@ -124,7 +124,7 @@ We use a strategic mix of **pre-built tools** (for common operations) and **cust
 ### Phase S4: PR Testing (P2)
 **Goal:** Enable automated PR review and testing
 
-- [ ] Create `exec-mcp` for command execution
+- [x] Create `exec-mcp` for command execution
 - [ ] Add `test-pr` workflow
 - [ ] Language-agnostic test runners (Node, Rust, Python, Go)
 
