@@ -212,6 +212,26 @@ impl FilesystemMcpServer {
     }
 
     #[tool(
+        description = "Read multiple files simultaneously. Each file is read independently; failures for individual files don't affect others. Returns results for all requested files."
+    )]
+    async fn read_multiple_files(
+        &self,
+        Parameters(params): Parameters<ReadMultipleFilesParams>,
+    ) -> Result<CallToolResult, McpError> {
+        handlers::read_multiple_files(&self.sandbox, &self.config, params).await
+    }
+
+    #[tool(
+        description = "Get a recursive directory tree structure as nested JSON. Returns file names, types, and sizes organized hierarchically."
+    )]
+    async fn directory_tree(
+        &self,
+        Parameters(params): Parameters<DirectoryTreeParams>,
+    ) -> Result<CallToolResult, McpError> {
+        handlers::directory_tree(&self.sandbox, &self.config, params).await
+    }
+
+    #[tool(
         description = "List allowed directories that this server can access for reading and writing."
     )]
     async fn list_allowed_directories(&self) -> Result<CallToolResult, McpError> {

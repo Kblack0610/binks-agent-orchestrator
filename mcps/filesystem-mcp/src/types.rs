@@ -286,6 +286,44 @@ pub struct EditFileResponse {
     pub snippet: String,
 }
 
+/// Result for a single file in a batch read
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileReadResult {
+    pub path: String,
+    pub content: Option<String>,
+    pub size: Option<u64>,
+    pub error: Option<String>,
+}
+
+/// Response for read_multiple_files operation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReadMultipleFilesResponse {
+    pub results: Vec<FileReadResult>,
+    pub total: usize,
+    pub succeeded: usize,
+    pub failed: usize,
+}
+
+/// A node in the directory tree
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TreeEntry {
+    pub name: String,
+    pub path: String,
+    #[serde(rename = "type")]
+    pub entry_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<TreeEntry>>,
+}
+
+/// Response for directory_tree operation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DirectoryTreeResponse {
+    pub tree: TreeEntry,
+    pub total_entries: usize,
+}
+
 /// Response for file_info operation
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileInfoResponse {

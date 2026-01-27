@@ -69,6 +69,13 @@ impl Sandbox {
 
     /// Resolve a user-provided path to a canonical path
     pub fn resolve_path(&self, path: &str) -> FsResult<PathBuf> {
+        // Reject paths containing null bytes (defense-in-depth)
+        if path.contains('\0') {
+            return Err(FsError::InvalidPath(
+                "Path contains null byte".to_string(),
+            ));
+        }
+
         let expanded = if let Some(stripped) = path.strip_prefix("~/") {
             self.home_dir.join(stripped)
         } else if path == "~" {
@@ -159,6 +166,13 @@ impl Sandbox {
     /// Validate a path for writing, returning the canonical path
     /// For write operations on non-existent files, validates the parent directory
     pub fn validate_write(&self, path: &str) -> FsResult<PathBuf> {
+        // Reject paths containing null bytes (defense-in-depth)
+        if path.contains('\0') {
+            return Err(FsError::InvalidPath(
+                "Path contains null byte".to_string(),
+            ));
+        }
+
         let expanded = if let Some(stripped) = path.strip_prefix("~/") {
             self.home_dir.join(stripped)
         } else if path == "~" {
