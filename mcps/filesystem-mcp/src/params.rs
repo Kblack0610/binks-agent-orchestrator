@@ -75,6 +75,22 @@ pub struct CreateDirParams {
     pub recursive: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct EditFileParams {
+    #[schemars(description = "Path to the file to edit")]
+    pub path: String,
+
+    #[schemars(
+        description = "The exact text to find and replace. If empty, new_string is prepended to the file."
+    )]
+    pub old_string: String,
+
+    #[schemars(
+        description = "The replacement text. If empty, the matched old_string is deleted."
+    )]
+    pub new_string: String,
+}
+
 fn default_true() -> bool {
     true
 }
