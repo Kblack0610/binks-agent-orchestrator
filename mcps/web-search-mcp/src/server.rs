@@ -3,7 +3,6 @@
 //! This module defines the main MCP server that exposes web search
 //! tools with pluggable backend support.
 
-use anyhow::Result;
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
@@ -64,7 +63,20 @@ pub struct ImageSearchParams {
 
 #[tool_router]
 impl WebSearchMcpServer {
-    pub async fn new(config: Config) -> Result<Self> {
+    /// Create a new server, loading config from standard locations
+    ///
+    /// Config is loaded from:
+    /// 1. Environment variable SEARXNG_URL (highest priority for URL)
+    /// 2. Environment variable WEB_SEARCH_CONFIG_PATH
+    /// 3. ~/.binks/web-search.toml
+    /// 4. Default values
+    pub fn new() -> Self {
+        let config = Config::load().expect("Failed to load web-search configuration");
+        Self::with_config(config)
+    }
+
+    /// Create a new server with explicit config
+    pub fn with_config(config: Config) -> Self {
         // SearXNG is the only supported backend (self-hosted, no API keys needed)
         tracing::info!("Using SearXNG backend at {}", config.searxng.url);
         let backend: Arc<dyn SearchBackend> = Arc::new(SearXNGBackend::new(config.searxng.clone()));
@@ -76,11 +88,11 @@ impl WebSearchMcpServer {
             );
         }
 
-        Ok(Self {
+        Self {
             backend,
             config,
             tool_router: Self::tool_router(),
-        })
+        }
     }
 
     // ========================================================================
@@ -193,5 +205,11 @@ impl rmcp::ServerHandler for WebSearchMcpServer {
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             ..Default::default()
         }
+    }
+}
+
+impl Default for WebSearchMcpServer {
+    fn default() -> Self {
+        Self::new()
     }
 }

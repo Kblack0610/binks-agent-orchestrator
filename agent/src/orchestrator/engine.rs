@@ -444,10 +444,8 @@ impl WorkflowEngine {
                 if let Err(e) = db.fail_run(run_id, error) {
                     tracing::warn!("Failed to record run failure: {}", e);
                 }
-            } else {
-                if let Err(e) = db.complete_run(run_id, context_json.as_ref()) {
-                    tracing::warn!("Failed to record run completion: {}", e);
-                }
+            } else if let Err(e) = db.complete_run(run_id, context_json.as_ref()) {
+                tracing::warn!("Failed to record run completion: {}", e);
             }
             tracing::info!(run_id = %run_id, "Run recording completed");
         }

@@ -202,7 +202,9 @@ impl From<Improvement> for ImprovementResponse {
             description: imp.description,
             related_runs: imp.related_runs,
             changes_made: imp.changes_made,
-            impact: imp.impact.map(|v| serde_json::to_string(&v).unwrap_or_default()),
+            impact: imp
+                .impact
+                .map(|v| serde_json::to_string(&v).unwrap_or_default()),
             created_at: imp.created_at.to_rfc3339(),
         }
     }

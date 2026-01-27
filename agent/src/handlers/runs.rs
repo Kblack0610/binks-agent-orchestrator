@@ -73,7 +73,7 @@ async fn run_list(
         };
         let duration = run
             .duration_ms
-            .map(|d| format_duration(d))
+            .map(format_duration)
             .unwrap_or_else(|| "running".to_string());
         let started = run.started_at.format("%Y-%m-%d %H:%M").to_string();
 
@@ -98,10 +98,16 @@ async fn run_view(db: &Database, id: &str, show_events: bool, full: bool) -> Res
     println!("Task:       {}", run.task);
     println!("Status:     {}", run.status);
     println!("Model:      {}", run.model);
-    println!("Started:    {}", run.started_at.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!(
+        "Started:    {}",
+        run.started_at.format("%Y-%m-%d %H:%M:%S UTC")
+    );
 
     if let Some(completed_at) = run.completed_at {
-        println!("Completed:  {}", completed_at.format("%Y-%m-%d %H:%M:%S UTC"));
+        println!(
+            "Completed:  {}",
+            completed_at.format("%Y-%m-%d %H:%M:%S UTC")
+        );
     }
 
     if let Some(duration) = run.duration_ms {
@@ -138,7 +144,10 @@ async fn run_view(db: &Database, id: &str, show_events: bool, full: bool) -> Res
     // Show context output
     if let Some(ref context) = run.context {
         if let Some(obj) = context.as_object() {
-            println!("\nContext keys: {}", obj.keys().cloned().collect::<Vec<_>>().join(", "));
+            println!(
+                "\nContext keys: {}",
+                obj.keys().cloned().collect::<Vec<_>>().join(", ")
+            );
 
             if full {
                 for (key, value) in obj {
@@ -161,7 +170,10 @@ async fn run_view(db: &Database, id: &str, show_events: bool, full: bool) -> Res
 
         for event in events {
             let time = event.timestamp.format("%H:%M:%S%.3f").to_string();
-            println!("[{}] Step {} - {}", time, event.step_index, event.event_type);
+            println!(
+                "[{}] Step {} - {}",
+                time, event.step_index, event.event_type
+            );
 
             if full {
                 if let Some(obj) = event.event_data.as_object() {
@@ -226,7 +238,9 @@ async fn run_compare(db: &Database, run_a_id: &str, run_b_id: &str) -> Result<()
 
     println!(
         "{:<20} {:<20} {:<20}",
-        "METRIC", format!("RUN A ({})", &run_a.id[..8]), format!("RUN B ({})", &run_b.id[..8])
+        "METRIC",
+        format!("RUN A ({})", &run_a.id[..8]),
+        format!("RUN B ({})", &run_b.id[..8])
     );
     println!("{}", "─".repeat(60));
 
@@ -241,8 +255,14 @@ async fn run_compare(db: &Database, run_a_id: &str, run_b_id: &str) -> Result<()
         run_b.status.to_string()
     );
 
-    let dur_a = run_a.duration_ms.map(format_duration).unwrap_or("-".to_string());
-    let dur_b = run_b.duration_ms.map(format_duration).unwrap_or("-".to_string());
+    let dur_a = run_a
+        .duration_ms
+        .map(format_duration)
+        .unwrap_or("-".to_string());
+    let dur_b = run_b
+        .duration_ms
+        .map(format_duration)
+        .unwrap_or("-".to_string());
     println!("{:<20} {:<20} {:<20}", "Duration", dur_a, dur_b);
 
     if let (Some(ma), Some(mb)) = (&metrics_a, &metrics_b) {
@@ -251,12 +271,18 @@ async fn run_compare(db: &Database, run_a_id: &str, run_b_id: &str) -> Result<()
             "Tool calls", ma.total_tool_calls, mb.total_tool_calls
         );
         let rate_a = if ma.total_tool_calls > 0 {
-            format!("{:.0}%", (ma.successful_tool_calls as f64 / ma.total_tool_calls as f64) * 100.0)
+            format!(
+                "{:.0}%",
+                (ma.successful_tool_calls as f64 / ma.total_tool_calls as f64) * 100.0
+            )
         } else {
             "-".to_string()
         };
         let rate_b = if mb.total_tool_calls > 0 {
-            format!("{:.0}%", (mb.successful_tool_calls as f64 / mb.total_tool_calls as f64) * 100.0)
+            format!(
+                "{:.0}%",
+                (mb.successful_tool_calls as f64 / mb.total_tool_calls as f64) * 100.0
+            )
         } else {
             "-".to_string()
         };
@@ -303,14 +329,34 @@ async fn run_summary(db: &Database, last: u32, workflow: Option<String>) -> Resu
     println!("{}\n", "═".repeat(60));
 
     let total = runs.len();
-    let completed = runs.iter().filter(|r| r.status == RunStatus::Completed).count();
-    let failed = runs.iter().filter(|r| r.status == RunStatus::Failed).count();
-    let running = runs.iter().filter(|r| r.status == RunStatus::Running).count();
-    let cancelled = runs.iter().filter(|r| r.status == RunStatus::Cancelled).count();
+    let completed = runs
+        .iter()
+        .filter(|r| r.status == RunStatus::Completed)
+        .count();
+    let failed = runs
+        .iter()
+        .filter(|r| r.status == RunStatus::Failed)
+        .count();
+    let running = runs
+        .iter()
+        .filter(|r| r.status == RunStatus::Running)
+        .count();
+    let cancelled = runs
+        .iter()
+        .filter(|r| r.status == RunStatus::Cancelled)
+        .count();
 
     println!("Total runs:   {}", total);
-    println!("  Completed:  {} ({:.0}%)", completed, (completed as f64 / total as f64) * 100.0);
-    println!("  Failed:     {} ({:.0}%)", failed, (failed as f64 / total as f64) * 100.0);
+    println!(
+        "  Completed:  {} ({:.0}%)",
+        completed,
+        (completed as f64 / total as f64) * 100.0
+    );
+    println!(
+        "  Failed:     {} ({:.0}%)",
+        failed,
+        (failed as f64 / total as f64) * 100.0
+    );
     println!("  Running:    {}", running);
     println!("  Cancelled:  {}", cancelled);
 
@@ -333,7 +379,8 @@ async fn run_summary(db: &Database, last: u32, workflow: Option<String>) -> Resu
 
     // Group by workflow if not filtered
     if workflow.is_none() {
-        let mut by_workflow: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut by_workflow: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
         for run in &runs {
             *by_workflow.entry(run.workflow_name.clone()).or_insert(0) += 1;
         }
@@ -403,7 +450,11 @@ async fn run_list_improvements(
     println!("{}", "─".repeat(80));
 
     for imp in improvements {
-        let id_short = if imp.id.len() > 8 { &imp.id[..8] } else { &imp.id };
+        let id_short = if imp.id.len() > 8 {
+            &imp.id[..8]
+        } else {
+            &imp.id
+        };
         let desc_short = if imp.description.len() > 37 {
             format!("{}...", &imp.description[..37])
         } else {
@@ -439,7 +490,9 @@ fn find_run_by_prefix(db: &Database, prefix: &str) -> Result<crate::db::runs::Ru
 
     match matches.len() {
         0 => Err(anyhow::anyhow!("No run found with ID prefix: {}", prefix)),
-        1 => db.get_run(&matches[0].id)?.ok_or_else(|| anyhow::anyhow!("Run not found")),
+        1 => db
+            .get_run(&matches[0].id)?
+            .ok_or_else(|| anyhow::anyhow!("Run not found")),
         _ => Err(anyhow::anyhow!(
             "Ambiguous ID prefix '{}', matches {} runs",
             prefix,
@@ -499,15 +552,25 @@ fn export_markdown(
         md.push_str("\n## Metrics\n\n");
         md.push_str("| Metric | Value |\n");
         md.push_str("|--------|-------|\n");
-        md.push_str(&format!("| Total tool calls | {} |\n", metrics.total_tool_calls));
-        md.push_str(&format!("| Successful | {} |\n", metrics.successful_tool_calls));
+        md.push_str(&format!(
+            "| Total tool calls | {} |\n",
+            metrics.total_tool_calls
+        ));
+        md.push_str(&format!(
+            "| Successful | {} |\n",
+            metrics.successful_tool_calls
+        ));
         md.push_str(&format!("| Failed | {} |\n", metrics.failed_tool_calls));
         md.push_str(&format!("| Iterations | {} |\n", metrics.total_iterations));
         md.push_str(&format!("| Files read | {} |\n", metrics.files_read));
-        md.push_str(&format!("| Files modified | {} |\n", metrics.files_modified));
+        md.push_str(&format!(
+            "| Files modified | {} |\n",
+            metrics.files_modified
+        ));
 
         if metrics.total_tool_calls > 0 {
-            let rate = (metrics.successful_tool_calls as f64 / metrics.total_tool_calls as f64) * 100.0;
+            let rate =
+                (metrics.successful_tool_calls as f64 / metrics.total_tool_calls as f64) * 100.0;
             md.push_str(&format!("| Success rate | {:.1}% |\n", rate));
         }
 
@@ -549,7 +612,7 @@ fn export_markdown(
                     }
                 }
             }
-            md.push_str("\n");
+            md.push('\n');
         }
     }
 

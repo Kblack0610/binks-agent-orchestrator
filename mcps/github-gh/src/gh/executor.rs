@@ -238,6 +238,7 @@ pub async fn execute_gh_raw_with_exit_code(args: &[&str]) -> GhResult<(String, i
 /// This function verifies that:
 /// 1. The gh CLI is installed and in PATH
 /// 2. The user is authenticated (via OAuth, token, etc.)
+#[allow(dead_code)] // Used in tests
 #[instrument]
 pub async fn check_gh_available() -> GhResult<()> {
     debug!("checking gh availability");
