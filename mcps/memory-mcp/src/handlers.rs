@@ -3,8 +3,7 @@
 //! Each handler takes the session/persistent memory and params to perform memory operations.
 
 use chrono::Utc;
-use rmcp::model::{CallToolResult, Content};
-use rmcp::ErrorData as McpError;
+use mcp_common::{internal_error, json_success, CallToolResult, McpError};
 
 use crate::params::*;
 use crate::persistent::PersistentMemory;
@@ -33,9 +32,7 @@ pub async fn think(
         step_number,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn remember(
@@ -50,9 +47,7 @@ pub async fn remember(
         success: true,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn recall(
@@ -67,17 +62,13 @@ pub async fn recall(
         value,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn get_context(session: &SessionMemory) -> Result<CallToolResult, McpError> {
     let context = session.get_full_context().await;
 
-    let json = serde_json::to_string_pretty(&context)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&context)
 }
 
 pub async fn cache_tool_result(
@@ -94,9 +85,7 @@ pub async fn cache_tool_result(
         "ttl_seconds": params.ttl_seconds
     });
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn reset_session(session: &SessionMemory) -> Result<CallToolResult, McpError> {
@@ -107,9 +96,7 @@ pub async fn reset_session(session: &SessionMemory) -> Result<CallToolResult, Mc
         "new_session_id": session.session_id().await
     });
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 // ============================================================================
@@ -124,7 +111,7 @@ pub async fn learn(
     let entity = persistent
         .get_or_create_entity(&params.entity, &params.entity_type)
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     let mut facts_added = 0;
     let mut relations_added = 0;
@@ -140,7 +127,7 @@ pub async fn learn(
                 fact.confidence,
             )
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .map_err(|e| internal_error(e.to_string()))?;
         facts_added += 1;
     }
 
@@ -150,12 +137,12 @@ pub async fn learn(
         let target = persistent
             .get_or_create_entity(&relation.to_entity, "unknown")
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .map_err(|e| internal_error(e.to_string()))?;
 
         persistent
             .add_relation(&entity.id, &target.id, &relation.relation_type)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .map_err(|e| internal_error(e.to_string()))?;
         relations_added += 1;
     }
 
@@ -165,9 +152,7 @@ pub async fn learn(
         relations_added,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn query(
@@ -181,7 +166,7 @@ pub async fn query(
     let entities_with_facts = persistent
         .query_entities(&pattern)
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     // Collect relations if requested
     let mut all_relations = Vec::new();
@@ -190,7 +175,7 @@ pub async fn query(
             let relations = persistent
                 .get_relations(&ewf.entity.id)
                 .await
-                .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+                .map_err(|e| internal_error(e.to_string()))?;
             all_relations.extend(relations);
         }
     }
@@ -200,9 +185,7 @@ pub async fn query(
         relations: all_relations,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn summarize_session(
@@ -227,7 +210,7 @@ pub async fn summarize_session(
             session_end,
         )
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     let response = SummarizeResponse {
         summary_id: summary.id,
@@ -235,9 +218,7 @@ pub async fn summarize_session(
         thoughts_compressed: thought_count,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn forget(
@@ -247,7 +228,7 @@ pub async fn forget(
     let (facts_removed, relations_removed) = persistent
         .delete_entity(&params.entity)
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     let response = ForgetResponse {
         entity_name: params.entity,
@@ -256,7 +237,5 @@ pub async fn forget(
         relations_removed,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }

@@ -72,7 +72,7 @@ libc = "0.2"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }
@@ -99,7 +99,7 @@ uuid = { version = "1", features = ["v4"], optional = true }
 
 # Web server (optional: web feature)
 axum = { version = "0.7", features = ["ws"], optional = true }
-tower-http = { version = "0.5", features = ["fs", "cors"], optional = true }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace"], optional = true }
 axum-extra = { version = "0.9", features = ["typed-header"], optional = true }
 rust-embed = { version = "8", optional = true }
 mime_guess = { version = "2", optional = true }

@@ -91,7 +91,7 @@ pub struct RunEvent {
 }
 
 /// Aggregated metrics for a run
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RunMetrics {
     pub run_id: String,
     pub total_tool_calls: i32,
@@ -104,24 +104,6 @@ pub struct RunMetrics {
     pub files_modified: i32,
     pub tools_used: HashMap<String, i32>,
     pub step_durations: Vec<i64>,
-}
-
-impl Default for RunMetrics {
-    fn default() -> Self {
-        Self {
-            run_id: String::new(),
-            total_tool_calls: 0,
-            successful_tool_calls: 0,
-            failed_tool_calls: 0,
-            total_iterations: 0,
-            total_tokens_in: None,
-            total_tokens_out: None,
-            files_read: 0,
-            files_modified: 0,
-            tools_used: HashMap::new(),
-            step_durations: Vec::new(),
-        }
-    }
 }
 
 /// Improvement category
@@ -281,22 +263,17 @@ impl Database {
     }
 
     /// Complete a run successfully
-    pub fn complete_run(
-        &self,
-        id: &str,
-        context: Option<&serde_json::Value>,
-    ) -> Result<()> {
+    pub fn complete_run(&self, id: &str, context: Option<&serde_json::Value>) -> Result<()> {
         let now = Utc::now();
         let context_json = context.map(|c| serde_json::to_string(c).unwrap());
 
         let conn = self.conn.lock().unwrap();
 
         // Get start time to calculate duration
-        let started_at: String = conn.query_row(
-            "SELECT started_at FROM runs WHERE id = ?1",
-            [id],
-            |row| row.get(0),
-        )?;
+        let started_at: String =
+            conn.query_row("SELECT started_at FROM runs WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })?;
         let started = DateTime::parse_from_rfc3339(&started_at)?.with_timezone(&Utc);
         let duration_ms = (now - started).num_milliseconds();
 
@@ -325,11 +302,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
 
         // Get start time to calculate duration
-        let started_at: String = conn.query_row(
-            "SELECT started_at FROM runs WHERE id = ?1",
-            [id],
-            |row| row.get(0),
-        )?;
+        let started_at: String =
+            conn.query_row("SELECT started_at FROM runs WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })?;
         let started = DateTime::parse_from_rfc3339(&started_at)?.with_timezone(&Utc);
         let duration_ms = (now - started).num_milliseconds();
 
@@ -358,11 +334,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
 
         // Get start time to calculate duration
-        let started_at: String = conn.query_row(
-            "SELECT started_at FROM runs WHERE id = ?1",
-            [id],
-            |row| row.get(0),
-        )?;
+        let started_at: String =
+            conn.query_row("SELECT started_at FROM runs WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })?;
         let started = DateTime::parse_from_rfc3339(&started_at)?.with_timezone(&Utc);
         let duration_ms = (now - started).num_milliseconds();
 
@@ -411,8 +386,11 @@ impl Database {
                 started_at: DateTime::parse_from_rfc3339(&started_at)
                     .unwrap()
                     .with_timezone(&Utc),
-                completed_at: completed_at
-                    .map(|s| DateTime::parse_from_rfc3339(&s).unwrap().with_timezone(&Utc)),
+                completed_at: completed_at.map(|s| {
+                    DateTime::parse_from_rfc3339(&s)
+                        .unwrap()
+                        .with_timezone(&Utc)
+                }),
                 duration_ms: row.get(7)?,
                 context: context_str.and_then(|s| serde_json::from_str(&s).ok()),
                 error: row.get(9)?,
@@ -485,12 +463,7 @@ impl Database {
     // ------------------------------------------------------------------------
 
     /// Record an event for a run
-    pub fn record_event(
-        &self,
-        run_id: &str,
-        step_index: usize,
-        event: &AgentEvent,
-    ) -> Result<()> {
+    pub fn record_event(&self, run_id: &str, step_index: usize, event: &AgentEvent) -> Result<()> {
         let now = Utc::now();
         let event_type = match event {
             AgentEvent::ProcessingStart { .. } => "processing_start",
@@ -546,7 +519,8 @@ impl Database {
                     run_id: row.get(1)?,
                     step_index: row.get::<_, i32>(2)? as usize,
                     event_type: row.get(3)?,
-                    event_data: serde_json::from_str(&event_data_str).unwrap_or(serde_json::Value::Null),
+                    event_data: serde_json::from_str(&event_data_str)
+                        .unwrap_or(serde_json::Value::Null),
                     timestamp: DateTime::parse_from_rfc3339(&timestamp)
                         .unwrap()
                         .with_timezone(&Utc),
@@ -714,10 +688,16 @@ impl Database {
                 created_at: DateTime::parse_from_rfc3339(&created_at)
                     .unwrap()
                     .with_timezone(&Utc),
-                applied_at: applied_at
-                    .map(|s| DateTime::parse_from_rfc3339(&s).unwrap().with_timezone(&Utc)),
-                verified_at: verified_at
-                    .map(|s| DateTime::parse_from_rfc3339(&s).unwrap().with_timezone(&Utc)),
+                applied_at: applied_at.map(|s| {
+                    DateTime::parse_from_rfc3339(&s)
+                        .unwrap()
+                        .with_timezone(&Utc)
+                }),
+                verified_at: verified_at.map(|s| {
+                    DateTime::parse_from_rfc3339(&s)
+                        .unwrap()
+                        .with_timezone(&Utc)
+                }),
                 status: status_str.parse().unwrap_or(ImprovementStatus::Proposed),
             })
         });
@@ -783,10 +763,16 @@ impl Database {
                     created_at: DateTime::parse_from_rfc3339(&created_at)
                         .unwrap()
                         .with_timezone(&Utc),
-                    applied_at: applied_at
-                        .map(|s| DateTime::parse_from_rfc3339(&s).unwrap().with_timezone(&Utc)),
-                    verified_at: verified_at
-                        .map(|s| DateTime::parse_from_rfc3339(&s).unwrap().with_timezone(&Utc)),
+                    applied_at: applied_at.map(|s| {
+                        DateTime::parse_from_rfc3339(&s)
+                            .unwrap()
+                            .with_timezone(&Utc)
+                    }),
+                    verified_at: verified_at.map(|s| {
+                        DateTime::parse_from_rfc3339(&s)
+                            .unwrap()
+                            .with_timezone(&Utc)
+                    }),
                     status: status_str.parse().unwrap_or(ImprovementStatus::Proposed),
                 })
             })?
@@ -852,8 +838,10 @@ pub struct RunRecorder {
 impl RunRecorder {
     /// Create a new recorder for a run
     pub fn new(db: Database, run_id: String) -> Self {
-        let mut metrics = RunMetrics::default();
-        metrics.run_id = run_id.clone();
+        let metrics = RunMetrics {
+            run_id: run_id.clone(),
+            ..Default::default()
+        };
 
         Self {
             db,
@@ -898,7 +886,11 @@ impl RunRecorder {
                     }
 
                     // Track file modifications
-                    if !*is_error && (name.contains("write") || name.contains("edit") || name.contains("create")) {
+                    if !*is_error
+                        && (name.contains("write")
+                            || name.contains("edit")
+                            || name.contains("create"))
+                    {
                         metrics.files_modified += 1;
                     }
                 }
@@ -974,7 +966,9 @@ mod tests {
     #[test]
     fn test_start_and_get_run() {
         let (db, _dir) = test_db();
-        let run = db.start_run("implement-feature", "Add dark mode", "qwen3:14b").unwrap();
+        let run = db
+            .start_run("implement-feature", "Add dark mode", "qwen3:14b")
+            .unwrap();
 
         assert_eq!(run.workflow_name, "implement-feature");
         assert_eq!(run.task, "Add dark mode");
@@ -1021,10 +1015,12 @@ mod tests {
         let all = db.list_runs(&RunFilter::default()).unwrap();
         assert_eq!(all.len(), 3);
 
-        let filtered = db.list_runs(&RunFilter {
-            workflow_name: Some("workflow-a".to_string()),
-            ..Default::default()
-        }).unwrap();
+        let filtered = db
+            .list_runs(&RunFilter {
+                workflow_name: Some("workflow-a".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
         assert_eq!(filtered.len(), 2);
     }
 
@@ -1049,11 +1045,13 @@ mod tests {
         let (db, _dir) = test_db();
         let run = db.start_run("test", "test", "model").unwrap();
 
-        let mut metrics = RunMetrics::default();
-        metrics.run_id = run.id.clone();
-        metrics.total_tool_calls = 10;
-        metrics.successful_tool_calls = 8;
-        metrics.failed_tool_calls = 2;
+        let mut metrics = RunMetrics {
+            run_id: run.id.clone(),
+            total_tool_calls: 10,
+            successful_tool_calls: 8,
+            failed_tool_calls: 2,
+            ..Default::default()
+        };
         metrics.tools_used.insert("read_file".to_string(), 5);
         metrics.tools_used.insert("edit_file".to_string(), 5);
 
@@ -1069,15 +1067,18 @@ mod tests {
         let (db, _dir) = test_db();
         let run = db.start_run("test", "test", "model").unwrap();
 
-        let imp = db.create_improvement(
-            ImprovementCategory::Prompt,
-            "Updated planner to verify paths",
-            &[run.id.clone()],
-        ).unwrap();
+        let imp = db
+            .create_improvement(
+                ImprovementCategory::Prompt,
+                "Updated planner to verify paths",
+                std::slice::from_ref(&run.id),
+            )
+            .unwrap();
 
         assert_eq!(imp.status, ImprovementStatus::Proposed);
 
-        db.apply_improvement(&imp.id, "Modified planner.md system prompt").unwrap();
+        db.apply_improvement(&imp.id, "Modified planner.md system prompt")
+            .unwrap();
 
         let fetched = db.get_improvement(&imp.id).unwrap().unwrap();
         assert_eq!(fetched.status, ImprovementStatus::Applied);
@@ -1092,17 +1093,21 @@ mod tests {
         let recorder = RunRecorder::new(db.clone(), run.id.clone());
 
         // Record some events
-        recorder.record(&AgentEvent::ToolStart {
-            name: "read_file".to_string(),
-            arguments: serde_json::json!({}),
-        }).unwrap();
+        recorder
+            .record(&AgentEvent::ToolStart {
+                name: "read_file".to_string(),
+                arguments: serde_json::json!({}),
+            })
+            .unwrap();
 
-        recorder.record(&AgentEvent::ToolComplete {
-            name: "read_file".to_string(),
-            result: "content".to_string(),
-            duration: std::time::Duration::from_millis(100),
-            is_error: false,
-        }).unwrap();
+        recorder
+            .record(&AgentEvent::ToolComplete {
+                name: "read_file".to_string(),
+                result: "content".to_string(),
+                duration: std::time::Duration::from_millis(100),
+                is_error: false,
+            })
+            .unwrap();
 
         recorder.save_metrics().unwrap();
 

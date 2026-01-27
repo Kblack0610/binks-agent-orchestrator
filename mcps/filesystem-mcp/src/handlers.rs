@@ -3,8 +3,7 @@
 //! Each handler takes the sandbox, config, and params to perform file operations.
 
 use chrono::{DateTime, Utc};
-use rmcp::model::{CallToolResult, Content};
-use rmcp::ErrorData as McpError;
+use mcp_common::{internal_error, invalid_params, json_success, CallToolResult, McpError};
 use std::path::Path;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -25,9 +24,9 @@ pub fn fs_error_to_mcp(err: FsError) -> McpError {
         FsError::AccessDenied(_) | FsError::PathTraversal(_) => {
             McpError::invalid_request(err.to_string(), None)
         }
-        FsError::NotFound(_) => McpError::invalid_params(err.to_string(), None),
+        FsError::NotFound(_) => invalid_params(err.to_string()),
         FsError::FileTooLarge { .. } => McpError::invalid_request(err.to_string(), None),
-        _ => McpError::internal_error(err.to_string(), None),
+        _ => internal_error(err.to_string()),
     }
 }
 
@@ -71,7 +70,7 @@ pub async fn read_file(
     // Check file size before reading
     let metadata = fs::metadata(&canonical)
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     if metadata.len() > config.limits.max_file_size as u64 {
         return Err(fs_error_to_mcp(FsError::FileTooLarge {
@@ -82,7 +81,7 @@ pub async fn read_file(
 
     let content = fs::read_to_string(&canonical)
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     let response = ReadFileResponse {
         path: canonical.display().to_string(),
@@ -90,9 +89,7 @@ pub async fn read_file(
         size: metadata.len(),
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn write_file(
@@ -114,11 +111,11 @@ pub async fn write_file(
 
     let mut file = fs::File::create(&canonical)
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     file.write_all(params.content.as_bytes())
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     let response = WriteFileResponse {
         path: canonical.display().to_string(),
@@ -126,9 +123,7 @@ pub async fn write_file(
         bytes_written: params.content.len(),
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn list_dir(
@@ -153,12 +148,12 @@ pub async fn list_dir(
 
             let mut read_dir = fs::read_dir(&dir)
                 .await
-                .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+                .map_err(|e| internal_error(e.to_string()))?;
 
             while let Some(entry) = read_dir
                 .next_entry()
                 .await
-                .map_err(|e| McpError::internal_error(e.to_string(), None))?
+                .map_err(|e| internal_error(e.to_string()))?
             {
                 if count >= config.limits.max_files_per_list {
                     break;
@@ -184,12 +179,12 @@ pub async fn list_dir(
         // Non-recursive listing
         let mut read_dir = fs::read_dir(&canonical)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .map_err(|e| internal_error(e.to_string()))?;
 
         while let Some(entry) = read_dir
             .next_entry()
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .map_err(|e| internal_error(e.to_string()))?
         {
             if count >= config.limits.max_files_per_list {
                 break;
@@ -209,9 +204,7 @@ pub async fn list_dir(
         total_count: count,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn search_files(
@@ -231,9 +224,7 @@ pub async fn search_files(
     let mut count = 0;
 
     // Use glob to find matches
-    for entry in
-        glob::glob(&pattern_str).map_err(|e| McpError::invalid_params(e.to_string(), None))?
-    {
+    for entry in glob::glob(&pattern_str).map_err(|e| invalid_params(e.to_string()))? {
         if count >= config.limits.max_files_per_list {
             break;
         }
@@ -254,9 +245,7 @@ pub async fn search_files(
         total_count: count,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn file_info(
@@ -270,7 +259,7 @@ pub async fn file_info(
     let response = if canonical.exists() {
         let metadata = fs::metadata(&canonical)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .map_err(|e| internal_error(e.to_string()))?;
 
         let modified: Option<DateTime<Utc>> = metadata.modified().ok().map(|t| t.into());
         let created: Option<DateTime<Utc>> = metadata.created().ok().map(|t| t.into());
@@ -306,9 +295,7 @@ pub async fn file_info(
         }
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn move_file(
@@ -325,7 +312,7 @@ pub async fn move_file(
 
     fs::rename(&src_canonical, &dst_canonical)
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     let response = MoveFileResponse {
         src: src_canonical.display().to_string(),
@@ -333,9 +320,7 @@ pub async fn move_file(
         success: true,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn delete_file(
@@ -354,22 +339,22 @@ pub async fn delete_file(
 
     let metadata = fs::metadata(&canonical)
         .await
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
     if metadata.is_dir() {
         if params.recursive {
             fs::remove_dir_all(&canonical)
                 .await
-                .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+                .map_err(|e| internal_error(e.to_string()))?;
         } else {
             fs::remove_dir(&canonical)
                 .await
-                .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+                .map_err(|e| internal_error(e.to_string()))?;
         }
     } else {
         fs::remove_file(&canonical)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .map_err(|e| internal_error(e.to_string()))?;
     }
 
     let response = DeleteFileResponse {
@@ -377,9 +362,7 @@ pub async fn delete_file(
         deleted: true,
     };
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn create_directory(
@@ -393,11 +376,11 @@ pub async fn create_directory(
     if params.recursive {
         fs::create_dir_all(&canonical)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .map_err(|e| internal_error(e.to_string()))?;
     } else {
         fs::create_dir(&canonical)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .map_err(|e| internal_error(e.to_string()))?;
     }
 
     let response = serde_json::json!({
@@ -405,9 +388,7 @@ pub async fn create_directory(
         "created": true
     });
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }
 
 pub async fn list_allowed_directories(sandbox: &Sandbox) -> Result<CallToolResult, McpError> {
@@ -416,7 +397,5 @@ pub async fn list_allowed_directories(sandbox: &Sandbox) -> Result<CallToolResul
         "write_paths": sandbox.allowed_write_paths()
     });
 
-    let json = serde_json::to_string_pretty(&response)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&response)
 }

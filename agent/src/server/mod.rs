@@ -162,7 +162,10 @@ impl AgentMcpServer {
                     Some(db)
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to open runs database: {} - run tools will be unavailable", e);
+                    tracing::warn!(
+                        "Failed to open runs database: {} - run tools will be unavailable",
+                        e
+                    );
                     None
                 }
             }
@@ -390,7 +393,8 @@ impl AgentMcpServer {
     fn ensure_db(&self) -> Result<&Database, McpError> {
         self.db.as_ref().ok_or_else(|| {
             McpError::internal_error(
-                "Run tracking is not available. Enable with `enable_runs: true` in config.".to_string(),
+                "Run tracking is not available. Enable with `enable_runs: true` in config."
+                    .to_string(),
                 None,
             )
         })
@@ -431,7 +435,11 @@ impl AgentMcpServer {
                 format!(
                     "Multiple runs match prefix '{}': {}",
                     prefix,
-                    matches.iter().map(|r| &r.id[..8]).collect::<Vec<_>>().join(", ")
+                    matches
+                        .iter()
+                        .map(|r| &r.id[..8])
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ),
                 None,
             )),
@@ -485,7 +493,7 @@ impl AgentMcpServer {
         for run in &runs {
             let duration = run
                 .duration_ms
-                .map(|ms| format_duration(ms))
+                .map(format_duration)
                 .unwrap_or_else(|| "running".to_string());
             let started = run.started_at.format("%Y-%m-%d %H:%M").to_string();
 
@@ -733,7 +741,10 @@ fn export_markdown(run: &Run, events: &[RunEvent], metrics: Option<&RunMetrics>)
         output.push_str(&format!("- **Files Read:** {}\n", m.files_read));
         output.push_str(&format!("- **Files Modified:** {}\n", m.files_modified));
         if let (Some(tokens_in), Some(tokens_out)) = (m.total_tokens_in, m.total_tokens_out) {
-            output.push_str(&format!("- **Tokens (in/out):** {} / {}\n", tokens_in, tokens_out));
+            output.push_str(&format!(
+                "- **Tokens (in/out):** {} / {}\n",
+                tokens_in, tokens_out
+            ));
         }
         output.push('\n');
     }
@@ -751,14 +762,11 @@ fn export_markdown(run: &Run, events: &[RunEvent], metrics: Option<&RunMetrics>)
             }
 
             let timestamp = event.timestamp.format("%H:%M:%S").to_string();
-            output.push_str(&format!(
-                "- `{}` **{}**: ",
-                timestamp, event.event_type
-            ));
+            output.push_str(&format!("- `{}` **{}**: ", timestamp, event.event_type));
 
             // Extract meaningful info from event data (already a Value)
             if let Some(name) = event.event_data.get("name") {
-                output.push_str(&format!("{}", name.as_str().unwrap_or("?")));
+                output.push_str(name.as_str().unwrap_or("?"));
             }
             if let Some(is_error) = event.event_data.get("is_error") {
                 if is_error.as_bool().unwrap_or(false) {

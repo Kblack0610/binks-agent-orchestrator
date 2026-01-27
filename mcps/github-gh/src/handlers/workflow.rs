@@ -1,7 +1,6 @@
 //! Workflow and run handler implementations
 
-use rmcp::model::{CallToolResult, Content};
-use rmcp::ErrorData as McpError;
+use mcp_common::{json_success, text_success, CallToolResult, McpError};
 
 use crate::gh::{execute_gh_action, execute_gh_json, execute_gh_raw};
 use crate::params::{
@@ -24,9 +23,7 @@ pub async fn workflow_list(params: WorkflowListParams) -> Result<CallToolResult,
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string(&workflows)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&workflows)
 }
 
 /// Trigger a workflow run
@@ -51,7 +48,7 @@ pub async fn workflow_run(params: WorkflowRunParams) -> Result<CallToolResult, M
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// List workflow runs
@@ -84,9 +81,7 @@ pub async fn run_list(params: RunListParams) -> Result<CallToolResult, McpError>
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json =
-        serde_json::to_string(&runs).map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&runs)
 }
 
 /// View workflow run details
@@ -98,9 +93,7 @@ pub async fn run_view(params: RunViewParams) -> Result<CallToolResult, McpError>
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json =
-        serde_json::to_string(&run).map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&run)
 }
 
 /// Cancel a workflow run
@@ -114,7 +107,7 @@ pub async fn run_cancel(params: RunCancelParams) -> Result<CallToolResult, McpEr
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// View logs for a workflow run or specific job
@@ -152,9 +145,9 @@ pub async fn run_log(params: RunLogParams) -> Result<CallToolResult, McpError> {
         } else {
             format!("No logs found for run {}", params.run_id)
         };
-        Ok(CallToolResult::success(vec![Content::text(msg)]))
+        Ok(text_success(msg))
     } else {
-        Ok(CallToolResult::success(vec![Content::text(output)]))
+        Ok(text_success(output))
     }
 }
 
@@ -180,5 +173,5 @@ pub async fn run_rerun(params: RunRerunParams) -> Result<CallToolResult, McpErro
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }

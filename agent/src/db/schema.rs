@@ -158,13 +158,19 @@ fn migrate(conn: &Connection) -> Result<()> {
 
     if current_version < 1 {
         // Fresh install - insert version 1
-        conn.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (1)", [])?;
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_version (version) VALUES (1)",
+            [],
+        )?;
     }
 
     if current_version < 2 {
         // Migration from v1 to v2
         // Tables are created with IF NOT EXISTS, so we just need to record the version
-        conn.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (2)", [])?;
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_version (version) VALUES (2)",
+            [],
+        )?;
         tracing::info!("Migrated database schema to version 2 (run tracking)");
     }
 
@@ -231,9 +237,11 @@ mod tests {
 
         // Verify it was inserted
         let count: i32 = conn
-            .query_row("SELECT COUNT(*) FROM runs WHERE id = 'test-run'", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT COUNT(*) FROM runs WHERE id = 'test-run'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(count, 1);
     }

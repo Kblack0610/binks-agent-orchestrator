@@ -17,7 +17,10 @@ use axum::{
 };
 use rust_embed::RustEmbed;
 use std::net::SocketAddr;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 
 use crate::db::Database;
 use state::AppState;
@@ -103,10 +106,22 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
 
     let ws_routes = Router::new().route("/chat/:conversation_id", get(ws::chat_handler));
 
+    let trace_layer =
+        TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
+            let request_id = uuid::Uuid::new_v4().to_string();
+            tracing::info_span!(
+                "http_request",
+                method = %request.method(),
+                uri = %request.uri(),
+                request_id = %request_id,
+            )
+        });
+
     let mut router = Router::new()
         .nest("/api", api_routes)
         .nest("/ws", ws_routes)
         .layer(cors)
+        .layer(trace_layer)
         .with_state(state);
 
     // Static file serving

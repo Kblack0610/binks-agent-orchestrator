@@ -12,6 +12,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 /// - Environment-based filtering via RUST_LOG
 /// - Default log level of `info` for the specified crate
 ///
+/// Set `LOG_FORMAT=json` for structured JSON output (useful for production/log aggregation).
+/// Default is human-readable text output.
+///
 /// # Arguments
 ///
 /// * `crate_name` - The name of the MCP server crate (e.g., "sysinfo_mcp")
@@ -23,15 +26,31 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 /// ```
 pub fn init_tracing(crate_name: &str) -> anyhow::Result<()> {
     let directive = format!("{}=info", crate_name);
+    let filter = EnvFilter::from_default_env().add_directive(directive.parse()?);
 
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_writer(std::io::stderr)
-                .with_ansi(false),
-        )
-        .with(EnvFilter::from_default_env().add_directive(directive.parse()?))
-        .init();
+    let use_json = std::env::var("LOG_FORMAT")
+        .map(|v| v.eq_ignore_ascii_case("json"))
+        .unwrap_or(false);
+
+    let registry = tracing_subscriber::registry().with(filter);
+
+    if use_json {
+        registry
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .json()
+                    .with_writer(std::io::stderr),
+            )
+            .init();
+    } else {
+        registry
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_ansi(false),
+            )
+            .init();
+    }
 
     Ok(())
 }

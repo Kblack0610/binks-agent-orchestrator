@@ -27,7 +27,7 @@ pub mod init;
 pub mod result;
 
 // Re-export commonly used items at crate root
-pub use error::{IntoMcpError, McpResult};
+pub use error::{internal_error, invalid_params, IntoMcpError, McpResult, ResultExt};
 pub use init::init_tracing;
 pub use result::{json_success, text_success};
 

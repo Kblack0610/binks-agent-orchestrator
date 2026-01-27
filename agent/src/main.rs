@@ -17,6 +17,9 @@ use agent::handlers::CommandContext;
 /// - 1: info (-v)
 /// - 2: debug (-vv)
 /// - 3+: trace (-vvv)
+///
+/// Set `LOG_FORMAT=json` for structured JSON output (useful for production/log aggregation).
+/// Default is human-readable text output.
 fn init_tracing(verbosity: u8) {
     let level = match verbosity {
         0 => tracing::Level::WARN,
@@ -28,10 +31,19 @@ fn init_tracing(verbosity: u8) {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(level.to_string()));
 
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(filter)
-        .init();
+    let use_json = std::env::var("LOG_FORMAT")
+        .map(|v| v.eq_ignore_ascii_case("json"))
+        .unwrap_or(false);
+
+    let registry = tracing_subscriber::registry().with(filter);
+
+    if use_json {
+        registry
+            .with(tracing_subscriber::fmt::layer().json())
+            .init();
+    } else {
+        registry.with(tracing_subscriber::fmt::layer()).init();
+    }
 }
 
 #[tokio::main]

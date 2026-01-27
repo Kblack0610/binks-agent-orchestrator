@@ -3,10 +3,13 @@
 //! This module defines the main MCP server that exposes filesystem operations as tools.
 //! Handler implementations are in the handlers module.
 
+use std::path::PathBuf;
+
+use mcp_common::{CallToolResult, McpError};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, ServerCapabilities, ServerInfo},
-    tool, tool_handler, tool_router, ErrorData as McpError,
+    model::{ServerCapabilities, ServerInfo},
+    tool, tool_handler, tool_router,
 };
 
 use crate::handlers;
@@ -28,7 +31,19 @@ pub struct FilesystemMcpServer {
 
 #[tool_router]
 impl FilesystemMcpServer {
-    pub fn new(config: Config) -> Result<Self, FsError> {
+    /// Create a new server, loading config from standard locations
+    ///
+    /// Config is searched in order:
+    /// 1. `./filesystem-mcp.toml`
+    /// 2. `$XDG_CONFIG_HOME/filesystem-mcp/config.toml`
+    /// 3. `~/.filesystem-mcp.toml`
+    /// 4. Default config if none found
+    pub fn new() -> Self {
+        Self::with_config(Self::load_config()).expect("Failed to create FilesystemMcpServer")
+    }
+
+    /// Create a new server with explicit config
+    pub fn with_config(config: Config) -> Result<Self, FsError> {
         let sandbox = Sandbox::new(&config)?;
 
         Ok(Self {
@@ -38,8 +53,36 @@ impl FilesystemMcpServer {
         })
     }
 
-    pub fn with_default_config() -> Result<Self, FsError> {
-        Self::new(Config::default())
+    /// Load config from standard file locations
+    fn load_config() -> Config {
+        let config_paths = [
+            PathBuf::from("filesystem-mcp.toml"),
+            dirs::config_dir()
+                .map(|p| p.join("filesystem-mcp").join("config.toml"))
+                .unwrap_or_default(),
+            dirs::home_dir()
+                .map(|p| p.join(".filesystem-mcp.toml"))
+                .unwrap_or_default(),
+        ];
+
+        for path in config_paths {
+            if path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    match toml::from_str::<Config>(&content) {
+                        Ok(config) => {
+                            tracing::info!("Loaded config from {}", path.display());
+                            return config;
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to parse config {}: {}", path.display(), e);
+                        }
+                    }
+                }
+            }
+        }
+
+        tracing::info!("Using default configuration");
+        Config::default()
     }
 
     #[tool(
@@ -150,6 +193,6 @@ impl rmcp::ServerHandler for FilesystemMcpServer {
 
 impl Default for FilesystemMcpServer {
     fn default() -> Self {
-        Self::with_default_config().expect("Failed to create FilesystemMcpServer")
+        Self::new()
     }
 }

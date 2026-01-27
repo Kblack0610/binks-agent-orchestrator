@@ -3,11 +3,11 @@
 //! This module defines the main MCP server that exposes web search
 //! tools with pluggable backend support.
 
-use anyhow::Result;
+use mcp_common::{json_success, CallToolResult, McpError, ResultExt};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
-    tool, tool_handler, tool_router, ErrorData as McpError,
+    model::{ServerCapabilities, ServerInfo},
+    tool, tool_handler, tool_router,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -64,7 +64,20 @@ pub struct ImageSearchParams {
 
 #[tool_router]
 impl WebSearchMcpServer {
-    pub async fn new(config: Config) -> Result<Self> {
+    /// Create a new server, loading config from standard locations
+    ///
+    /// Config is loaded from:
+    /// 1. Environment variable SEARXNG_URL (highest priority for URL)
+    /// 2. Environment variable WEB_SEARCH_CONFIG_PATH
+    /// 3. ~/.binks/web-search.toml
+    /// 4. Default values
+    pub fn new() -> Self {
+        let config = Config::load().expect("Failed to load web-search configuration");
+        Self::with_config(config)
+    }
+
+    /// Create a new server with explicit config
+    pub fn with_config(config: Config) -> Self {
         // SearXNG is the only supported backend (self-hosted, no API keys needed)
         tracing::info!("Using SearXNG backend at {}", config.searxng.url);
         let backend: Arc<dyn SearchBackend> = Arc::new(SearXNGBackend::new(config.searxng.clone()));
@@ -76,11 +89,11 @@ impl WebSearchMcpServer {
             );
         }
 
-        Ok(Self {
+        Self {
             backend,
             config,
             tool_router: Self::tool_router(),
-        })
+        }
     }
 
     // ========================================================================
@@ -100,12 +113,9 @@ impl WebSearchMcpServer {
             .backend
             .search(&params.query, limit)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .to_mcp_err()?;
 
-        let json = serde_json::to_string_pretty(&results)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&results)
     }
 
     #[tool(
@@ -123,12 +133,9 @@ impl WebSearchMcpServer {
             .backend
             .search_news(&params.query, limit)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .to_mcp_err()?;
 
-        let json = serde_json::to_string_pretty(&results)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&results)
     }
 
     #[tool(description = "Search for images. Returns image URLs, page URLs, and dimensions.")]
@@ -144,12 +151,9 @@ impl WebSearchMcpServer {
             .backend
             .search_images(&params.query, limit)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .to_mcp_err()?;
 
-        let json = serde_json::to_string_pretty(&results)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&results)
     }
 
     #[tool(description = "Get the current search backend configuration and status.")]
@@ -169,10 +173,7 @@ impl WebSearchMcpServer {
             cache_enabled: self.config.search.cache_enabled,
         };
 
-        let json = serde_json::to_string_pretty(&status)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&status)
     }
 }
 
@@ -193,5 +194,11 @@ impl rmcp::ServerHandler for WebSearchMcpServer {
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             ..Default::default()
         }
+    }
+}
+
+impl Default for WebSearchMcpServer {
+    fn default() -> Self {
+        Self::new()
     }
 }
