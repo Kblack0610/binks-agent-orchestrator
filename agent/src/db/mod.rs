@@ -4,7 +4,11 @@
 
 pub mod conversations;
 pub mod messages;
+pub mod runs;
 pub mod schema;
+
+// Re-export commonly used types
+pub use runs::RunRecorder;
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;

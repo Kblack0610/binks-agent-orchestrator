@@ -63,6 +63,8 @@ impl AppState {
             non_interactive,
             verbose: false,
             custom_workflows_dir: None,
+            record_runs: true,  // Enable run recording for web
+            db_path: None,      // Use default path
         }
     }
 }

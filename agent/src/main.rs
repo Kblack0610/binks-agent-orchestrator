@@ -112,5 +112,8 @@ async fn dispatch(cmd: Commands, ctx: CommandContext) -> Result<()> {
         // =================================================================
         #[cfg(feature = "orchestrator")]
         Commands::Workflow { command } => workflow::run_workflow_command(&ctx, command).await,
+
+        #[cfg(feature = "orchestrator")]
+        Commands::Runs { command } => runs::run_runs_command(&ctx, command).await,
     }
 }

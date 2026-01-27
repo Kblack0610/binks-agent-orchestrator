@@ -53,6 +53,9 @@ impl AgentEvent {
             AgentEvent::Thinking { .. } => None,
             AgentEvent::Iteration { .. } => None,
             AgentEvent::ResponseComplete { .. } => None,
+            // Workflow orchestration events (not needed for WebSocket clients)
+            AgentEvent::StepStarted { .. } => None,
+            AgentEvent::StepCompleted { .. } => None,
         }
     }
 }

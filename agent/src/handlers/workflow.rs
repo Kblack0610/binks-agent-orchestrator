@@ -141,6 +141,8 @@ fn create_engine(ctx: &CommandContext, non_interactive: bool) -> WorkflowEngine 
         non_interactive,
         verbose: ctx.is_verbose(),
         custom_workflows_dir: None,
+        record_runs: true,  // Enable run recording by default
+        db_path: None,      // Use default path
     };
     let registry = AgentRegistry::with_defaults(&ctx.model);
     WorkflowEngine::new(registry, config)

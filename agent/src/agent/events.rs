@@ -80,6 +80,24 @@ pub enum AgentEvent {
         /// Error message
         message: String,
     },
+
+    /// Workflow step started (used by orchestrator)
+    StepStarted {
+        /// Step index in the workflow
+        step_index: usize,
+        /// Step name (agent name or "checkpoint")
+        step_name: String,
+    },
+
+    /// Workflow step completed (used by orchestrator)
+    StepCompleted {
+        /// Step index in the workflow
+        step_index: usize,
+        /// Whether the step succeeded
+        success: bool,
+        /// Duration in milliseconds
+        duration_ms: u64,
+    },
 }
 
 /// Serialize Duration as milliseconds
@@ -211,6 +229,23 @@ impl AgentEventSender {
     pub fn error(&self, message: &str) {
         self.send(AgentEvent::Error {
             message: message.to_string(),
+        });
+    }
+
+    /// Send step started event (for workflow orchestration)
+    pub fn step_started(&self, step_index: usize, step_name: &str) {
+        self.send(AgentEvent::StepStarted {
+            step_index,
+            step_name: step_name.to_string(),
+        });
+    }
+
+    /// Send step completed event (for workflow orchestration)
+    pub fn step_completed(&self, step_index: usize, success: bool, duration_ms: u64) {
+        self.send(AgentEvent::StepCompleted {
+            step_index,
+            success,
+            duration_ms,
         });
     }
 }

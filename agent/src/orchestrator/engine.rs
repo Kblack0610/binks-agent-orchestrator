@@ -5,6 +5,7 @@
 //! - Human-in-loop checkpoints
 //! - Context passing between agents
 //! - Per-agent model configuration
+//! - Run recording for analysis
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -12,8 +13,9 @@ use std::time::Instant;
 
 use anyhow::Result;
 
-use crate::agent::Agent;
+use crate::agent::{event_channel, Agent};
 use crate::config::{AgentFileConfig, McpConfig};
+use crate::db::{Database, RunRecorder};
 use crate::mcp::McpClientPool;
 
 use super::agent_config::AgentRegistry;
@@ -42,6 +44,12 @@ pub struct EngineConfig {
 
     /// Enable verbose output
     pub verbose: bool,
+
+    /// Enable run recording for analysis
+    pub record_runs: bool,
+
+    /// Database path for run recording (defaults to ~/.binks/binks.db)
+    pub db_path: Option<PathBuf>,
 }
 
 impl Default for EngineConfig {
@@ -52,6 +60,8 @@ impl Default for EngineConfig {
             custom_workflows_dir: None,
             non_interactive: false,
             verbose: false,
+            record_runs: true, // Enable by default for analysis
+            db_path: None,     // Uses default ~/.binks/binks.db
         }
     }
 }
@@ -64,6 +74,18 @@ impl EngineConfig {
             default_model: config.llm.model.clone(),
             ..Default::default()
         }
+    }
+
+    /// Builder method to enable/disable run recording
+    pub fn with_record_runs(mut self, record: bool) -> Self {
+        self.record_runs = record;
+        self
+    }
+
+    /// Builder method to set database path
+    pub fn with_db_path(mut self, path: PathBuf) -> Self {
+        self.db_path = Some(path);
+        self
     }
 }
 
@@ -195,16 +217,57 @@ impl WorkflowEngine {
             anyhow::anyhow!("No .mcp.json found. MCP configuration is required for workflows.")
         })?;
 
+        // Set up run recording if enabled
+        let (db, run_id, event_tx) = if self.config.record_runs {
+            let db = if let Some(ref path) = self.config.db_path {
+                Database::open_at(path.clone())?
+            } else {
+                Database::open()?
+            };
+            let run = db.start_run(&workflow.name, task, &self.config.default_model)?;
+            let run_id = run.id.clone();
+
+            // Create event channel and spawn recorder task
+            let (tx, rx) = event_channel();
+            let recorder = RunRecorder::new(db.clone(), run_id.clone());
+
+            // Spawn background task to consume events
+            tokio::spawn(async move {
+                recorder.consume_events(rx).await;
+            });
+
+            tracing::info!(run_id = %run_id, "Started run recording");
+            (Some(db), Some(run_id), Some(tx))
+        } else {
+            (None, None, None)
+        };
+
         // Context for variable substitution
         let mut context: HashMap<String, String> = HashMap::new();
         context.insert("task".to_string(), task.to_string());
 
         let mut step_results = Vec::new();
+        let workflow_error: Option<(usize, String)> = None;
 
         for (step_index, step) in workflow.steps.iter().enumerate() {
             let step_start = Instant::now();
 
             println!("\n[Step {}/{}]", step_index + 1, workflow.steps.len());
+
+            // Update run recorder with current step
+            if let Some(ref tx) = event_tx {
+                // Signal step change to recorder via a synthetic event
+                // The recorder will pick this up from event stream
+                let _ = tx.send(crate::agent::AgentEvent::StepStarted {
+                    step_index,
+                    step_name: match step {
+                        WorkflowStep::Agent { name, .. } => name.clone(),
+                        WorkflowStep::Checkpoint { .. } => "checkpoint".to_string(),
+                        WorkflowStep::Parallel(_) => "parallel".to_string(),
+                        WorkflowStep::Branch { .. } => "branch".to_string(),
+                    },
+                });
+            }
 
             match step {
                 WorkflowStep::Agent {
@@ -233,6 +296,11 @@ impl WorkflowEngine {
                     let mut agent = Agent::new(&self.config.ollama_url, model, mcp_pool)
                         .with_system_prompt(&agent_config.system_prompt)
                         .with_verbose(self.config.verbose);
+
+                    // Attach event sender for run recording if enabled
+                    if let Some(ref tx) = event_tx {
+                        agent = agent.with_event_sender(tx.clone());
+                    }
 
                     // Run agent with tool filtering if specified
                     let output = if agent_config.tools.is_empty() {
@@ -295,6 +363,16 @@ impl WorkflowEngine {
                         }
                         CheckpointResult::Rejected => {
                             println!("  ✗ Rejected - stopping workflow");
+
+                            // Record run cancellation
+                            if let (Some(db), Some(ref run_id)) = (&db, &run_id) {
+                                drop(event_tx);
+                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                if let Err(e) = db.cancel_run(run_id) {
+                                    tracing::warn!("Failed to record run cancellation: {}", e);
+                                }
+                            }
+
                             return Ok(WorkflowResult {
                                 workflow_name: workflow.name.clone(),
                                 step_results,
@@ -353,10 +431,34 @@ impl WorkflowEngine {
         println!("  WORKFLOW COMPLETED: {}", workflow.name);
         println!("{}\n", "═".repeat(60));
 
+        // Complete run recording
+        if let (Some(db), Some(ref run_id)) = (&db, &run_id) {
+            // Drop event sender to signal recorder to finish
+            drop(event_tx);
+
+            // Small delay to let recorder finish processing
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+            let context_json = serde_json::to_value(&context).ok();
+            if let Some((_, ref error)) = workflow_error {
+                if let Err(e) = db.fail_run(run_id, error) {
+                    tracing::warn!("Failed to record run failure: {}", e);
+                }
+            } else {
+                if let Err(e) = db.complete_run(run_id, context_json.as_ref()) {
+                    tracing::warn!("Failed to record run completion: {}", e);
+                }
+            }
+            tracing::info!(run_id = %run_id, "Run recording completed");
+        }
+
         Ok(WorkflowResult {
             workflow_name: workflow.name.clone(),
             step_results,
-            status: WorkflowStatus::Completed,
+            status: match workflow_error {
+                Some((step_index, error)) => WorkflowStatus::Failed { step_index, error },
+                None => WorkflowStatus::Completed,
+            },
             context,
         })
     }

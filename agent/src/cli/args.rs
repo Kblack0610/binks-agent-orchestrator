@@ -7,6 +7,8 @@ use clap::{ArgAction, Parser, Subcommand};
 #[cfg(feature = "mcp")]
 use super::mcps_args::McpsCommands;
 #[cfg(feature = "orchestrator")]
+use super::runs_args::RunsCommands;
+#[cfg(feature = "orchestrator")]
 use super::workflow_args::WorkflowCommands;
 
 #[derive(Parser)]
@@ -151,5 +153,11 @@ pub enum Commands {
     Workflow {
         #[command(subcommand)]
         command: WorkflowCommands,
+    },
+    /// View, analyze, and manage workflow runs
+    #[cfg(feature = "orchestrator")]
+    Runs {
+        #[command(subcommand)]
+        command: RunsCommands,
     },
 }

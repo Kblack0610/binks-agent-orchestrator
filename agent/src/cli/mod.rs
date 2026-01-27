@@ -31,10 +31,14 @@ pub mod mcps_args;
 pub use mcps_args::McpsCommands;
 
 // =============================================================================
-// Orchestrator feature - WorkflowCommands
+// Orchestrator feature - WorkflowCommands, RunsCommands
 // =============================================================================
 #[cfg(feature = "orchestrator")]
+pub mod runs_args;
+#[cfg(feature = "orchestrator")]
 pub mod workflow_args;
+#[cfg(feature = "orchestrator")]
+pub use runs_args::RunsCommands;
 #[cfg(feature = "orchestrator")]
 pub use workflow_args::WorkflowCommands;
 
