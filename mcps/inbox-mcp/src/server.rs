@@ -1,10 +1,11 @@
 //! MCP Server implementation for local inbox
 
 use chrono::{Local, NaiveDate};
+use mcp_common::{internal_error, json_success, CallToolResult, McpError};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
-    tool, tool_handler, tool_router, ErrorData as McpError,
+    model::{ServerCapabilities, ServerInfo},
+    tool, tool_handler, tool_router,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -106,9 +107,9 @@ impl InboxMcpServer {
 
     /// Ensure the inbox directory exists
     async fn ensure_inbox_dir(&self) -> Result<(), McpError> {
-        fs::create_dir_all(&self.inbox_path).await.map_err(|e| {
-            McpError::internal_error(format!("Failed to create inbox directory: {}", e), None)
-        })
+        fs::create_dir_all(&self.inbox_path)
+            .await
+            .map_err(|e| internal_error(format!("Failed to create inbox directory: {e}")))
     }
 
     // ========================================================================
@@ -154,14 +155,13 @@ impl InboxMcpServer {
             .append(true)
             .open(&file_path)
             .await
-            .map_err(|e| {
-                McpError::internal_error(format!("Failed to open inbox file: {}", e), None)
-            })?;
+            .map_err(|e| internal_error(format!("Failed to open inbox file: {e}")))?;
 
         // Add separator if file is not empty
-        let metadata = file.metadata().await.map_err(|e| {
-            McpError::internal_error(format!("Failed to get file metadata: {}", e), None)
-        })?;
+        let metadata = file
+            .metadata()
+            .await
+            .map_err(|e| internal_error(format!("Failed to get file metadata: {e}")))?;
 
         let content = if metadata.len() > 0 {
             format!("\n---\n\n{}\n", markdown)
@@ -169,9 +169,9 @@ impl InboxMcpServer {
             format!("# Inbox - {}\n\n{}\n", now.format("%Y-%m-%d"), markdown)
         };
 
-        file.write_all(content.as_bytes()).await.map_err(|e| {
-            McpError::internal_error(format!("Failed to write to inbox: {}", e), None)
-        })?;
+        file.write_all(content.as_bytes())
+            .await
+            .map_err(|e| internal_error(format!("Failed to write to inbox: {e}")))?;
 
         let response = WriteResponse {
             success: true,
@@ -183,9 +183,7 @@ impl InboxMcpServer {
             ),
         };
 
-        let json = serde_json::to_string_pretty(&response)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&response)
     }
 
     // ========================================================================
@@ -213,9 +211,9 @@ impl InboxMcpServer {
             if file_path.exists() {
                 files_read.push(file_path.to_string_lossy().to_string());
 
-                let content = fs::read_to_string(&file_path).await.map_err(|e| {
-                    McpError::internal_error(format!("Failed to read inbox file: {}", e), None)
-                })?;
+                let content = fs::read_to_string(&file_path)
+                    .await
+                    .map_err(|e| internal_error(format!("Failed to read inbox file: {e}")))?;
 
                 // Parse messages from markdown (simple parsing)
                 // Messages start with "## YYYY-MM-DD HH:MM:SS"
@@ -253,9 +251,7 @@ impl InboxMcpServer {
             files_read,
         };
 
-        let json = serde_json::to_string_pretty(&response)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&response)
     }
 
     /// Parse an inbox message from markdown section
@@ -358,19 +354,21 @@ impl InboxMcpServer {
 
         // Create archive directory if needed
         if let Some(ref archive) = archive_path {
-            fs::create_dir_all(archive).await.map_err(|e| {
-                McpError::internal_error(format!("Failed to create archive directory: {}", e), None)
-            })?;
+            fs::create_dir_all(archive)
+                .await
+                .map_err(|e| internal_error(format!("Failed to create archive directory: {e}")))?;
         }
 
         // List all .md files in inbox
-        let mut entries = fs::read_dir(&self.inbox_path).await.map_err(|e| {
-            McpError::internal_error(format!("Failed to read inbox directory: {}", e), None)
-        })?;
+        let mut entries = fs::read_dir(&self.inbox_path)
+            .await
+            .map_err(|e| internal_error(format!("Failed to read inbox directory: {e}")))?;
 
-        while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            McpError::internal_error(format!("Failed to read directory entry: {}", e), None)
-        })? {
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| internal_error(format!("Failed to read directory entry: {e}")))?
+        {
             let path = entry.path();
             if path.extension().map(|e| e == "md").unwrap_or(false) {
                 // Parse date from filename (YYYY-MM-DD.md)
@@ -381,18 +379,12 @@ impl InboxMcpServer {
                                 // Move to archive
                                 let dest = archive.join(path.file_name().unwrap());
                                 fs::rename(&path, dest).await.map_err(|e| {
-                                    McpError::internal_error(
-                                        format!("Failed to archive file: {}", e),
-                                        None,
-                                    )
+                                    internal_error(format!("Failed to archive file: {e}"))
                                 })?;
                             } else {
                                 // Delete
                                 fs::remove_file(&path).await.map_err(|e| {
-                                    McpError::internal_error(
-                                        format!("Failed to delete file: {}", e),
-                                        None,
-                                    )
+                                    internal_error(format!("Failed to delete file: {e}"))
                                 })?;
                             }
                             archived_count += 1;
@@ -407,9 +399,7 @@ impl InboxMcpServer {
             archive_path: archive_path.map(|p| p.to_string_lossy().to_string()),
         };
 
-        let json = serde_json::to_string_pretty(&response)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&response)
     }
 }
 

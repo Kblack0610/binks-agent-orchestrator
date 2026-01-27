@@ -5,10 +5,11 @@
 
 use std::path::PathBuf;
 
+use mcp_common::{CallToolResult, McpError};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, ServerCapabilities, ServerInfo},
-    tool, tool_handler, tool_router, ErrorData as McpError,
+    model::{ServerCapabilities, ServerInfo},
+    tool, tool_handler, tool_router,
 };
 
 use crate::handlers;

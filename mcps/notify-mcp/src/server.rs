@@ -1,10 +1,11 @@
 //! MCP Server implementation for notifications
 
 use chrono::Local;
+use mcp_common::{internal_error, json_success, CallToolResult, McpError};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
-    tool, tool_handler, tool_router, ErrorData as McpError,
+    model::{ServerCapabilities, ServerInfo},
+    tool, tool_handler, tool_router,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -153,9 +154,10 @@ impl NotifyMcpServer {
         &self,
         Parameters(params): Parameters<SlackMessageParams>,
     ) -> Result<CallToolResult, McpError> {
-        let webhook_url = self.slack_webhook.as_ref().ok_or_else(|| {
-            McpError::internal_error("SLACK_WEBHOOK_URL not configured".to_string(), None)
-        })?;
+        let webhook_url = self
+            .slack_webhook
+            .as_ref()
+            .ok_or_else(|| internal_error("SLACK_WEBHOOK_URL not configured"))?;
 
         let payload = SlackPayload {
             text: params.message.clone(),
@@ -170,9 +172,7 @@ impl NotifyMcpServer {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| {
-                McpError::internal_error(format!("Failed to send Slack message: {}", e), None)
-            })?;
+            .map_err(|e| internal_error(format!("Failed to send Slack message: {e}")))?;
 
         let status = response.status();
         if !status.is_success() {
@@ -180,10 +180,9 @@ impl NotifyMcpServer {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(McpError::internal_error(
-                format!("Slack API error ({}): {}", status, error_text),
-                None,
-            ));
+            return Err(internal_error(format!(
+                "Slack API error ({status}): {error_text}"
+            )));
         }
 
         let result = NotifyResponse {
@@ -195,9 +194,7 @@ impl NotifyMcpServer {
             ),
         };
 
-        let json = serde_json::to_string_pretty(&result)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&result)
     }
 
     // ========================================================================
@@ -211,9 +208,10 @@ impl NotifyMcpServer {
         &self,
         Parameters(params): Parameters<DiscordMessageParams>,
     ) -> Result<CallToolResult, McpError> {
-        let webhook_url = self.discord_webhook.as_ref().ok_or_else(|| {
-            McpError::internal_error("DISCORD_WEBHOOK_URL not configured".to_string(), None)
-        })?;
+        let webhook_url = self
+            .discord_webhook
+            .as_ref()
+            .ok_or_else(|| internal_error("DISCORD_WEBHOOK_URL not configured"))?;
 
         let payload = DiscordPayload {
             content: params.content.clone(),
@@ -228,9 +226,7 @@ impl NotifyMcpServer {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| {
-                McpError::internal_error(format!("Failed to send Discord message: {}", e), None)
-            })?;
+            .map_err(|e| internal_error(format!("Failed to send Discord message: {e}")))?;
 
         let status = response.status();
         // Discord returns 204 No Content on success
@@ -239,10 +235,9 @@ impl NotifyMcpServer {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(McpError::internal_error(
-                format!("Discord API error ({}): {}", status, error_text),
-                None,
-            ));
+            return Err(internal_error(format!(
+                "Discord API error ({status}): {error_text}"
+            )));
         }
 
         let result = NotifyResponse {
@@ -254,9 +249,7 @@ impl NotifyMcpServer {
             ),
         };
 
-        let json = serde_json::to_string_pretty(&result)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&result)
     }
 
     // ========================================================================
@@ -322,13 +315,10 @@ impl NotifyMcpServer {
         }
 
         if results.is_empty() {
-            return Err(McpError::internal_error(
-                format!(
-                    "No notification platforms configured for '{}'",
-                    params.platform
-                ),
-                None,
-            ));
+            return Err(internal_error(format!(
+                "No notification platforms configured for '{}'",
+                params.platform
+            )));
         }
 
         let result = serde_json::json!({
@@ -338,9 +328,7 @@ impl NotifyMcpServer {
             "items_count": params.items.len(),
         });
 
-        let json = serde_json::to_string_pretty(&result)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&result)
     }
 
     // ========================================================================
@@ -372,9 +360,7 @@ impl NotifyMcpServer {
             }
         });
 
-        let json = serde_json::to_string_pretty(&status)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&status)
     }
 }
 

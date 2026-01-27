@@ -1,7 +1,6 @@
 //! Pull Request handler implementations
 
-use rmcp::model::{CallToolResult, Content};
-use rmcp::ErrorData as McpError;
+use mcp_common::{json_success, text_success, CallToolResult, McpError};
 
 use crate::gh::{
     execute_gh_action, execute_gh_json, execute_gh_raw, execute_gh_raw_with_exit_code,
@@ -54,9 +53,7 @@ pub async fn pr_list(params: PrListParams) -> Result<CallToolResult, McpError> {
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json =
-        serde_json::to_string(&prs).map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&prs)
 }
 
 /// View detailed information about a pull request
@@ -68,9 +65,7 @@ pub async fn pr_view(params: PrViewParams) -> Result<CallToolResult, McpError> {
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json =
-        serde_json::to_string(&pr).map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&pr)
 }
 
 /// Create a new pull request
@@ -98,7 +93,7 @@ pub async fn pr_create(params: PrCreateParams) -> Result<CallToolResult, McpErro
     }
 
     let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// Merge a pull request
@@ -122,7 +117,7 @@ pub async fn pr_merge(params: PrMergeParams) -> Result<CallToolResult, McpError>
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// Get the diff for a pull request
@@ -135,7 +130,7 @@ pub async fn pr_diff(params: PrDiffParams) -> Result<CallToolResult, McpError> {
     }
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// Get CI/CD check status for a pull request
@@ -155,10 +150,10 @@ pub async fn pr_checks(params: PrChecksParams) -> Result<CallToolResult, McpErro
         Ok((output, exit_code)) => {
             // Exit code 0 or 1 both have valid output
             if output.trim().is_empty() {
-                Ok(CallToolResult::success(vec![Content::text(format!(
+                Ok(text_success(format!(
                     "No checks reported for PR #{}",
                     params.number
-                ))]))
+                )))
             } else {
                 // Add status indicator based on exit code
                 let status_msg = if exit_code == 0 {
@@ -166,19 +161,16 @@ pub async fn pr_checks(params: PrChecksParams) -> Result<CallToolResult, McpErro
                 } else {
                     "✗ Some checks failed"
                 };
-                Ok(CallToolResult::success(vec![Content::text(format!(
-                    "{}\n\n{}",
-                    status_msg, output
-                ))]))
+                Ok(text_success(format!("{}\n\n{}", status_msg, output)))
             }
         }
         Err(e) => {
             let err_str = e.to_string();
             if err_str.contains("no checks reported") {
-                Ok(CallToolResult::success(vec![Content::text(format!(
+                Ok(text_success(format!(
                     "No checks reported for PR #{}",
                     params.number
-                ))]))
+                )))
             } else {
                 Err(gh_to_mcp_error(e))
             }
@@ -205,7 +197,7 @@ pub async fn pr_comment(params: PrCommentParams) -> Result<CallToolResult, McpEr
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// Show status of your PRs in a repository
@@ -219,7 +211,7 @@ pub async fn pr_status(params: PrStatusParams) -> Result<CallToolResult, McpErro
     }
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// Submit a review on a pull request
@@ -246,7 +238,7 @@ pub async fn pr_review(params: PrReviewParams) -> Result<CallToolResult, McpErro
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// Mark a draft pull request as ready for review
@@ -260,7 +252,7 @@ pub async fn pr_ready(params: PrReadyParams) -> Result<CallToolResult, McpError>
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// Edit a pull request
@@ -311,5 +303,5 @@ pub async fn pr_edit(params: PrEditParams) -> Result<CallToolResult, McpError> {
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }

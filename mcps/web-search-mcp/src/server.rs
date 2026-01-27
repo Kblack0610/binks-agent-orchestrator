@@ -3,10 +3,11 @@
 //! This module defines the main MCP server that exposes web search
 //! tools with pluggable backend support.
 
+use mcp_common::{json_success, CallToolResult, McpError, ResultExt};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
-    tool, tool_handler, tool_router, ErrorData as McpError,
+    model::{ServerCapabilities, ServerInfo},
+    tool, tool_handler, tool_router,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -112,12 +113,9 @@ impl WebSearchMcpServer {
             .backend
             .search(&params.query, limit)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .to_mcp_err()?;
 
-        let json = serde_json::to_string_pretty(&results)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&results)
     }
 
     #[tool(
@@ -135,12 +133,9 @@ impl WebSearchMcpServer {
             .backend
             .search_news(&params.query, limit)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .to_mcp_err()?;
 
-        let json = serde_json::to_string_pretty(&results)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&results)
     }
 
     #[tool(description = "Search for images. Returns image URLs, page URLs, and dimensions.")]
@@ -156,12 +151,9 @@ impl WebSearchMcpServer {
             .backend
             .search_images(&params.query, limit)
             .await
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+            .to_mcp_err()?;
 
-        let json = serde_json::to_string_pretty(&results)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&results)
     }
 
     #[tool(description = "Get the current search backend configuration and status.")]
@@ -181,10 +173,7 @@ impl WebSearchMcpServer {
             cache_enabled: self.config.search.cache_enabled,
         };
 
-        let json = serde_json::to_string_pretty(&status)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        json_success(&status)
     }
 }
 

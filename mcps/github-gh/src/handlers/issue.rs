@@ -1,7 +1,6 @@
 //! Issue handler implementations
 
-use rmcp::model::{CallToolResult, Content};
-use rmcp::ErrorData as McpError;
+use mcp_common::{json_success, text_success, CallToolResult, McpError};
 
 use crate::gh::{execute_gh_action, execute_gh_json, execute_gh_raw};
 use crate::params::{
@@ -47,9 +46,7 @@ pub async fn issue_list(params: IssueListParams) -> Result<CallToolResult, McpEr
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json = serde_json::to_string(&issues)
-        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&issues)
 }
 
 /// View detailed information about a specific GitHub issue
@@ -61,9 +58,7 @@ pub async fn issue_view(params: IssueViewParams) -> Result<CallToolResult, McpEr
         .await
         .map_err(gh_to_mcp_error)?;
 
-    let json =
-        serde_json::to_string(&issue).map_err(|e| McpError::internal_error(e.to_string(), None))?;
-    Ok(CallToolResult::success(vec![Content::text(json)]))
+    json_success(&issue)
 }
 
 /// Create a new issue in a GitHub repository
@@ -88,7 +83,7 @@ pub async fn issue_create(params: IssueCreateParams) -> Result<CallToolResult, M
     }
 
     let output = execute_gh_action(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// Edit an existing GitHub issue
@@ -129,7 +124,7 @@ pub async fn issue_edit(params: IssueEditParams) -> Result<CallToolResult, McpEr
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// Close a GitHub issue
@@ -155,7 +150,7 @@ pub async fn issue_close(params: IssueCloseParams) -> Result<CallToolResult, Mcp
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// Add a comment to an issue
@@ -177,7 +172,7 @@ pub async fn issue_comment(params: IssueCommentParams) -> Result<CallToolResult,
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// Delete an issue (requires admin permissions)
@@ -191,7 +186,7 @@ pub async fn issue_delete(params: IssueDeleteParams) -> Result<CallToolResult, M
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// Show status of issues relevant to you
@@ -205,5 +200,5 @@ pub async fn issue_status(params: IssueStatusParams) -> Result<CallToolResult, M
     }
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }

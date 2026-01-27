@@ -1,7 +1,6 @@
 //! Release, label, cache, secret, and variable handler implementations
 
-use rmcp::model::{CallToolResult, Content};
-use rmcp::ErrorData as McpError;
+use mcp_common::{text_success, CallToolResult, McpError};
 
 use crate::gh::{execute_gh_action, execute_gh_raw};
 use crate::params::{
@@ -22,7 +21,7 @@ pub async fn release_list(params: ReleaseListParams) -> Result<CallToolResult, M
     }
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// View release details including changelog and assets
@@ -30,7 +29,7 @@ pub async fn release_view(params: ReleaseViewParams) -> Result<CallToolResult, M
     let args = vec!["release", "view", &params.tag, "-R", &params.repo];
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// Create a new release in a repository
@@ -69,7 +68,7 @@ pub async fn release_create(params: ReleaseCreateParams) -> Result<CallToolResul
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// List labels in a repository
@@ -83,7 +82,7 @@ pub async fn label_list(params: LabelListParams) -> Result<CallToolResult, McpEr
     }
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// Create a new label in a repository
@@ -108,7 +107,7 @@ pub async fn label_create(params: LabelCreateParams) -> Result<CallToolResult, M
     } else {
         output
     };
-    Ok(CallToolResult::success(vec![Content::text(msg)]))
+    Ok(text_success(msg))
 }
 
 /// List GitHub Actions caches in a repository
@@ -122,7 +121,7 @@ pub async fn cache_list(params: CacheListParams) -> Result<CallToolResult, McpEr
     }
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// List repository secrets (names only, not values)
@@ -130,7 +129,7 @@ pub async fn secret_list(params: SecretListParams) -> Result<CallToolResult, Mcp
     let args = vec!["secret", "list", "-R", &params.repo];
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }
 
 /// List repository variables for GitHub Actions
@@ -138,5 +137,5 @@ pub async fn variable_list(params: VariableListParams) -> Result<CallToolResult,
     let args = vec!["variable", "list", "-R", &params.repo];
 
     let output = execute_gh_raw(&args).await.map_err(gh_to_mcp_error)?;
-    Ok(CallToolResult::success(vec![Content::text(output)]))
+    Ok(text_success(output))
 }

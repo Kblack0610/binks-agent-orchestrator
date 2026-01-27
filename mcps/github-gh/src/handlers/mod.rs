@@ -16,11 +16,11 @@ pub use repo::*;
 pub use search::*;
 pub use workflow::*;
 
-use rmcp::ErrorData as McpError;
+use mcp_common::{internal_error, McpError};
 
 use crate::gh::GhError;
 
 /// Convert a GhError to an MCP error
 pub fn gh_to_mcp_error(e: GhError) -> McpError {
-    McpError::internal_error(e.to_string(), None)
+    internal_error(e.to_string())
 }
