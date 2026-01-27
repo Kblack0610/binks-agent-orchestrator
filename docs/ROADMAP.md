@@ -57,7 +57,7 @@ We use a strategic mix of **pre-built tools** (for common operations) and **cust
 - [x] Pre-built ShellTools for code editing
 - [x] Pre-built FileTools for file operations
 - [x] FastAPI server for remote access
-- [ ] Basic error handling and retries
+- [x] Clear error messages (fail fast philosophy)
 
 ### Phase 2: Walk
 **Goal:** Expanded capabilities and reliability
@@ -94,20 +94,23 @@ We use a strategic mix of **pre-built tools** (for common operations) and **cust
 
 ## Stability & Code Quality Phases
 
-### Phase S1: Agent Stability (P0) 🔴 CRITICAL
+### Phase S1: Agent Stability (P0) ✅ COMPLETE
 **Goal:** Make binks reliable for production use
+**Philosophy:** Fail fast, fail loud (see ARCHITECTURE.md)
 
-- [ ] Add configurable timeouts (LLM: 5min, tools: 1min)
-- [ ] Add retry with exponential backoff (3 attempts)
-- [ ] Make MAX_ITERATIONS configurable (--max-iterations flag)
-- [ ] Add model fallback chain (primary → fallback models)
-- [ ] Add conversation history pruning (prevent OOM)
+- [x] Add configurable timeouts (LLM: 5min default, tools: 1min default)
+- [x] Make MAX_ITERATIONS configurable (default: 10)
+- [x] Add conversation history pruning (max_history_messages: 100)
+- [x] Clear error messages on failure
 
-### Phase S2: Observability (P1)
+> **Note:** Retry logic and model fallback chains are explicitly **not** implemented.
+> Per ARCHITECTURE.md, these are anti-patterns that hide failures and make debugging harder.
+
+### Phase S2: Observability (P1) 🟡 PARTIAL
 **Goal:** Debug failures and monitor performance
 
 - [ ] Structured logging with correlation IDs
-- [ ] Health check HTTP endpoint (/health, /ready)
+- [x] Health check HTTP endpoint (/api/health)
 - [ ] Basic metrics (latency, errors)
 
 ### Phase S3: Code Cleanup (P1)
