@@ -42,6 +42,9 @@ pub enum AgentEvent {
         duration: Duration,
         /// Whether the tool call failed
         is_error: bool,
+        /// Classified error type (e.g. "timeout", "connection_refused", "server_crashed")
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error_type: Option<String>,
     },
 
     /// Streaming token received
@@ -188,12 +191,20 @@ impl AgentEventSender {
     }
 
     /// Send tool complete event
-    pub fn tool_complete(&self, name: &str, result: &str, duration: Duration, is_error: bool) {
+    pub fn tool_complete(
+        &self,
+        name: &str,
+        result: &str,
+        duration: Duration,
+        is_error: bool,
+        error_type: Option<String>,
+    ) {
         self.send(AgentEvent::ToolComplete {
             name: name.to_string(),
             result: result.to_string(),
             duration,
             is_error,
+            error_type,
         });
     }
 
@@ -284,7 +295,7 @@ mod tests {
 
         // These should not panic
         sender.tool_start("tool", &serde_json::json!({}));
-        sender.tool_complete("tool", "result", Duration::from_millis(100), false);
+        sender.tool_complete("tool", "result", Duration::from_millis(100), false, None);
         sender.token("hello");
         sender.thinking("hmm");
         sender.iteration(1, 2);
@@ -308,6 +319,7 @@ mod tests {
             result: "ok".to_string(),
             duration: Duration::from_millis(123),
             is_error: false,
+            error_type: None,
         };
 
         let json = serde_json::to_string(&event).unwrap();

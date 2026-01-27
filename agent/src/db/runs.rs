@@ -1106,6 +1106,7 @@ mod tests {
                 result: "content".to_string(),
                 duration: std::time::Duration::from_millis(100),
                 is_error: false,
+                error_type: None,
             })
             .unwrap();
 

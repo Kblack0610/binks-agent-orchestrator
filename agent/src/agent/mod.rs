@@ -30,6 +30,10 @@ use types::{DirectChatRequest, DirectChatResponse, DirectTool};
 mod tools;
 use tools::mcp_tools_to_direct;
 
+// MCP tool call metrics and observability
+pub mod metrics;
+use metrics::McpMetrics;
+
 /// Default maximum iterations (used when config not provided)
 const DEFAULT_MAX_ITERATIONS: usize = 10;
 /// Default LLM timeout in seconds (5 minutes)
@@ -55,6 +59,8 @@ pub struct Agent {
     llm_timeout: Duration,
     tool_timeout: Duration,
     max_history_messages: usize,
+    // MCP observability
+    mcp_metrics: McpMetrics,
 }
 
 impl Agent {
@@ -110,6 +116,7 @@ impl Agent {
             llm_timeout,
             tool_timeout: Duration::from_secs(tool_timeout_secs),
             max_history_messages,
+            mcp_metrics: McpMetrics::new(),
         }
     }
 
@@ -172,6 +179,11 @@ impl Agent {
     /// Get the current system prompt
     pub fn system_prompt(&self) -> Option<&str> {
         self.system_prompt.as_deref()
+    }
+
+    /// Get MCP tool call metrics
+    pub fn mcp_metrics(&self) -> &metrics::McpMetrics {
+        &self.mcp_metrics
     }
 
     /// Run a single message through the agent, handling tool calls
@@ -523,6 +535,30 @@ impl Agent {
                     ),
                 };
                 let tool_elapsed = tool_start.elapsed();
+                let duration_ms = tool_elapsed.as_millis() as u64;
+
+                // Record MCP metrics and classify error
+                let server_name = self
+                    .mcp_pool
+                    .server_for_tool(&tool_call.function.name)
+                    .unwrap_or_else(|| "unknown".to_string());
+                let error_type = if is_error {
+                    let error = metrics::ToolCallError::classify(&result);
+                    self.mcp_metrics.record_error(
+                        &server_name,
+                        &tool_call.function.name,
+                        duration_ms,
+                        &error,
+                    );
+                    Some(error.label().to_string())
+                } else {
+                    self.mcp_metrics.record_success(
+                        &server_name,
+                        &tool_call.function.name,
+                        duration_ms,
+                    );
+                    None
+                };
 
                 // Emit tool complete event
                 self.event_sender.tool_complete(
@@ -530,6 +566,7 @@ impl Agent {
                     &result,
                     tool_elapsed,
                     is_error,
+                    error_type,
                 );
 
                 if self.verbose {

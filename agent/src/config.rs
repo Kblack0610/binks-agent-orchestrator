@@ -137,6 +137,12 @@ pub struct AgentSectionConfig {
     /// Maximum conversation history messages to keep (default: 100)
     #[serde(default = "default_max_history_messages")]
     pub max_history_messages: usize,
+    /// MCP daemon socket connect timeout in seconds (default: 5)
+    #[serde(default = "default_mcp_connect_timeout_secs")]
+    pub mcp_connect_timeout_secs: u64,
+    /// MCP server startup timeout in seconds (default: 30)
+    #[serde(default = "default_mcp_startup_timeout_secs")]
+    pub mcp_startup_timeout_secs: u64,
 }
 
 fn default_max_iterations() -> usize {
@@ -155,6 +161,14 @@ fn default_max_history_messages() -> usize {
     100
 }
 
+fn default_mcp_connect_timeout_secs() -> u64 {
+    5
+}
+
+fn default_mcp_startup_timeout_secs() -> u64 {
+    30
+}
+
 impl Default for AgentSectionConfig {
     fn default() -> Self {
         Self {
@@ -163,6 +177,8 @@ impl Default for AgentSectionConfig {
             llm_timeout_secs: default_llm_timeout_secs(),
             tool_timeout_secs: default_tool_timeout_secs(),
             max_history_messages: default_max_history_messages(),
+            mcp_connect_timeout_secs: default_mcp_connect_timeout_secs(),
+            mcp_startup_timeout_secs: default_mcp_startup_timeout_secs(),
         }
     }
 }

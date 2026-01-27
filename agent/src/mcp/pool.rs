@@ -6,6 +6,7 @@
 //! Otherwise, it falls back to spawn-per-call.
 
 use std::collections::HashMap;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use rmcp::model::{CallToolResult, RawContent, RawTextContent};
@@ -30,17 +31,51 @@ pub struct McpClientPool {
     daemon_available: Option<bool>,
     /// Daemon client for when daemon is running
     daemon_client: DaemonClient,
+    /// Timeout for connecting to daemon socket or spawning MCP process
+    connect_timeout: Duration,
+    /// Timeout for MCP server startup/initialization
+    startup_timeout: Duration,
+    /// Timeout for individual tool calls
+    tool_timeout: Duration,
 }
 
+/// Default connect timeout (daemon socket or spawn connection)
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// Default MCP server startup timeout
+const DEFAULT_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+/// Default tool call timeout
+const DEFAULT_TOOL_TIMEOUT: Duration = Duration::from_secs(60);
+
 impl McpClientPool {
-    /// Create a new pool from config
+    /// Create a new pool from config (uses default timeouts)
     pub fn new(config: McpConfig) -> Self {
         Self {
             config,
             tools_cache: HashMap::new(),
             daemon_available: None,
-            daemon_client: DaemonClient::new(),
+            daemon_client: DaemonClient::new()
+                .with_connect_timeout(DEFAULT_CONNECT_TIMEOUT)
+                .with_read_timeout(DEFAULT_TOOL_TIMEOUT),
+            connect_timeout: DEFAULT_CONNECT_TIMEOUT,
+            startup_timeout: DEFAULT_STARTUP_TIMEOUT,
+            tool_timeout: DEFAULT_TOOL_TIMEOUT,
         }
+    }
+
+    /// Create a pool with custom timeouts
+    pub fn with_timeouts(
+        mut self,
+        connect_timeout: Duration,
+        startup_timeout: Duration,
+        tool_timeout: Duration,
+    ) -> Self {
+        self.connect_timeout = connect_timeout;
+        self.startup_timeout = startup_timeout;
+        self.tool_timeout = tool_timeout;
+        self.daemon_client = DaemonClient::new()
+            .with_connect_timeout(connect_timeout)
+            .with_read_timeout(tool_timeout);
+        self
     }
 
     /// Create an empty pool for testing purposes
@@ -63,9 +98,19 @@ impl McpClientPool {
         self.daemon_available.unwrap_or(false)
     }
 
+    /// Get cached daemon availability state (non-async, returns last known value)
+    pub fn is_daemon_available(&self) -> bool {
+        self.daemon_available.unwrap_or(false)
+    }
+
     /// Force recheck of daemon availability
     pub fn reset_daemon_check(&mut self) {
         self.daemon_available = None;
+    }
+
+    /// Get the number of cached tools for a server
+    pub fn cached_tool_count(&self, name: &str) -> usize {
+        self.tools_cache.get(name).map(|v| v.len()).unwrap_or(0)
     }
 
     /// Load pool from .mcp.json in current directory tree
@@ -159,7 +204,8 @@ impl McpClientPool {
                 .mcp_servers
                 .get(name)
                 .context(format!("MCP server '{}' not found in config", name))?;
-            McpClient::list_tools(name, server_config).await?
+            McpClient::list_tools_with_timeout(name, server_config, self.startup_timeout)
+                .await?
         };
 
         // Cache the result
@@ -249,8 +295,29 @@ impl McpClientPool {
                 .get(&server_name)
                 .context(format!("MCP server '{}' not found", server_name))?;
 
-            McpClient::call_tool(&server_name, server_config, tool_name, arguments).await
+            McpClient::call_tool_with_timeouts(
+                &server_name,
+                server_config,
+                tool_name,
+                arguments,
+                self.startup_timeout,
+                self.tool_timeout,
+            )
+            .await
         }
+    }
+
+    /// Look up which server owns a tool (from the tools cache)
+    ///
+    /// Returns the server name if the tool is found in the cache.
+    /// This is useful for recording per-server metrics after a tool call.
+    pub fn server_for_tool(&self, tool_name: &str) -> Option<String> {
+        for (server_name, tools) in &self.tools_cache {
+            if tools.iter().any(|t| t.name == tool_name) {
+                return Some(server_name.clone());
+            }
+        }
+        None
     }
 
     /// Clear the tools cache

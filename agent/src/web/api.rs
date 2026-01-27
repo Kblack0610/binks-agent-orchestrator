@@ -275,6 +275,78 @@ pub async fn list_tools(
     }
 }
 
+/// MCP server status info
+#[derive(Debug, Serialize)]
+pub struct McpServerStatus {
+    pub name: String,
+    pub tier: u8,
+    pub tools_cached: bool,
+    pub tool_count: usize,
+}
+
+/// MCP health response
+#[derive(Debug, Serialize)]
+pub struct McpHealthResponse {
+    pub daemon_available: bool,
+    pub servers: Vec<McpServerStatus>,
+    pub total_servers: usize,
+    pub total_tools_cached: usize,
+}
+
+/// MCP health endpoint — pool-level server status
+pub async fn mcp_health(
+    State(state): State<AppState>,
+) -> Result<Json<McpHealthResponse>, (StatusCode, Json<ErrorResponse>)> {
+    match &state.mcp_pool {
+        Some(pool) => {
+            let pool = pool.lock().await;
+
+            // Check daemon availability (uses cached result)
+            let daemon_available = pool.is_daemon_available();
+
+            let server_names = pool.server_names();
+            let mut servers = Vec::with_capacity(server_names.len());
+            let mut total_tools_cached = 0;
+
+            for name in &server_names {
+                let tier = pool
+                    .get_server_config(name)
+                    .map(|c| c.tier)
+                    .unwrap_or(2);
+                let tools_cached = pool.has_cached_tools(name);
+                let tool_count = if tools_cached {
+                    pool.cached_tool_count(name)
+                } else {
+                    0
+                };
+                total_tools_cached += tool_count;
+
+                servers.push(McpServerStatus {
+                    name: name.clone(),
+                    tier,
+                    tools_cached,
+                    tool_count,
+                });
+            }
+
+            let total_servers = servers.len();
+
+            Ok(Json(McpHealthResponse {
+                daemon_available,
+                servers,
+                total_servers,
+                total_tools_cached,
+            }))
+        }
+        None => Ok(Json(McpHealthResponse {
+            daemon_available: false,
+            servers: vec![],
+            total_servers: 0,
+            total_tools_cached: 0,
+        })),
+    }
+}
+
 /// Models list response
 #[derive(Debug, Serialize)]
 pub struct ModelsResponse {

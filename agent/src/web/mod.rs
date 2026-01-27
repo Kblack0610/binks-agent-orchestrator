@@ -102,7 +102,8 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         .route("/runs/:id/export", get(runs::export_run))
         .route("/improvements", get(runs::list_improvements).post(runs::create_improvement))
         // Health
-        .route("/health", get(api::health_check));
+        .route("/health", get(api::health_check))
+        .route("/mcp/health", get(api::mcp_health));
 
     let ws_routes = Router::new().route("/chat/:conversation_id", get(ws::chat_handler));
 
@@ -217,6 +218,7 @@ pnpm dev</pre>
         <li><code>DELETE /api/conversations/:id</code> - Delete conversation</li>
         <li><code>GET /api/tools</code> - List available tools</li>
         <li><code>GET /api/models</code> - List available models</li>
+        <li><code>GET /api/mcp/health</code> - MCP server health status</li>
         <li><code>WS /ws/chat/:id</code> - WebSocket for chat</li>
     </ul>
     <h2>Workflow Endpoints</h2>
