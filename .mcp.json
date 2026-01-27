@@ -73,6 +73,15 @@
       },
       "tier": 1
     },
+    "exec": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/exec-mcp/target/release/exec-mcp",
+      "args": [],
+      "env": {
+        "EXEC_CONFIG_PATH": "${HOME}/.binks/exec.toml",
+        "RUST_LOG": "info"
+      },
+      "tier": 2
+    },
     "web-search": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/web-search-mcp",
       "args": [],

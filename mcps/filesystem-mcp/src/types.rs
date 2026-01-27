@@ -276,6 +276,16 @@ pub struct SearchFilesResponse {
     pub total_count: usize,
 }
 
+/// Response for edit_file operation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EditFileResponse {
+    pub path: String,
+    pub success: bool,
+    pub new_size: u64,
+    /// A snippet of the file around the edit location
+    pub snippet: String,
+}
+
 /// Response for file_info operation
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileInfoResponse {

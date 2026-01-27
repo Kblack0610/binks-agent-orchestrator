@@ -34,10 +34,12 @@ impl FilesystemMcpServer {
     /// Create a new server, loading config from standard locations
     ///
     /// Config is searched in order:
-    /// 1. `./filesystem-mcp.toml`
-    /// 2. `$XDG_CONFIG_HOME/filesystem-mcp/config.toml`
-    /// 3. `~/.filesystem-mcp.toml`
-    /// 4. Default config if none found
+    /// 1. `FS_CONFIG_PATH` env var
+    /// 2. `~/.binks/filesystem.toml`
+    /// 3. `./filesystem-mcp.toml`
+    /// 4. `$XDG_CONFIG_HOME/filesystem-mcp/config.toml`
+    /// 5. `~/.filesystem-mcp.toml`
+    /// 6. Default config if none found
     pub fn new() -> Self {
         Self::with_config(Self::load_config()).expect("Failed to create FilesystemMcpServer")
     }
@@ -55,15 +57,50 @@ impl FilesystemMcpServer {
 
     /// Load config from standard file locations
     fn load_config() -> Config {
-        let config_paths = [
-            PathBuf::from("filesystem-mcp.toml"),
-            dirs::config_dir()
-                .map(|p| p.join("filesystem-mcp").join("config.toml"))
-                .unwrap_or_default(),
-            dirs::home_dir()
-                .map(|p| p.join(".filesystem-mcp.toml"))
-                .unwrap_or_default(),
-        ];
+        // 1. Check FS_CONFIG_PATH env var first
+        if let Ok(env_path) = std::env::var("FS_CONFIG_PATH") {
+            let path = PathBuf::from(&env_path);
+            if path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    match toml::from_str::<Config>(&content) {
+                        Ok(config) => {
+                            tracing::info!("Loaded config from FS_CONFIG_PATH={}", path.display());
+                            return config;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to parse config from FS_CONFIG_PATH={}: {}",
+                                path.display(),
+                                e
+                            );
+                        }
+                    }
+                }
+            } else {
+                tracing::warn!("FS_CONFIG_PATH={} does not exist", env_path);
+            }
+        }
+
+        // 2-5. Check standard file locations
+        let mut config_paths = Vec::new();
+
+        // 2. ~/.binks/filesystem.toml (project convention)
+        if let Some(home) = dirs::home_dir() {
+            config_paths.push(home.join(".binks").join("filesystem.toml"));
+        }
+
+        // 3. ./filesystem-mcp.toml (local override)
+        config_paths.push(PathBuf::from("filesystem-mcp.toml"));
+
+        // 4. $XDG_CONFIG_HOME/filesystem-mcp/config.toml
+        if let Some(config_dir) = dirs::config_dir() {
+            config_paths.push(config_dir.join("filesystem-mcp").join("config.toml"));
+        }
+
+        // 5. ~/.filesystem-mcp.toml
+        if let Some(home) = dirs::home_dir() {
+            config_paths.push(home.join(".filesystem-mcp.toml"));
+        }
 
         for path in config_paths {
             if path.exists() {
@@ -81,6 +118,7 @@ impl FilesystemMcpServer {
             }
         }
 
+        // 6. Default config
         tracing::info!("Using default configuration");
         Config::default()
     }
@@ -103,6 +141,16 @@ impl FilesystemMcpServer {
         Parameters(params): Parameters<WriteFileParams>,
     ) -> Result<CallToolResult, McpError> {
         handlers::write_file(&self.sandbox, &self.config, params).await
+    }
+
+    #[tool(
+        description = "Edit a file by replacing an exact string match. If old_string is empty, new_string is prepended. If new_string is empty, old_string is deleted. The match must be unique."
+    )]
+    async fn edit_file(
+        &self,
+        Parameters(params): Parameters<EditFileParams>,
+    ) -> Result<CallToolResult, McpError> {
+        handlers::edit_file(&self.sandbox, &self.config, params).await
     }
 
     #[tool(

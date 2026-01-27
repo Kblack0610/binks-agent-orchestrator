@@ -11,8 +11,8 @@ use tokio::io::AsyncWriteExt;
 use crate::params::*;
 use crate::sandbox::Sandbox;
 use crate::types::{
-    Config, DeleteFileResponse, FileEntry, FileInfoResponse, FsError, ListDirResponse,
-    MoveFileResponse, ReadFileResponse, SearchFilesResponse, WriteFileResponse,
+    Config, DeleteFileResponse, EditFileResponse, FileEntry, FileInfoResponse, FsError,
+    ListDirResponse, MoveFileResponse, ReadFileResponse, SearchFilesResponse, WriteFileResponse,
 };
 
 // ============================================================================
@@ -124,6 +124,109 @@ pub async fn write_file(
     };
 
     json_success(&response)
+}
+
+pub async fn edit_file(
+    sandbox: &Sandbox,
+    config: &Config,
+    params: EditFileParams,
+) -> Result<CallToolResult, McpError> {
+    let canonical = sandbox
+        .validate_write(&params.path)
+        .map_err(fs_error_to_mcp)?;
+
+    // Read existing content
+    let content = fs::read_to_string(&canonical)
+        .await
+        .map_err(|e| internal_error(e.to_string()))?;
+
+    let new_content = if params.old_string.is_empty() {
+        // Empty old_string → prepend new_string to file
+        format!("{}{}", params.new_string, content)
+    } else {
+        // Count occurrences
+        let count = content.matches(&params.old_string).count();
+        if count == 0 {
+            return Err(invalid_params(format!(
+                "old_string not found in {}",
+                canonical.display()
+            )));
+        }
+        if count > 1 {
+            return Err(invalid_params(format!(
+                "old_string found {} times in {} — provide more context to make the match unique",
+                count,
+                canonical.display()
+            )));
+        }
+        content.replacen(&params.old_string, &params.new_string, 1)
+    };
+
+    // Check size limit
+    if new_content.len() > config.limits.max_file_size {
+        return Err(fs_error_to_mcp(FsError::FileTooLarge {
+            size: new_content.len() as u64,
+            max: config.limits.max_file_size,
+        }));
+    }
+
+    // Write back
+    fs::write(&canonical, &new_content)
+        .await
+        .map_err(|e| internal_error(e.to_string()))?;
+
+    // Build a snippet around the edit location
+    let snippet = build_edit_snippet(&new_content, &params.new_string);
+
+    let response = EditFileResponse {
+        path: canonical.display().to_string(),
+        success: true,
+        new_size: new_content.len() as u64,
+        snippet,
+    };
+
+    json_success(&response)
+}
+
+/// Build a context snippet showing lines around the edited region
+fn build_edit_snippet(content: &str, new_text: &str) -> String {
+    const CONTEXT_LINES: usize = 3;
+
+    if new_text.is_empty() {
+        return "(text deleted)".to_string();
+    }
+
+    // Find the position of the replacement text
+    let Some(byte_offset) = content.find(new_text) else {
+        return String::new();
+    };
+
+    let lines: Vec<&str> = content.lines().collect();
+
+    // Find which line the edit starts on
+    let mut edit_line = 0;
+    let mut chars_seen = 0;
+    for (i, line) in lines.iter().enumerate() {
+        if chars_seen + line.len() >= byte_offset {
+            edit_line = i;
+            break;
+        }
+        chars_seen += line.len() + 1; // +1 for newline
+    }
+
+    // Find how many lines the replacement spans
+    let replacement_lines = new_text.lines().count().max(1);
+    let edit_end_line = (edit_line + replacement_lines).min(lines.len());
+
+    let start = edit_line.saturating_sub(CONTEXT_LINES);
+    let end = (edit_end_line + CONTEXT_LINES).min(lines.len());
+
+    lines[start..end]
+        .iter()
+        .enumerate()
+        .map(|(i, line)| format!("{:>4} | {}", start + i + 1, line))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub async fn list_dir(
