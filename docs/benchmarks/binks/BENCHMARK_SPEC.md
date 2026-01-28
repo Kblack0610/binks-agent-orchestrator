@@ -10,6 +10,12 @@ Benchmarks to evaluate LLM capability thresholds for autonomous agent tasks.
 | llama3.1:70b | 70B | General purpose |
 | deepseek-r1:70b | 70B | Reasoning model |
 | qwen3-coder:480b | 480B MoE | Large coding specialist |
+| deepseek-r1:latest | ~7B | Reasoning (small) |
+| llama3.1:8b | 8B | General purpose (small) |
+| qwen-agent:latest | ~32B | Agent-tuned |
+| devstral-2:latest | ~120B | Coding specialist |
+| gpt-oss:120b | 120B | General purpose |
+| deepseek-r1:671b | 671B MoE | Large reasoning |
 
 ## Tier Definitions
 
@@ -39,3 +45,5 @@ Multi-step with analysis and decision making.
 ## Test Environment
 - MCP Servers: filesystem, serena (for code analysis)
 - Test files in: `apps/pick-a-number/` (isolated test directory)
+- Ollama host: 192.168.1.4:11434
+- Results: See `RESULTS_EXPANDED.md` for full benchmark data across all models
