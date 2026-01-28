@@ -89,6 +89,22 @@
         "RUST_LOG": "info"
       },
       "tier": 3
+    },
+    "git": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/git-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      },
+      "tier": 1
+    },
+    "memory": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/memory-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      },
+      "tier": 2
     }
   }
 }
