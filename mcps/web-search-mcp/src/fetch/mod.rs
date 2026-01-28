@@ -6,8 +6,10 @@
 pub mod types;
 
 use anyhow::{anyhow, Result};
+use regex::Regex;
 use reqwest::Client;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use crate::config::FetchConfig;
@@ -146,6 +148,17 @@ impl FetchService {
             ));
         }
 
-        Ok(html2md::parse_html(&result.content))
+        // Strip <style> and <script> tags before converting to markdown
+        // to avoid CSS/JS content leaking into the output
+        static STYLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap()
+        });
+        static SCRIPT_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"(?is)<script[^>]*>.*?</script>").unwrap()
+        });
+        let cleaned = STYLE_RE.replace_all(&result.content, "");
+        let cleaned = SCRIPT_RE.replace_all(&cleaned, "");
+
+        Ok(html2md::parse_html(&cleaned))
     }
 }
