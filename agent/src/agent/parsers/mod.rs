@@ -8,6 +8,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::agent::capabilities::FunctionCallFormat;
+
 mod function_params;
 mod standard;
 mod tool_args;
@@ -93,6 +95,43 @@ impl ToolCallParserRegistry {
 
         // Sort by priority (highest first)
         parsers.sort_by_key(|p| std::cmp::Reverse(p.priority()));
+
+        Self { parsers }
+    }
+
+    /// Create a registry with parsers reordered based on preferred format
+    ///
+    /// This is useful when we know a model uses a specific format (e.g., XML for Llama).
+    /// The preferred format's parsers will be tried first.
+    pub fn with_preferred_format(format: FunctionCallFormat) -> Self {
+        let mut parsers: Vec<Box<dyn ToolCallParser>> = vec![
+            Box::new(StandardParser),
+            Box::new(XmlFunctionParser::new()),
+            Box::new(ToolArgsParser),
+            Box::new(FunctionParamsParser),
+        ];
+
+        // Reorder based on preferred format
+        match format {
+            FunctionCallFormat::Xml => {
+                // Move XML parser to front with boosted priority
+                parsers.sort_by_key(|p| {
+                    if p.name() == "XmlFunctionParser" {
+                        std::cmp::Reverse(200) // Higher than standard 100
+                    } else {
+                        std::cmp::Reverse(p.priority())
+                    }
+                });
+            }
+            FunctionCallFormat::Json => {
+                // Standard/JSON parsers already have highest priority
+                parsers.sort_by_key(|p| std::cmp::Reverse(p.priority()));
+            }
+            FunctionCallFormat::Native | FunctionCallFormat::Unknown => {
+                // Default ordering
+                parsers.sort_by_key(|p| std::cmp::Reverse(p.priority()));
+            }
+        }
 
         Self { parsers }
     }

@@ -20,7 +20,7 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::agent::{Agent, DirectMessage};
+use crate::agent::{detect_capabilities, Agent, DirectMessage, ModelCapabilityOverride};
 use crate::config::AgentSectionConfig;
 use crate::db::runs::{ImprovementFilter, Run, RunEvent, RunFilter, RunMetrics, RunStatus};
 use crate::db::Database;
@@ -37,6 +37,8 @@ pub struct ServerConfig {
     pub enable_runs: bool,
     /// Agent stability settings from .agent.toml
     pub agent_config: AgentSectionConfig,
+    /// Model capability overrides from config
+    pub model_overrides: HashMap<String, ModelCapabilityOverride>,
 }
 
 impl Default for ServerConfig {
@@ -47,6 +49,7 @@ impl Default for ServerConfig {
             system_prompt: None,
             enable_runs: true,
             agent_config: AgentSectionConfig::default(),
+            model_overrides: HashMap::new(),
         }
     }
 }
@@ -191,12 +194,29 @@ impl AgentMcpServer {
     pub async fn init_agent(&self) -> Result<(), anyhow::Error> {
         let pool = McpClientPool::load()?.ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
 
+        // Detect model capabilities
+        let capabilities = detect_capabilities(
+            &self.config.ollama_url,
+            &self.config.model,
+            Some(&self.config.model_overrides),
+        )
+        .await;
+
+        tracing::info!(
+            "Model capabilities for {}: tool_calling={}, thinking={}, format={:?}",
+            self.config.model,
+            capabilities.tool_calling,
+            capabilities.thinking,
+            capabilities.function_call_format
+        );
+
         let mut agent = Agent::from_agent_config(
             &self.config.ollama_url,
             &self.config.model,
             pool,
             &self.config.agent_config,
-        );
+        )
+        .with_capabilities(capabilities);
 
         if let Some(ref prompt) = self.config.system_prompt {
             agent = agent.with_system_prompt(prompt);
@@ -252,12 +272,29 @@ impl AgentMcpServer {
                 })?
                 .ok_or_else(|| McpError::internal_error("No .mcp.json found".to_string(), None))?;
 
+            // Detect model capabilities
+            let capabilities = detect_capabilities(
+                &self.config.ollama_url,
+                &self.config.model,
+                Some(&self.config.model_overrides),
+            )
+            .await;
+
+            tracing::info!(
+                "Model capabilities for {}: tool_calling={}, thinking={}, format={:?}",
+                self.config.model,
+                capabilities.tool_calling,
+                capabilities.thinking,
+                capabilities.function_call_format
+            );
+
             let mut agent = Agent::from_agent_config(
                 &self.config.ollama_url,
                 &self.config.model,
                 pool,
                 &self.config.agent_config,
-            );
+            )
+            .with_capabilities(capabilities);
 
             if let Some(ref prompt) = self.config.system_prompt {
                 agent = agent.with_system_prompt(prompt);

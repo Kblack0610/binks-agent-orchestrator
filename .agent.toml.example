@@ -28,6 +28,58 @@ model = "qwen3-coder:30b"
 # If not set, uses the default system prompt
 # system_prompt = "You are a helpful coding assistant."
 
+# Maximum agent iterations before stopping (prevents infinite loops)
+# Default: 10
+max_iterations = 10
+
+# Timeout for LLM responses in seconds
+# Default: 300 (5 minutes)
+llm_timeout_secs = 300
+
+# Timeout for individual tool calls in seconds
+# Default: 60 (1 minute)
+tool_timeout_secs = 60
+
+# Maximum conversation history messages to retain
+# Default: 100
+max_history_messages = 100
+
+# =============================================================================
+# Model Capability Overrides
+# =============================================================================
+#
+# Auto-detection infers model capabilities from:
+# - Ollama /api/show response (template tokens, model family)
+# - Model name heuristics (e.g., "deepseek-r1" → thinking=true)
+#
+# Override specific capabilities per model when auto-detection is wrong:
+#
+# [models.overrides."model-name"]
+# tool_calling = true          # Model supports native tool calling
+# thinking = false             # Model emits <think>...</think> reasoning traces
+# function_call_format = "xml" # "native", "xml", "json", or "unknown"
+# vision = false               # Model supports image inputs
+# code_specialized = true      # Model is optimized for code tasks
+# json_mode = false            # Model supports structured JSON output mode
+#
+# Examples:
+#
+# [models.overrides."deepseek-r1:70b"]
+# thinking = true              # Strip <think> tags from output
+# tool_calling = false         # Model doesn't use tools well
+#
+# [models.overrides."qwq:32b"]
+# thinking = true
+# function_call_format = "xml" # Prefers XML function call format
+#
+# [models.overrides."llama3.2-vision:11b"]
+# vision = true
+# tool_calling = true
+#
+# [models.overrides."codestral:22b"]
+# code_specialized = true
+# json_mode = true
+
 # =============================================================================
 # Monitor Configuration (for `agent monitor` command)
 # =============================================================================

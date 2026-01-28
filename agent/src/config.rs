@@ -5,6 +5,8 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::agent::capabilities::{FunctionCallFormat, ModelCapabilityOverride};
+
 /// Find a config file by walking up the directory tree, then checking global config.
 ///
 /// Search order:
@@ -110,6 +112,51 @@ pub struct AgentFileConfig {
     pub monitor: MonitorSectionConfig,
     #[serde(default)]
     pub mcp: McpSectionConfig,
+    #[serde(default)]
+    pub models: ModelsConfig,
+}
+
+// ============================================================================
+// Models Configuration (capability overrides)
+// ============================================================================
+
+/// Model capability overrides configuration
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ModelsConfig {
+    /// Per-model capability overrides
+    /// Key is the model name (e.g., "deepseek-r1:32b" or just "deepseek-r1")
+    #[serde(default)]
+    pub overrides: HashMap<String, ModelCapabilityOverride>,
+}
+
+/// Re-export for convenience - allows specifying overrides in config
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ModelOverrideConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calling: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub function_call_format: Option<FunctionCallFormat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vision: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_specialized: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub json_mode: Option<bool>,
+}
+
+impl From<ModelOverrideConfig> for ModelCapabilityOverride {
+    fn from(config: ModelOverrideConfig) -> Self {
+        Self {
+            tool_calling: config.tool_calling,
+            thinking: config.thinking,
+            function_call_format: config.function_call_format,
+            vision: config.vision,
+            code_specialized: config.code_specialized,
+            json_mode: config.json_mode,
+        }
+    }
 }
 
 /// LLM configuration section

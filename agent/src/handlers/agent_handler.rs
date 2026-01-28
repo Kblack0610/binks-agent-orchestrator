@@ -5,7 +5,7 @@
 use anyhow::Result;
 
 use super::CommandContext;
-use crate::agent::Agent;
+use crate::agent::{detect_capabilities, Agent};
 use crate::cli::{Repl, ReplConfig};
 use crate::mcp::{parse_model_size_with_thresholds, McpClientPool, ModelSize};
 use crate::output::TerminalOutput;
@@ -23,12 +23,31 @@ pub async fn run_agent(
     let server_list = CommandContext::parse_server_filter(servers);
     let effective_servers = resolve_server_filter(ctx, &pool, server_list);
 
+    // Detect model capabilities
+    let capabilities = detect_capabilities(
+        &ctx.ollama_url,
+        &ctx.model,
+        Some(&ctx.file_config.models.overrides),
+    )
+    .await;
+
+    if ctx.is_verbose() {
+        tracing::info!(
+            "Model capabilities for {}: tool_calling={}, thinking={}, format={:?}",
+            ctx.model,
+            capabilities.tool_calling,
+            capabilities.thinking,
+            capabilities.function_call_format
+        );
+    }
+
     let mut agent = Agent::from_agent_config(
         &ctx.ollama_url,
         &ctx.model,
         pool,
         &ctx.file_config.agent,
     )
+    .with_capabilities(capabilities)
     .with_verbose(ctx.is_verbose());
 
     // Apply system prompt

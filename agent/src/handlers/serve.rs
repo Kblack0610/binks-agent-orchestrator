@@ -15,6 +15,7 @@ pub async fn run_serve(ctx: &CommandContext, system: Option<String>) -> Result<(
         system_prompt: ctx.resolve_system_prompt(system),
         enable_runs: true,
         agent_config: ctx.file_config.agent.clone(),
+        model_overrides: ctx.file_config.models.overrides.clone(),
     };
     server::serve(config).await
 }

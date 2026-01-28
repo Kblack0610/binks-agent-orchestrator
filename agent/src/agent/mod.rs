@@ -17,6 +17,13 @@ use crate::mcp::{McpClientPool, McpTool};
 pub mod parsers;
 use parsers::ToolCallParserRegistry;
 
+// Model capability detection and classification
+pub mod capabilities;
+pub use capabilities::{
+    detect_capabilities, strip_think_tags, FunctionCallFormat, ModelCapabilities,
+    ModelCapabilityOverride,
+};
+
 // Agent event emission for real-time visibility
 pub mod events;
 pub use events::{event_channel, AgentEvent, AgentEventSender, EventReceiver, EventSender};
@@ -61,6 +68,8 @@ pub struct Agent {
     max_history_messages: usize,
     // MCP observability
     mcp_metrics: McpMetrics,
+    // Model capabilities (tool calling, thinking, etc.)
+    capabilities: ModelCapabilities,
 }
 
 impl Agent {
@@ -135,6 +144,7 @@ impl Agent {
             tool_timeout: Duration::from_secs(tool_timeout_secs),
             max_history_messages,
             mcp_metrics: McpMetrics::new(),
+            capabilities: ModelCapabilities::default(),
         }
     }
 
@@ -154,6 +164,24 @@ impl Agent {
     pub fn with_event_sender(mut self, sender: EventSender) -> Self {
         self.event_sender = AgentEventSender::new(sender);
         self
+    }
+
+    /// Set model capabilities (affects tool calling and response processing)
+    pub fn with_capabilities(mut self, capabilities: ModelCapabilities) -> Self {
+        self.capabilities = capabilities;
+
+        // Reconfigure parser registry based on preferred format
+        if self.capabilities.function_call_format != FunctionCallFormat::Native {
+            self.parser_registry =
+                ToolCallParserRegistry::with_preferred_format(self.capabilities.function_call_format);
+        }
+
+        self
+    }
+
+    /// Get the current model capabilities
+    pub fn capabilities(&self) -> &ModelCapabilities {
+        &self.capabilities
     }
 
     /// Set event sender dynamically
@@ -322,6 +350,18 @@ impl Agent {
         // Emit processing start event
         self.event_sender.processing_start(user_message);
 
+        // If model doesn't support tool calling, don't send tools
+        // (empty Vec is omitted from JSON via skip_serializing_if)
+        let effective_tools = if self.capabilities.tool_calling {
+            tools
+        } else {
+            tracing::info!(
+                "Model {} doesn't support tool calling, omitting tools",
+                self.model
+            );
+            Vec::new()
+        };
+
         // Build initial messages
         let mut messages: Vec<DirectMessage> = Vec::new();
 
@@ -366,7 +406,7 @@ impl Agent {
             let request = DirectChatRequest {
                 model: self.model.clone(),
                 messages: messages.clone(),
-                tools: tools.clone(),
+                tools: effective_tools.clone(),
                 stream: false,
             };
 
@@ -374,13 +414,13 @@ impl Agent {
             tracing::info!("=== OLLAMA REQUEST (Direct HTTP) ===");
             tracing::info!("Model: {}", self.model);
             tracing::info!("Messages count: {}", messages.len());
-            tracing::info!("Tools count: {}", tools.len());
+            tracing::info!("Tools count: {}", effective_tools.len());
 
             // Verbose feedback before Ollama call
             if self.verbose {
                 eprint!("[       ...] Waiting for {} ", self.model);
                 if iterations == 1 {
-                    eprintln!("({}msg, {}tools)", messages.len(), tools.len());
+                    eprintln!("({}msg, {}tools)", messages.len(), effective_tools.len());
                 } else {
                     eprintln!("(iteration {})", iterations);
                 }
@@ -468,11 +508,25 @@ impl Agent {
                 // No tool calls - we're done
                 tracing::info!("Agent responding without tool calls");
 
+                // Strip <think>...</think> tags if model uses reasoning traces
+                let final_content = if self.capabilities.thinking {
+                    let stripped = strip_think_tags(&assistant_msg.content);
+                    if stripped.len() != assistant_msg.content.len() {
+                        tracing::debug!(
+                            "Stripped {} chars of <think> content from response",
+                            assistant_msg.content.len() - stripped.len()
+                        );
+                    }
+                    stripped
+                } else {
+                    assistant_msg.content.clone()
+                };
+
                 let total_duration = total_start.elapsed();
 
                 // Emit response complete event
                 self.event_sender.response_complete(
-                    &assistant_msg.content,
+                    &final_content,
                     iterations,
                     total_duration,
                 );
@@ -486,7 +540,7 @@ impl Agent {
                     );
                 }
 
-                // Add to history
+                // Add to history (use stripped content so history is clean)
                 self.history.push(DirectMessage {
                     role: "user".to_string(),
                     content: user_message.to_string(),
@@ -494,14 +548,14 @@ impl Agent {
                 });
                 self.history.push(DirectMessage {
                     role: "assistant".to_string(),
-                    content: assistant_msg.content.clone(),
+                    content: final_content.clone(),
                     tool_calls: None,
                 });
 
                 // Prune history to stay within limits
                 self.prune_history();
 
-                return Ok(assistant_msg.content);
+                return Ok(final_content);
             }
 
             // Process tool calls

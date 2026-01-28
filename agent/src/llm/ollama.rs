@@ -36,6 +36,41 @@ pub async fn list_models(ollama_url: &str) -> Result<Vec<ModelInfo>> {
     Ok(response.models)
 }
 
+// ============================================================================
+// Model Show Endpoint (for capability detection)
+// ============================================================================
+
+use crate::agent::capabilities::OllamaShowResponse;
+
+/// Get detailed model information from Ollama `/api/show` endpoint
+///
+/// This provides model template, family, and other metadata useful for
+/// capability detection.
+pub async fn show_model(ollama_url: &str, model: &str) -> Result<OllamaShowResponse> {
+    let url = url::Url::parse(ollama_url)
+        .unwrap_or_else(|_| url::Url::parse("http://localhost:11434").unwrap());
+
+    let client = reqwest::Client::new();
+    let api_url = format!("{}api/show", url);
+
+    let response = client
+        .post(&api_url)
+        .json(&serde_json::json!({ "name": model }))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!(
+            "Ollama show failed for model '{}': {}",
+            model,
+            response.status()
+        );
+    }
+
+    let info: OllamaShowResponse = response.json().await?;
+    Ok(info)
+}
+
 /// Ollama client wrapper
 pub struct OllamaClient {
     client: Ollama,

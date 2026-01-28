@@ -12,6 +12,8 @@ use super::parsers::ToolCall;
 pub struct DirectChatRequest {
     pub model: String,
     pub messages: Vec<DirectMessage>,
+    /// Tools array - omitted from JSON when empty (for non-tool-calling models)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tools: Vec<DirectTool>,
     pub stream: bool,
 }
