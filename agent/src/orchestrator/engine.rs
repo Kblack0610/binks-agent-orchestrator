@@ -14,7 +14,7 @@ use std::time::Instant;
 use anyhow::Result;
 
 use crate::agent::{event_channel, Agent};
-use crate::config::{AgentFileConfig, McpConfig};
+use crate::config::{AgentFileConfig, AgentSectionConfig, McpConfig};
 use crate::db::{Database, RunRecorder};
 use crate::mcp::McpClientPool;
 
@@ -50,6 +50,9 @@ pub struct EngineConfig {
 
     /// Database path for run recording (defaults to ~/.binks/binks.db)
     pub db_path: Option<PathBuf>,
+
+    /// Agent stability settings from .agent.toml
+    pub agent_config: AgentSectionConfig,
 }
 
 impl Default for EngineConfig {
@@ -62,6 +65,7 @@ impl Default for EngineConfig {
             verbose: false,
             record_runs: true, // Enable by default for analysis
             db_path: None,     // Uses default ~/.binks/binks.db
+            agent_config: AgentSectionConfig::default(),
         }
     }
 }
@@ -72,6 +76,7 @@ impl EngineConfig {
         Self {
             ollama_url: config.llm.url.clone(),
             default_model: config.llm.model.clone(),
+            agent_config: config.agent.clone(),
             ..Default::default()
         }
     }
@@ -292,10 +297,15 @@ impl WorkflowEngine {
                     // Create MCP pool for this agent
                     let mcp_pool = McpClientPool::new(mcp_config.clone());
 
-                    // Create agent with config
-                    let mut agent = Agent::new(&self.config.ollama_url, model, mcp_pool)
-                        .with_system_prompt(&agent_config.system_prompt)
-                        .with_verbose(self.config.verbose);
+                    // Create agent with config from .agent.toml
+                    let mut agent = Agent::from_agent_config(
+                        &self.config.ollama_url,
+                        model,
+                        mcp_pool,
+                        &self.config.agent_config,
+                    )
+                    .with_system_prompt(&agent_config.system_prompt)
+                    .with_verbose(self.config.verbose);
 
                     // Attach event sender for run recording if enabled
                     if let Some(ref tx) = event_tx {
@@ -518,5 +528,33 @@ mod tests {
         assert!(names.contains(&"implement-feature"));
         assert!(names.contains(&"fix-bug"));
         assert!(names.contains(&"refactor"));
+    }
+
+    #[test]
+    fn test_engine_config_from_agent_config_plumbs_agent_settings() {
+        use crate::config::AgentFileConfig;
+
+        let mut file_config = AgentFileConfig::default();
+        file_config.agent.max_iterations = 3;
+        file_config.agent.llm_timeout_secs = 120;
+        file_config.agent.tool_timeout_secs = 30;
+        file_config.agent.max_history_messages = 50;
+
+        let engine_config = EngineConfig::from_agent_config(&file_config);
+
+        assert_eq!(engine_config.agent_config.max_iterations, 3);
+        assert_eq!(engine_config.agent_config.llm_timeout_secs, 120);
+        assert_eq!(engine_config.agent_config.tool_timeout_secs, 30);
+        assert_eq!(engine_config.agent_config.max_history_messages, 50);
+    }
+
+    #[test]
+    fn test_engine_config_default_has_default_agent_config() {
+        let config = EngineConfig::default();
+
+        assert_eq!(config.agent_config.max_iterations, 10);
+        assert_eq!(config.agent_config.llm_timeout_secs, 300);
+        assert_eq!(config.agent_config.tool_timeout_secs, 60);
+        assert_eq!(config.agent_config.max_history_messages, 100);
     }
 }

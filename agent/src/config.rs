@@ -122,7 +122,7 @@ pub struct LlmConfig {
 }
 
 /// Agent configuration section
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AgentSectionConfig {
     pub system_prompt: Option<String>,
     /// Maximum number of tool-calling iterations (default: 10)
@@ -774,5 +774,69 @@ interval = 999999999
         // Should parse successfully, ignoring unknown fields
         let config = McpConfig::load_from_path(file.path()).unwrap();
         assert_eq!(config.mcp_servers["test"].command, "cmd");
+    }
+
+    // ============== AgentSectionConfig Clone + plumbing tests ==============
+
+    #[test]
+    fn test_agent_section_config_clone() {
+        let config = AgentSectionConfig {
+            system_prompt: Some("test prompt".to_string()),
+            max_iterations: 5,
+            llm_timeout_secs: 120,
+            tool_timeout_secs: 30,
+            max_history_messages: 50,
+            mcp_connect_timeout_secs: 10,
+            mcp_startup_timeout_secs: 60,
+        };
+
+        let cloned = config.clone();
+        assert_eq!(cloned.max_iterations, 5);
+        assert_eq!(cloned.llm_timeout_secs, 120);
+        assert_eq!(cloned.tool_timeout_secs, 30);
+        assert_eq!(cloned.max_history_messages, 50);
+        assert_eq!(cloned.system_prompt, Some("test prompt".to_string()));
+    }
+
+    #[test]
+    fn test_agent_section_config_from_toml() {
+        let toml = r#"
+[agent]
+max_iterations = 3
+llm_timeout_secs = 60
+tool_timeout_secs = 15
+max_history_messages = 25
+"#;
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let config = AgentFileConfig::load_from_path(file.path()).unwrap();
+        assert_eq!(config.agent.max_iterations, 3);
+        assert_eq!(config.agent.llm_timeout_secs, 60);
+        assert_eq!(config.agent.tool_timeout_secs, 15);
+        assert_eq!(config.agent.max_history_messages, 25);
+    }
+
+    #[test]
+    fn test_agent_section_config_preserves_after_clone() {
+        // Regression test: ensure .agent.toml values survive Clone
+        // (needed because ServerConfig/EngineConfig derive Clone)
+        let toml = r#"
+[agent]
+max_iterations = 3
+"#;
+
+        let mut file = NamedTempFile::with_suffix(".toml").unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
+
+        let config = AgentFileConfig::load_from_path(file.path()).unwrap();
+        let cloned = config.agent.clone();
+
+        assert_eq!(cloned.max_iterations, 3);
+        // Other fields should still have defaults
+        assert_eq!(cloned.llm_timeout_secs, 300);
+        assert_eq!(cloned.tool_timeout_secs, 60);
+        assert_eq!(cloned.max_history_messages, 100);
     }
 }

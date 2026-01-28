@@ -6,49 +6,46 @@ Build a **Global AI** that manages your entire digital life - not just code, but
 
 ---
 
-## Tool Strategy: Pre-built vs Custom
+## Current Capabilities (January 2026)
 
-### The Hybrid Approach
-
-We use a strategic mix of **pre-built tools** (for common operations) and **custom tools** (for domain-specific work).
+The Rust-based agent is operational with a full MCP tool ecosystem:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Master Agent                          │
+│                    Binks Agent (Rust)                     │
 ├─────────────────────────────────────────────────────────┤
-│  Pre-built Tools          │  Custom Tools               │
-│  ─────────────────        │  ─────────────              │
-│  ShellTools (general)     │  KubectlToolkit (K8s)       │
-│  FileTools (read/write)   │  AgentSpawnerToolkit        │
-│  [Future: GitTools]       │  [Future: HomeLabToolkit]   │
-│  [Future: WebTools]       │  [Future: MonitoringToolkit]│
+│  CLI Modes            │  Infrastructure                  │
+│  ─────────            │  ──────────────                  │
+│  chat (simple LLM)    │  Ollama (local LLM on M3 Ultra) │
+│  interactive (REPL)   │  SQLite (persistence)            │
+│  agent (tool-using)   │  Axum (web server + WebSocket)   │
+│  monitor (autonomous) │  MCP (tool protocol)             │
+│  serve (MCP server)   │                                  │
+│  web (UI backend)     │                                  │
+├─────────────────────────────────────────────────────────┤
+│  MCP Servers (9 implemented + 2 external)                │
+│  ┌────────────┐ ┌────────────┐ ┌──────────────┐          │
+│  │ github-gh  │ │  sysinfo   │ │  filesystem  │          │
+│  │ (44 tools) │ │ (10 tools) │ │  (14 tools)  │          │
+│  ├────────────┤ ├────────────┤ ├──────────────┤          │
+│  │   inbox    │ │   notify   │ │     exec     │          │
+│  │ (5 tools)  │ │ (6 tools)  │ │  (5 tools)   │          │
+│  ├────────────┤ ├────────────┤ ├──────────────┤          │
+│  │  git-mcp   │ │ memory-mcp │ │  web-search  │          │
+│  │ (10 tools) │ │ (12 tools) │ │  (6 tools)   │          │
+│  ├────────────┤ ├────────────┤                            │
+│  │ kubernetes │ │    ssh     │  (external, Node.js)       │
+│  └────────────┘ └────────────┘                            │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### When to Use Pre-built Tools
-
-| Scenario | Tool | Rationale |
-|----------|------|-----------|
-| Run shell commands | `ShellTools` | Covers 80% of coding tasks |
-| Read/write files | `FileTools` | No need to reinvent |
-| Git operations | `ShellTools` | git CLI is sufficient |
-| Web searches | `DuckDuckGo` (future) | Pre-built, battle-tested |
-| Database queries | `SQLToolkit` (future) | Standard SQL interface |
-
-### When to Build Custom Tools
-
-| Scenario | Custom Tool | Rationale |
-|----------|-------------|-----------|
-| Kubernetes management | `KubectlToolkit` | Domain-specific validation, error handling |
-| Agent spawning | `AgentSpawnerToolkit` | Proprietary job templates |
-| Home automation | `HomeLabToolkit` (future) | Specific device APIs |
-| Monitoring/alerting | `MonitoringToolkit` (future) | Custom thresholds, integrations |
+**112 tools** across 11 MCP servers, with structured logging, health checks, metrics, and a web UI.
 
 ---
 
 ## Development Phases
 
-### Phase 1: Crawl (Current)
+### Phase 1: Crawl ✅ COMPLETE
 **Goal:** Basic agent functionality with core tools
 
 - [x] Master Agent with Ollama integration
@@ -59,19 +56,20 @@ We use a strategic mix of **pre-built tools** (for common operations) and **cust
 - [x] FastAPI server for remote access
 - [x] Clear error messages (fail fast philosophy)
 
-### Phase 2: Walk
+### Phase 2: Walk 🟡 MOSTLY COMPLETE
 **Goal:** Expanded capabilities and reliability
 
-- [ ] Add pre-built `DuckDuckGo` or `GoogleSearch` toolkit
-- [ ] Add pre-built `SQLToolkit` for database queries
-- [ ] Implement agent memory/persistence
-- [ ] Build `MonitoringToolkit` for cluster health alerts
-- [ ] Add authentication to API
-- [ ] Implement structured logging
+- [x] Web search (web-search-mcp with SearXNG backend)
+- [x] Agent memory/persistence (SQLite + memory-mcp with dual-layer architecture)
+- [x] Monitoring for repo health (monitor subcommand + inbox-mcp + notify-mcp)
+- [x] Structured logging (tracing with correlation IDs)
+- [ ] SQL toolkit for database queries
+- [ ] Authentication to API
 
 ### Phase 3: Run
 **Goal:** Multi-agent orchestration and specialization
 
+- [x] MCP integration (11 servers, full client/server protocol)
 - [ ] Specialized worker agents:
   - Code Review Agent
   - Security Audit Agent
@@ -79,7 +77,6 @@ We use a strategic mix of **pre-built tools** (for common operations) and **cust
   - Home Automation Agent
 - [ ] Agent-to-agent communication
 - [ ] Task queue and scheduling
-- [ ] MCP (Model Context Protocol) integration
 
 ### Phase 4: Fly
 **Goal:** Full Global AI autonomy
@@ -106,20 +103,20 @@ We use a strategic mix of **pre-built tools** (for common operations) and **cust
 > **Note:** Retry logic and model fallback chains are explicitly **not** implemented.
 > Per ARCHITECTURE.md, these are anti-patterns that hide failures and make debugging harder.
 
-### Phase S2: Observability (P1) 🟡 PARTIAL
+### Phase S2: Observability (P1) ✅ COMPLETE
 **Goal:** Debug failures and monitor performance
 
-- [ ] Structured logging with correlation IDs
-- [x] Health check HTTP endpoint (/api/health)
-- [ ] Basic metrics (latency, errors)
+- [x] Structured logging with correlation IDs (`agent/src/web/mod.rs`)
+- [x] Health check HTTP endpoint (`/api/health` — checks config, MCP, LLM, tools)
+- [x] Basic metrics — latency, errors, success rates (`agent/src/agent/metrics.rs`)
 
-### Phase S3: Code Cleanup (P1)
-**Goal:** Reduce maintenance burden (~2000 lines saved)
+### Phase S3: Code Cleanup (P1) 🟢 MOSTLY COMPLETE
+**Goal:** Reduce maintenance burden
 
-- [ ] Create `mcp-common` crate (init, errors, results)
-- [ ] Consolidate workspace dependencies
-- [ ] Extract common parameter types
-- [ ] Standardize error handling across MCPs
+- [x] Create `mcp-common` crate (init, errors, results) — used by all 9 MCPs
+- [x] Consolidate workspace dependencies (`[workspace.dependencies]` in root Cargo.toml)
+- [ ] Extract common parameter types (partially done — types still distributed per-MCP)
+- [x] Standardize error handling across MCPs (`mcp-common/src/error.rs`)
 
 ### Phase S4: PR Testing (P2)
 **Goal:** Enable automated PR review and testing
@@ -130,33 +127,41 @@ We use a strategic mix of **pre-built tools** (for common operations) and **cust
 
 ---
 
-## Available Agno Pre-built Toolkits
-
-Reference for future integration:
-
-| Toolkit | Purpose | Phase |
-|---------|---------|-------|
-| `ShellTools` | Run terminal commands | 1 (done) |
-| `FileTools` | Read/write files | 1 (done) |
-| `DuckDuckGo` | Web search | 2 |
-| `GoogleSearch` | Web search (API key required) | 2 |
-| `SQLToolkit` | Database queries | 2 |
-| `SlackToolkit` | Send Slack messages | 3 |
-| `GithubToolkit` | Manage GitHub repos | 3 |
-| `JiraToolkit` | Manage Jira tickets | 3 |
-
----
-
 ## MCP (Model Context Protocol) Strategy
 
-MCP is an emerging standard for tool interoperability. Both Agno and Claude Code support it.
+MCP is the standardized tool interface for the agent. All tools are implemented as MCP servers.
 
-### Future MCP Integrations
+### Current Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    MCP Server Hub                        │
 ├─────────────────────────────────────────────────────────┤
+│  Tier 1 (Core)       │  Tier 2 (Common)                │
+│  ──────────           │  ──────────────                 │
+│  sysinfo-mcp          │  github-gh                      │
+│  filesystem-mcp       │  inbox-mcp                      │
+│                       │  notify-mcp                     │
+│                       │  exec-mcp                       │
+├───────────────────────┼─────────────────────────────────┤
+│  Tier 3 (Optional)    │  Tier 4 (Meta)                  │
+│  ────────────────     │  ────────────                   │
+│  kubernetes (Node)    │  agent (self-hosting)           │
+│  ssh (Node)           │                                 │
+│  web-search-mcp       │                                 │
+├───────────────────────┴─────────────────────────────────┤
+│  Workspace-only (not in .mcp.json)                       │
+│  git-mcp, memory-mcp                                     │
+├─────────────────────────────────────────────────────────┤
+│  Planned (skeleton only)                                 │
+│  web-fetch-mcp, scratchpad-mcp, semantic-mcp             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Future MCP Integrations
+
+```
+┌─────────────────────────────────────────────────────────┐
 │  Community MCP Servers    │  Custom MCP Servers         │
 │  ─────────────────────    │  ──────────────────         │
 │  Spotify Control          │  Home Lab Control           │
@@ -175,20 +180,21 @@ MCP is an emerging standard for tool interoperability. Both Agno and Claude Code
 
 ## Architecture Decision Records
 
-### ADR-001: Agno as Agent Framework
-**Decision:** Use Agno as the agent framework
+### ADR-001: Rust + MCP Architecture
+**Decision:** Rewrite from Python/Agno to Rust with native MCP support
 **Rationale:**
-- Faster execution (no heavy abstractions)
-- Simpler toolkit pattern
-- Better suited for infrastructure orchestration
-- Lightweight and resource-efficient
+- Single binary, no runtime dependencies
+- Async-first with Tokio
+- MCP is the standard protocol for tool interoperability
+- Resource-efficient (4.5-13 MB binary depending on features)
 
-### ADR-002: Hybrid Tool Strategy
-**Decision:** Use pre-built tools for common operations, custom tools for domain-specific work
+### ADR-002: Modular MCP Servers
+**Decision:** Each capability is a standalone MCP server
 **Rationale:**
-- Pre-built tools are battle-tested and maintained
-- Custom tools allow domain-specific optimization
-- Reduces development time while maintaining flexibility
+- Independent development and deployment
+- Shared infrastructure via `mcp-common` crate
+- Can be used by any MCP-compatible agent (Claude Code, etc.)
+- Clear boundaries between capabilities
 
 ### ADR-003: Ollama for LLM
 **Decision:** Use Ollama for local LLM hosting
@@ -204,130 +210,47 @@ MCP is an emerging standard for tool interoperability. Both Agno and Claude Code
 
 When adding new capabilities:
 
-1. **Check for pre-built toolkits first** - Don't reinvent the wheel
-2. **Build custom only when needed** - Domain-specific, proprietary, or performance-critical
+1. **Build as an MCP server** - Each tool gets its own crate under `mcps/`
+2. **Use `mcp-common`** - Shared init, errors, and result formatting
 3. **Document in this roadmap** - Add to appropriate phase
-4. **Consider MCP** - Could this be an MCP server others could use?
+4. **Follow fail-fast** - No retries, no fallbacks (see ARCHITECTURE.md)
 
 ---
 
-## CLI Orchestrator - Backend Providers
+## Legacy Archive
 
-### Current Backends (December 2024)
+<details>
+<summary>Python-era sections (pre-Rust rewrite)</summary>
 
-| Backend | Status | Notes |
-|---------|--------|-------|
-| Claude Code | ✅ Ready | Primary backend |
-| Gemini CLI | ✅ Ready | Installed |
-| Groq | ✅ Ready | API runner, ultra-fast inference |
-| OpenRouter | ✅ Ready | API runner, 20+ free models |
-| Ollama Local | 🔧 Setup | Requires `ollama serve` |
-| Ollama Home | 🔧 Setup | Remote at 192.168.1.4 |
+### Agno Pre-built Toolkits (Python)
 
-### Active Service Projects
+These were relevant when the agent used the Agno Python framework. The Rust rewrite replaced all of these with native MCP servers.
 
-1. **Email Scoring LLM** ✅ COMPLETE
-   - Score and categorize job application emails
-   - Location: `services/email_scorer/`
-   - See: `docs/projects/email-scoring-llm.md`
+| Toolkit | Replaced By |
+|---------|-------------|
+| `ShellTools` | exec-mcp |
+| `FileTools` | filesystem-mcp |
+| `DuckDuckGo` | web-search-mcp (SearXNG) |
+| `SlackToolkit` | notify-mcp |
+| `GithubToolkit` | github-gh |
 
-2. **JobScan AI Integration** ✅ COMPLETE
-   - ATS scoring for LinkedIn job descriptions
-   - Location: `services/jobscan/`
-   - See: `docs/projects/jobscan-ai-integration.md`
+### CLI Orchestrator - Backend Providers (Python)
 
-### Phase: Free LLM Providers (After Services Built)
+The Python-era orchestrator supported multiple LLM backends (Groq, OpenRouter, Gemini, Claude). The Rust agent uses Ollama exclusively for local inference.
 
-#### OpenRouter (Best for Variety) ✅ DONE
-**20+ free models via single API**
+### Active Service Projects (Python)
 
-```python
-from runners import OpenRouterRunner
+1. **Email Scoring LLM** - Score and categorize job application emails
+2. **JobScan AI Integration** - ATS scoring for LinkedIn job descriptions
 
-runner = OpenRouterRunner()  # Uses OPENROUTER_API_KEY env var
-result = runner.run("Hello!")
+These were Python services, not part of the Rust agent.
 
-# With specific model
-runner = OpenRouterRunner(model="meta-llama/llama-3.1-8b-instruct:free")
-```
-
-Free models:
-- `meta-llama/llama-3.1-8b-instruct:free`
-- `mistralai/mistral-7b-instruct:free`
-- `google/gemma-2-9b-it:free`
-- `microsoft/phi-3-mini-128k-instruct:free`
-- `qwen/qwen-2-7b-instruct:free`
-
-**Tasks:**
-- [x] Create `OpenRouterRunner` class
-- [x] Add model selection for free tier
-- [x] Handle rate limits gracefully
-- [x] Integration tests added
-
-#### Groq (Best for Speed) ✅ DONE
-**Fast inference, generous free tier**
-
-```python
-from runners import GroqRunner
-
-runner = GroqRunner()  # Uses GROQ_API_KEY env var
-result = runner.run("Hello!")
-
-# With specific model
-runner = GroqRunner(model="llama-3.1-8b-instant")
-```
-
-Models: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `gemma2-9b-it`
-
-**Tasks:**
-- [x] Create `GroqRunner` class
-- [x] Optimized for multi-step agents (speed)
-- [x] Integration tests added
-- [ ] Benchmark against Claude/Gemini (future)
-
-#### Google Gemini Free Tier (Best for Context)
-**Already integrated - optimize for free tier**
-
-```python
-from agno.models.google import Gemini
-
-model = Gemini(id="gemini-1.5-flash")
-```
-
-- 1M+ token context window
-- Generous free rate limits
-
-### Provider Comparison
-
-| Provider | Speed | Free Models | Context | Best For |
-|----------|-------|-------------|---------|----------|
-| OpenRouter | Medium | 20+ | Varies | Experimentation |
-| Groq | ⚡ Fast | 3-5 | 32K-128K | Multi-step agents |
-| Gemini | Fast | 2-3 | 1M+ | Large documents |
-| Claude | Medium | 0 | 200K | Quality/reasoning |
-| Ollama | Varies | All local | Varies | Privacy/offline |
-
-### Implementation Order
-
-1. ~~**Now**: Use Claude + Gemini to build Email Scoring and JobScan services~~ ✅ DONE
-2. ~~**Next**: Add Groq for speed improvements~~ ✅ DONE
-3. ~~**Then**: Add OpenRouter for model variety~~ ✅ DONE
-4. **Now**: Multi-provider fallback and cost tracking
-
-### API Keys Required
-
-| Provider | Environment Variable | Get Key From |
-|----------|---------------------|--------------|
-| Anthropic | `ANTHROPIC_API_KEY` | console.anthropic.com |
-| Google | `GEMINI_API_KEY` | aistudio.google.com/apikey |
-| Groq | `GROQ_API_KEY` | console.groq.com |
-| OpenRouter | `OPENROUTER_API_KEY` | openrouter.ai/keys |
+</details>
 
 ---
 
 ## References
 
-- [Agno Documentation](https://docs.agno.com)
-- [Agno Pre-built Toolkits](https://docs.agno.com/tools)
 - [MCP Specification](https://modelcontextprotocol.io)
-- [Goose vs Agno Comparison](./DUAL_IMPLEMENTATION_SUMMARY.md)
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - System design and fail-fast philosophy
+- [mcps/ROADMAP.md](../mcps/ROADMAP.md) - MCP-specific roadmap

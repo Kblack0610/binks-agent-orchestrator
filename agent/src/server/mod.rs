@@ -21,6 +21,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::agent::{Agent, DirectMessage};
+use crate::config::AgentSectionConfig;
 use crate::db::runs::{ImprovementFilter, Run, RunEvent, RunFilter, RunMetrics, RunStatus};
 use crate::db::Database;
 use crate::llm::{Llm, OllamaClient};
@@ -34,6 +35,8 @@ pub struct ServerConfig {
     pub system_prompt: Option<String>,
     /// Enable run tracking/analysis tools (requires database)
     pub enable_runs: bool,
+    /// Agent stability settings from .agent.toml
+    pub agent_config: AgentSectionConfig,
 }
 
 impl Default for ServerConfig {
@@ -43,6 +46,7 @@ impl Default for ServerConfig {
             model: "qwen3-coder:30b".to_string(),
             system_prompt: None,
             enable_runs: true,
+            agent_config: AgentSectionConfig::default(),
         }
     }
 }
@@ -187,7 +191,12 @@ impl AgentMcpServer {
     pub async fn init_agent(&self) -> Result<(), anyhow::Error> {
         let pool = McpClientPool::load()?.ok_or_else(|| anyhow::anyhow!("No .mcp.json found"))?;
 
-        let mut agent = Agent::new(&self.config.ollama_url, &self.config.model, pool);
+        let mut agent = Agent::from_agent_config(
+            &self.config.ollama_url,
+            &self.config.model,
+            pool,
+            &self.config.agent_config,
+        );
 
         if let Some(ref prompt) = self.config.system_prompt {
             agent = agent.with_system_prompt(prompt);
@@ -243,7 +252,12 @@ impl AgentMcpServer {
                 })?
                 .ok_or_else(|| McpError::internal_error("No .mcp.json found".to_string(), None))?;
 
-            let mut agent = Agent::new(&self.config.ollama_url, &self.config.model, pool);
+            let mut agent = Agent::from_agent_config(
+                &self.config.ollama_url,
+                &self.config.model,
+                pool,
+                &self.config.agent_config,
+            );
 
             if let Some(ref prompt) = self.config.system_prompt {
                 agent = agent.with_system_prompt(prompt);

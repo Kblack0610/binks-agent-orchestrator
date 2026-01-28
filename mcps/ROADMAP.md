@@ -1,104 +1,32 @@
 # MCP Roadmap
 
-## Current MCPs
+## Current MCPs (January 2026)
 
-| MCP | Language | Status | Description |
-|-----|----------|--------|-------------|
-| github-gh | Rust | Production | GitHub CLI wrapper for issues, PRs, workflows |
-| sysinfo-mcp | Rust | Production | Cross-platform system information |
-| inbox-mcp | Rust | Production | Local file-based inbox for notifications |
-| notify-mcp | Rust | Production | Slack/Discord webhook notifications |
-| kubernetes | Node | External | Kubernetes cluster management |
-| ssh | Node | External | SSH remote operations |
+| MCP | Language | Status | Tools | In .mcp.json | Description |
+|-----|----------|--------|-------|--------------|-------------|
+| github-gh | Rust | Production | 44 | Yes (tier 2) | GitHub CLI wrapper for issues, PRs, workflows |
+| sysinfo-mcp | Rust | Production | 10 | Yes (tier 1) | Cross-platform system information |
+| filesystem-mcp | Rust | Production | 14 | Yes (tier 1) | Sandboxed file ops, batch reads, atomic writes |
+| exec-mcp | Rust | Production | 5 | Yes (tier 2) | Command execution with security guards |
+| inbox-mcp | Rust | Production | 5 | Yes (tier 2) | Local file-based inbox for notifications |
+| notify-mcp | Rust | Production | 6 | Yes (tier 2) | Slack/Discord webhook notifications |
+| web-search-mcp | Rust | Production | 6 | Yes (tier 3) | SearXNG-backed web search |
+| git-mcp | Rust | Implemented | 10 | No | Local git operations via libgit2 |
+| memory-mcp | Rust | Implemented | 12 | No | Dual-layer memory (session + persistent SQLite) |
+| kubernetes | Node | External | — | Yes (tier 3) | Kubernetes cluster management |
+| ssh | Node | External | — | Yes (tier 3) | SSH remote operations |
+
+**Total:** 112 tools across 9 Rust MCPs + 2 external Node.js MCPs
+
+> **Note:** git-mcp and memory-mcp are implemented and in the Cargo workspace but not yet configured in `.mcp.json`. Add them when ready for production use.
+
+---
 
 ## Planned MCPs
 
-### Phase 1: Foundation
+Three MCPs have specification documents (README.md) but no implementation yet:
 
-#### memory-mcp (Rust) - Priority 1
-**Purpose:** Persistent memory across agent sessions
-
-**Design:**
-- Dual-layer architecture: session (in-memory) + persistent (SQLite)
-- Session layer for working memory during tasks
-- Persistent layer for knowledge graph across restarts
-
-**Tools:**
-| Tool | Description |
-|------|-------------|
-| `think(thought)` | Record reasoning step in session |
-| `remember(key, value)` | Store in working memory |
-| `recall(key)` | Retrieve from working memory |
-| `get_context()` | Full session context |
-| `learn(entity, facts)` | Add to knowledge graph |
-| `query(pattern)` | Search knowledge graph |
-| `summarize_session()` | Compress session to persistent |
-| `forget(entity)` | Remove from knowledge graph |
-
-**Dependencies:** `rusqlite`, `rmcp`, `serde`, `chrono`
-
----
-
-#### filesystem-mcp (Rust) - Priority 2
-**Purpose:** Sandboxed file operations
-
-**Design:**
-- Allowlist-based directory access
-- Path traversal prevention
-- Size limits for operations
-- Optional confirmation for destructive ops
-
-**Tools:**
-| Tool | Description |
-|------|-------------|
-| `read_file(path)` | Read file contents |
-| `write_file(path, content)` | Write/create file |
-| `list_dir(path, recursive?)` | List directory contents |
-| `search_files(pattern, path)` | Search by pattern |
-| `file_info(path)` | Get file metadata |
-| `move_file(src, dst)` | Move/rename file |
-| `delete_file(path)` | Delete file |
-
-**Security:**
-```toml
-# Example config
-[allowed_paths]
-read = ["~", "/tmp"]
-write = ["~/projects", "/tmp"]
-max_file_size = "10MB"
-confirm_delete = true
-```
-
-**Dependencies:** `tokio::fs`, `rmcp`, `serde`
-
----
-
-### Phase 2: Capabilities
-
-#### git-mcp (Rust) - Priority 3
-**Purpose:** Local git operations (complements github-gh)
-
-**Design:**
-- Uses `git2` crate (libgit2 bindings)
-- Repository-local operations only
-- Read-heavy, minimal writes
-
-**Tools:**
-| Tool | Description |
-|------|-------------|
-| `git_status(repo)` | Repository status |
-| `git_diff(repo, ref?)` | Diff against ref |
-| `git_log(repo, limit?)` | Commit history |
-| `git_blame(repo, file)` | Blame for file |
-| `git_show(repo, ref)` | Show commit |
-| `git_branch_list(repo)` | List branches |
-| `git_stash(repo, action)` | Stash operations |
-
-**Dependencies:** `git2`, `rmcp`, `serde`
-
----
-
-#### web-fetch-mcp (Rust) - Priority 4
+### web-fetch-mcp (Rust) - Next Priority
 **Purpose:** HTTP fetching and HTML parsing
 
 **Design:**
@@ -119,53 +47,7 @@ confirm_delete = true
 
 ---
 
-#### web-search-mcp (Rust) - Priority 4.5
-**Purpose:** Search engine API integration for information retrieval
-
-**Design:**
-- Pluggable backend architecture
-- Primary: Brave Search API
-- Fallback: SearXNG (self-hosted), Tavily (AI-optimized)
-- Rate limiting and result caching
-
-**Tools:**
-| Tool | Description |
-|------|-------------|
-| `search(query, limit?)` | General web search |
-| `search_news(query, limit?)` | News-specific search |
-| `search_images(query, limit?)` | Image search |
-| `get_config()` | Show active backend |
-
-**Architecture:**
-```
-┌─────────────────────────────────────┐
-│         web-search-mcp              │
-├─────────────────────────────────────┤
-│  SearchBackend Trait                │
-│  ├── BraveSearchBackend (primary)   │
-│  ├── SearXNGBackend (self-hosted)   │
-│  └── TavilyBackend (AI-optimized)   │
-└─────────────────────────────────────┘
-```
-
-**Configuration:**
-```toml
-[search]
-backend = "brave"  # or "searxng", "tavily"
-api_key = "${BRAVE_API_KEY}"
-max_results = 10
-
-[searxng]
-url = "http://localhost:8888"  # self-hosted fallback
-```
-
-**Dependencies:** `reqwest`, `rmcp`, `serde`
-
----
-
-### Phase 3: Intelligence
-
-#### scratchpad-mcp (Rust) - Priority 5
+### scratchpad-mcp (Rust)
 **Purpose:** Structured reasoning and thinking chain
 
 **Design:**
@@ -196,7 +78,7 @@ struct ThinkingStep {
 
 ---
 
-#### semantic-mcp (Rust) - Priority 6
+### semantic-mcp (Rust)
 **Purpose:** Code understanding and navigation
 
 **Design options:**
@@ -245,11 +127,11 @@ struct ThinkingStep {
 
 | MCP | Decision | Rationale |
 |-----|----------|-----------|
-| memory | Build | Core to agent, tight integration |
-| filesystem | Build | Security-critical, need custom sandboxing |
-| git | Build | git2 crate excellent, complements github-gh |
+| memory | ✅ Built | Core to agent, tight integration |
+| filesystem | ✅ Built | Security-critical, custom sandboxing |
+| git | ✅ Built | git2 crate excellent, complements github-gh |
+| web-search | ✅ Built | Pluggable backends, control over rate limiting |
 | web-fetch | Build | Simple HTTP easy, reqwest is great |
-| web-search | Build | Pluggable backends, control over rate limiting |
 | scratchpad | Build | Simple, fits specific needs |
 | semantic | Build (tree-sitter) | Lightweight layer sufficient for most tasks |
 | browser | Use Playwright | Chromium too complex |
@@ -261,22 +143,26 @@ struct ThinkingStep {
 ## Implementation Timeline
 
 ```
-Phase 1 (Foundation)
-├── memory-mcp ..................... Enable agent persistence
-└── filesystem-mcp ................. Enable file operations
+✅ Complete
+├── github-gh ..................... GitHub CLI wrapper (44 tools)
+├── sysinfo-mcp .................. System information (10 tools)
+├── filesystem-mcp ............... File operations (14 tools)
+├── exec-mcp ..................... Command execution (5 tools)
+├── inbox-mcp .................... Notification inbox (5 tools)
+├── notify-mcp ................... Slack/Discord (6 tools)
+├── web-search-mcp ............... SearXNG search (6 tools)
+├── git-mcp ...................... Local git ops (10 tools)
+└── memory-mcp ................... Dual-layer memory (12 tools)
 
-Phase 2 (Capabilities)
-├── git-mcp ....................... Local git operations
-├── web-fetch-mcp ................. HTTP and HTML parsing
-└── web-search-mcp ................ Search engine APIs (Brave, SearXNG)
+📋 Planned
+├── web-fetch-mcp ................ HTTP and HTML parsing
+├── scratchpad-mcp ............... Structured reasoning
+└── semantic-mcp (tree-sitter) ... Basic code understanding
 
-Phase 3 (Intelligence)
-├── scratchpad-mcp ................ Structured reasoning
-└── semantic-mcp (tree-sitter) .... Basic code understanding
-
-Phase 4 (Integration)
-├── Add Playwright MCP ............ Full browser support
-└── Add Serena integration ........ Advanced code analysis
+🔌 External
+├── Playwright MCP ............... Full browser support
+├── Docker MCP ................... Container management
+└── Serena MCP ................... Advanced code analysis
 ```
 
 ---
@@ -285,30 +171,25 @@ Phase 4 (Integration)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Binks Agent Core                          │
+│                    Binks Agent Core                           │
 ├─────────────────────────────────────────────────────────────┤
-│  Phase 1: Foundation                                         │
-│  ┌──────────────┐ ┌──────────────┐                          │
-│  │   memory     │ │  filesystem  │                          │
-│  │  (dual-layer)│ │  (sandboxed) │                          │
-│  └──────────────┘ └──────────────┘                          │
+│  Production MCPs (in .mcp.json)                              │
+│  ┌─────────┐ ┌─────────┐ ┌────────────┐ ┌────────┐          │
+│  │github-gh│ │ sysinfo │ │ filesystem │ │  exec  │          │
+│  └─────────┘ └─────────┘ └────────────┘ └────────┘          │
+│  ┌─────────┐ ┌─────────┐ ┌────────────┐                     │
+│  │  inbox  │ │ notify  │ │ web-search │                     │
+│  └─────────┘ └─────────┘ └────────────┘                     │
 ├─────────────────────────────────────────────────────────────┤
-│  Phase 2: Capabilities                                       │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐         │
-│  │     git      │ │  web-fetch   │ │  web-search  │         │
-│  │   (git2)     │ │  (reqwest)   │ │ (brave/searx)│         │
-│  └──────────────┘ └──────────────┘ └──────────────┘         │
+│  Workspace MCPs (not in .mcp.json)                           │
+│  ┌─────────┐ ┌─────────┐                                    │
+│  │ git-mcp │ │ memory  │                                    │
+│  └─────────┘ └─────────┘                                    │
 ├─────────────────────────────────────────────────────────────┤
-│  Phase 3: Intelligence                                       │
-│  ┌──────────────┐ ┌──────────────┐                          │
-│  │  scratchpad  │ │   semantic   │                          │
-│  │  (reasoning) │ │ (tree-sitter)│                          │
-│  └──────────────┘ └──────────────┘                          │
-├─────────────────────────────────────────────────────────────┤
-│  Existing Production MCPs                                    │
-│  ┌─────────┐ ┌─────────┐ ┌───────┐ ┌────────┐              │
-│  │github-gh│ │ sysinfo │ │ inbox │ │ notify │              │
-│  └─────────┘ └─────────┘ └───────┘ └────────┘              │
+│  Planned MCPs                                                │
+│  ┌──────────┐ ┌────────────┐ ┌──────────┐                   │
+│  │web-fetch │ │ scratchpad │ │ semantic │                   │
+│  └──────────┘ └────────────┘ └──────────┘                   │
 ├─────────────────────────────────────────────────────────────┤
 │  External MCPs                                               │
 │  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌────────┐           │

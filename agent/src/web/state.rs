@@ -65,6 +65,7 @@ impl AppState {
             custom_workflows_dir: None,
             record_runs: true, // Enable run recording for web
             db_path: None,     // Use default path
+            agent_config: Default::default(),
         }
     }
 }

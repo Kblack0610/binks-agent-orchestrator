@@ -77,6 +77,24 @@ impl Agent {
         )
     }
 
+    /// Create a new agent with settings from AgentSectionConfig (.agent.toml)
+    pub fn from_agent_config(
+        ollama_url: &str,
+        model: &str,
+        mcp_pool: McpClientPool,
+        config: &crate::config::AgentSectionConfig,
+    ) -> Self {
+        Self::with_config(
+            ollama_url,
+            model,
+            mcp_pool,
+            config.max_iterations,
+            config.llm_timeout_secs,
+            config.tool_timeout_secs,
+            config.max_history_messages,
+        )
+    }
+
     /// Create a new agent with custom stability configuration
     pub fn with_config(
         ollama_url: &str,
@@ -756,5 +774,82 @@ mod tests {
 
         // Should not have pruned anything
         assert_eq!(agent.history.len(), 10);
+    }
+
+    // ============== from_agent_config Tests ==============
+
+    #[test]
+    fn test_from_agent_config_applies_custom_values() {
+        use crate::config::AgentSectionConfig;
+
+        let config = AgentSectionConfig {
+            system_prompt: None,
+            max_iterations: 3,
+            llm_timeout_secs: 120,
+            tool_timeout_secs: 30,
+            max_history_messages: 50,
+            mcp_connect_timeout_secs: 5,
+            mcp_startup_timeout_secs: 30,
+        };
+
+        let pool = McpClientPool::empty();
+        let agent =
+            Agent::from_agent_config("http://localhost:11434", "test-model", pool, &config);
+
+        assert_eq!(agent.max_iterations(), 3);
+        assert_eq!(agent.llm_timeout(), Duration::from_secs(120));
+        assert_eq!(agent.tool_timeout(), Duration::from_secs(30));
+        assert_eq!(agent.max_history_messages(), 50);
+    }
+
+    #[test]
+    fn test_from_agent_config_with_defaults() {
+        use crate::config::AgentSectionConfig;
+
+        let config = AgentSectionConfig::default();
+        let pool = McpClientPool::empty();
+        let agent =
+            Agent::from_agent_config("http://localhost:11434", "test-model", pool, &config);
+
+        // Should match the DEFAULT_* constants
+        assert_eq!(agent.max_iterations(), DEFAULT_MAX_ITERATIONS);
+        assert_eq!(
+            agent.llm_timeout(),
+            Duration::from_secs(DEFAULT_LLM_TIMEOUT_SECS)
+        );
+        assert_eq!(
+            agent.tool_timeout(),
+            Duration::from_secs(DEFAULT_TOOL_TIMEOUT_SECS)
+        );
+        assert_eq!(agent.max_history_messages(), DEFAULT_MAX_HISTORY_MESSAGES);
+    }
+
+    #[test]
+    fn test_from_agent_config_matches_with_config() {
+        use crate::config::AgentSectionConfig;
+
+        // Verify from_agent_config produces the same agent as with_config
+        let config = AgentSectionConfig {
+            system_prompt: None,
+            max_iterations: 7,
+            llm_timeout_secs: 200,
+            tool_timeout_secs: 45,
+            max_history_messages: 75,
+            mcp_connect_timeout_secs: 5,
+            mcp_startup_timeout_secs: 30,
+        };
+
+        let pool1 = McpClientPool::empty();
+        let agent1 =
+            Agent::from_agent_config("http://localhost:11434", "test-model", pool1, &config);
+
+        let pool2 = McpClientPool::empty();
+        let agent2 =
+            Agent::with_config("http://localhost:11434", "test-model", pool2, 7, 200, 45, 75);
+
+        assert_eq!(agent1.max_iterations(), agent2.max_iterations());
+        assert_eq!(agent1.llm_timeout(), agent2.llm_timeout());
+        assert_eq!(agent1.tool_timeout(), agent2.tool_timeout());
+        assert_eq!(agent1.max_history_messages(), agent2.max_history_messages());
     }
 }

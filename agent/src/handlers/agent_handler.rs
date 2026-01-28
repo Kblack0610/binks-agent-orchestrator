@@ -23,7 +23,13 @@ pub async fn run_agent(
     let server_list = CommandContext::parse_server_filter(servers);
     let effective_servers = resolve_server_filter(ctx, &pool, server_list);
 
-    let mut agent = Agent::new(&ctx.ollama_url, &ctx.model, pool).with_verbose(ctx.is_verbose());
+    let mut agent = Agent::from_agent_config(
+        &ctx.ollama_url,
+        &ctx.model,
+        pool,
+        &ctx.file_config.agent,
+    )
+    .with_verbose(ctx.is_verbose());
 
     // Apply system prompt
     if let Some(sys) = ctx.resolve_system_prompt(system) {
