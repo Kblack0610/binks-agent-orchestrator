@@ -7,6 +7,7 @@
 
 mod backends;
 mod config;
+mod fetch;
 mod server;
 mod types;
 

@@ -10,13 +10,13 @@
 | exec-mcp | Rust | Production | 5 | Yes (tier 2) | Command execution with security guards |
 | inbox-mcp | Rust | Production | 5 | Yes (tier 2) | Local file-based inbox for notifications |
 | notify-mcp | Rust | Production | 6 | Yes (tier 2) | Slack/Discord webhook notifications |
-| web-search-mcp | Rust | Production | 6 | Yes (tier 3) | SearXNG-backed web search |
+| web-search-mcp | Rust | Production | 10 | Yes (tier 3) | SearXNG search + HTTP fetch/parse |
 | git-mcp | Rust | Implemented | 10 | No | Local git operations via libgit2 |
 | memory-mcp | Rust | Implemented | 12 | No | Dual-layer memory (session + persistent SQLite) |
 | kubernetes | Node | External | — | Yes (tier 3) | Kubernetes cluster management |
 | ssh | Node | External | — | Yes (tier 3) | SSH remote operations |
 
-**Total:** 112 tools across 9 Rust MCPs + 2 external Node.js MCPs
+**Total:** 116 tools across 9 Rust MCPs + 2 external Node.js MCPs
 
 > **Note:** git-mcp and memory-mcp are implemented and in the Cargo workspace but not yet configured in `.mcp.json`. Add them when ready for production use.
 
@@ -24,28 +24,9 @@
 
 ## Planned MCPs
 
-Three MCPs have specification documents (README.md) but no implementation yet:
+Two MCPs have specification documents (README.md) but no implementation yet:
 
-### web-fetch-mcp (Rust) - Next Priority
-**Purpose:** HTTP fetching and HTML parsing
-
-**Design:**
-- Simple HTTP client wrapper
-- HTML to text/markdown conversion
-- CSS selector-based extraction
-- Rate limiting and caching
-
-**Tools:**
-| Tool | Description |
-|------|-------------|
-| `fetch(url)` | Fetch raw content |
-| `fetch_json(url)` | Fetch and parse JSON |
-| `parse_html(url, selector)` | Extract via CSS selector |
-| `fetch_markdown(url)` | Convert HTML to markdown |
-
-**Dependencies:** `reqwest`, `scraper`, `rmcp`
-
----
+> **Note:** web-fetch capabilities (`fetch`, `fetch_json`, `parse_html`, `fetch_markdown`) were merged directly into `web-search-mcp` rather than creating a separate crate.
 
 ### scratchpad-mcp (Rust)
 **Purpose:** Structured reasoning and thinking chain
@@ -131,7 +112,7 @@ struct ThinkingStep {
 | filesystem | ✅ Built | Security-critical, custom sandboxing |
 | git | ✅ Built | git2 crate excellent, complements github-gh |
 | web-search | ✅ Built | Pluggable backends, control over rate limiting |
-| web-fetch | Build | Simple HTTP easy, reqwest is great |
+| web-fetch | ✅ Merged into web-search | Avoids separate crate; reqwest already present |
 | scratchpad | Build | Simple, fits specific needs |
 | semantic | Build (tree-sitter) | Lightweight layer sufficient for most tasks |
 | browser | Use Playwright | Chromium too complex |
@@ -150,12 +131,11 @@ struct ThinkingStep {
 ├── exec-mcp ..................... Command execution (5 tools)
 ├── inbox-mcp .................... Notification inbox (5 tools)
 ├── notify-mcp ................... Slack/Discord (6 tools)
-├── web-search-mcp ............... SearXNG search (6 tools)
+├── web-search-mcp ............... SearXNG search + fetch (10 tools)
 ├── git-mcp ...................... Local git ops (10 tools)
 └── memory-mcp ................... Dual-layer memory (12 tools)
 
 📋 Planned
-├── web-fetch-mcp ................ HTTP and HTML parsing
 ├── scratchpad-mcp ............... Structured reasoning
 └── semantic-mcp (tree-sitter) ... Basic code understanding
 
@@ -187,9 +167,9 @@ struct ThinkingStep {
 │  └─────────┘ └─────────┘                                    │
 ├─────────────────────────────────────────────────────────────┤
 │  Planned MCPs                                                │
-│  ┌──────────┐ ┌────────────┐ ┌──────────┐                   │
-│  │web-fetch │ │ scratchpad │ │ semantic │                   │
-│  └──────────┘ └────────────┘ └──────────┘                   │
+│  ┌────────────┐ ┌──────────┐                                 │
+│  │ scratchpad │ │ semantic │                                 │
+│  └────────────┘ └──────────┘                                 │
 ├─────────────────────────────────────────────────────────────┤
 │  External MCPs                                               │
 │  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌────────┐           │

@@ -31,6 +31,10 @@ anyhow.workspace = true
 # Logging
 tracing.workspace = true
 
+# HTML parsing
+scraper = "0.22"
+html2md = "0.2"
+
 # Utilities
 url = "2"
 

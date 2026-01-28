@@ -154,7 +154,7 @@ MCP is the standardized tool interface for the agent. All tools are implemented 
 │  git-mcp, memory-mcp                                     │
 ├─────────────────────────────────────────────────────────┤
 │  Planned (skeleton only)                                 │
-│  web-fetch-mcp, scratchpad-mcp, semantic-mcp             │
+│  scratchpad-mcp, semantic-mcp                            │
 └─────────────────────────────────────────────────────────┘
 ```
 

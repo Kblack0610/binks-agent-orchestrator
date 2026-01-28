@@ -19,6 +19,9 @@ pub struct Config {
     /// SearXNG specific configuration
     #[serde(default)]
     pub searxng: SearXNGConfig,
+    /// HTTP fetch configuration
+    #[serde(default)]
+    pub fetch: FetchConfig,
 }
 
 /// General search configuration
@@ -46,7 +49,43 @@ pub struct SearXNGConfig {
     pub engines: String,
 }
 
+/// HTTP fetch configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FetchConfig {
+    /// Request timeout in seconds
+    #[serde(default = "default_fetch_timeout")]
+    pub timeout_seconds: u64,
+    /// User-Agent header for fetch requests
+    #[serde(default = "default_user_agent")]
+    pub user_agent: String,
+    /// Maximum response body size in bytes (default: 10MB)
+    #[serde(default = "default_max_response_size")]
+    pub max_response_size: usize,
+}
+
+impl Default for FetchConfig {
+    fn default() -> Self {
+        Self {
+            timeout_seconds: default_fetch_timeout(),
+            user_agent: default_user_agent(),
+            max_response_size: default_max_response_size(),
+        }
+    }
+}
+
 // Default value functions
+fn default_fetch_timeout() -> u64 {
+    30
+}
+
+fn default_user_agent() -> String {
+    "binks-web-search-mcp/0.1".to_string()
+}
+
+fn default_max_response_size() -> usize {
+    10 * 1024 * 1024 // 10 MB
+}
+
 fn default_max_results() -> usize {
     10
 }
@@ -104,6 +143,21 @@ impl Config {
         // SearXNG URL from environment (highest priority)
         if let Ok(url) = std::env::var("SEARXNG_URL") {
             config.searxng.url = url;
+        }
+
+        // Fetch config overrides from environment
+        if let Ok(timeout) = std::env::var("HTTP_TIMEOUT_SECONDS") {
+            if let Ok(t) = timeout.parse() {
+                config.fetch.timeout_seconds = t;
+            }
+        }
+        if let Ok(ua) = std::env::var("HTTP_USER_AGENT") {
+            config.fetch.user_agent = ua;
+        }
+        if let Ok(max_size) = std::env::var("HTTP_MAX_RESPONSE_SIZE") {
+            if let Ok(s) = max_size.parse() {
+                config.fetch.max_response_size = s;
+            }
         }
 
         Ok(config)

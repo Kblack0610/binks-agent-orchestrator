@@ -3,7 +3,7 @@
 //! This module defines the main MCP server that exposes web search
 //! tools with pluggable backend support.
 
-use mcp_common::{json_success, CallToolResult, McpError, ResultExt};
+use mcp_common::{json_success, text_success, CallToolResult, McpError, ResultExt};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{ServerCapabilities, ServerInfo},
@@ -15,11 +15,13 @@ use std::sync::Arc;
 
 use crate::backends::{searxng::SearXNGBackend, SearchBackend};
 use crate::config::Config;
+use crate::fetch::FetchService;
 
 /// The main Web Search MCP Server
 #[derive(Clone)]
 pub struct WebSearchMcpServer {
     backend: Arc<dyn SearchBackend>,
+    fetch_service: FetchService,
     config: Config,
     tool_router: ToolRouter<Self>,
 }
@@ -58,6 +60,37 @@ pub struct ImageSearchParams {
     pub limit: Option<usize>,
 }
 
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct FetchParams {
+    /// The URL to fetch
+    #[schemars(description = "The URL to fetch content from")]
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct FetchJsonParams {
+    /// The URL to fetch JSON from
+    #[schemars(description = "The URL to fetch and parse as JSON")]
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ParseHtmlParams {
+    /// The URL to fetch HTML from
+    #[schemars(description = "The URL to fetch HTML from")]
+    pub url: String,
+    /// CSS selector to extract elements
+    #[schemars(description = "CSS selector to extract matching elements (e.g., 'h1', '.class', '#id', 'div > p')")]
+    pub selector: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct FetchMarkdownParams {
+    /// The URL to fetch and convert to markdown
+    #[schemars(description = "The URL to fetch and convert HTML to markdown")]
+    pub url: String,
+}
+
 // ============================================================================
 // Tool Router Implementation
 // ============================================================================
@@ -89,8 +122,11 @@ impl WebSearchMcpServer {
             );
         }
 
+        let fetch_service = FetchService::new(&config.fetch);
+
         Self {
             backend,
+            fetch_service,
             config,
             tool_router: Self::tool_router(),
         }
@@ -156,6 +192,82 @@ impl WebSearchMcpServer {
         json_success(&results)
     }
 
+    // ========================================================================
+    // Fetch Tools
+    // ========================================================================
+
+    #[tool(description = "Fetch a URL and return the raw response content with status code, content type, and body.")]
+    async fn fetch(
+        &self,
+        Parameters(params): Parameters<FetchParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!("Fetching URL: {}", params.url);
+
+        let result = self
+            .fetch_service
+            .fetch(&params.url)
+            .await
+            .to_mcp_err()?;
+
+        json_success(&result)
+    }
+
+    #[tool(description = "Fetch a URL and parse the response as JSON. Returns the parsed JSON value.")]
+    async fn fetch_json(
+        &self,
+        Parameters(params): Parameters<FetchJsonParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!("Fetching JSON from: {}", params.url);
+
+        let value = self
+            .fetch_service
+            .fetch_json(&params.url)
+            .await
+            .to_mcp_err()?;
+
+        json_success(&value)
+    }
+
+    #[tool(description = "Fetch a URL and extract HTML elements matching a CSS selector. Returns matching elements with text, HTML, tag names, and attributes.")]
+    async fn parse_html(
+        &self,
+        Parameters(params): Parameters<ParseHtmlParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!(
+            "Parsing HTML from {} with selector: {}",
+            params.url,
+            params.selector
+        );
+
+        let result = self
+            .fetch_service
+            .parse_html(&params.url, &params.selector)
+            .await
+            .to_mcp_err()?;
+
+        json_success(&result)
+    }
+
+    #[tool(description = "Fetch a URL and convert the HTML content to markdown format.")]
+    async fn fetch_markdown(
+        &self,
+        Parameters(params): Parameters<FetchMarkdownParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!("Fetching markdown from: {}", params.url);
+
+        let markdown = self
+            .fetch_service
+            .fetch_markdown(&params.url)
+            .await
+            .to_mcp_err()?;
+
+        Ok(text_success(markdown))
+    }
+
+    // ========================================================================
+    // Configuration
+    // ========================================================================
+
     #[tool(description = "Get the current search backend configuration and status.")]
     async fn get_config(&self) -> Result<CallToolResult, McpError> {
         #[derive(Serialize)]
@@ -164,6 +276,8 @@ impl WebSearchMcpServer {
             available: bool,
             max_results: usize,
             cache_enabled: bool,
+            fetch_timeout_seconds: u64,
+            fetch_max_response_size: usize,
         }
 
         let status = ConfigStatus {
@@ -171,6 +285,8 @@ impl WebSearchMcpServer {
             available: self.backend.is_available(),
             max_results: self.config.search.max_results,
             cache_enabled: self.config.search.cache_enabled,
+            fetch_timeout_seconds: self.config.fetch.timeout_seconds,
+            fetch_max_response_size: self.config.fetch.max_response_size,
         };
 
         json_success(&status)
@@ -188,7 +304,10 @@ impl rmcp::ServerHandler for WebSearchMcpServer {
             instructions: Some(
                 "Web Search MCP Server - provides tools for searching the web using \
                  SearXNG (self-hosted meta-search engine). Supports web search, \
-                 news search, and image search. No API keys required."
+                 news search, and image search. No API keys required. \
+                 Also provides HTTP fetch tools for retrieving web content, \
+                 parsing JSON, extracting HTML elements via CSS selectors, \
+                 and converting HTML to markdown."
                     .into(),
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
