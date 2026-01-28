@@ -86,6 +86,10 @@ pub struct ChatParams {
 pub struct AgentChatParams {
     #[schemars(description = "The message to send to the agent")]
     pub message: String,
+    #[schemars(
+        description = "Optional model override (e.g., 'llama3.1:70b', 'deepseek-r1:70b'). Uses server default if not specified."
+    )]
+    pub model: Option<String>,
     #[schemars(description = "Optional system prompt for the agent")]
     pub system_prompt: Option<String>,
     #[schemars(
@@ -323,8 +327,9 @@ impl AgentMcpServer {
         Parameters(params): Parameters<AgentChatParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(
-            "agent_chat: {} (servers: {:?}, session: {:?})",
+            "agent_chat: {} (model: {:?}, servers: {:?}, session: {:?})",
             params.message,
+            params.model,
             params.servers,
             params.session_id
         );
@@ -333,11 +338,45 @@ impl AgentMcpServer {
         let run_id = uuid::Uuid::new_v4().to_string();
         let start_time = std::time::Instant::now();
 
-        // Lazily initialize agent on first call
-        self.ensure_agent().await?;
+        // Determine if we need a model override
+        let use_override_model = params.model.as_ref().is_some_and(|m| m != &self.config.model);
 
+        // Create temporary agent for model override, or use cached agent
+        let mut temp_agent: Option<Agent> = None;
+        if use_override_model {
+            let model = params.model.as_ref().unwrap();
+            tracing::info!("Creating temporary agent with model override: {}", model);
+
+            let pool = McpClientPool::load()
+                .map_err(|e| {
+                    McpError::internal_error(format!("Failed to load MCP config: {}", e), None)
+                })?
+                .ok_or_else(|| McpError::internal_error("No .mcp.json found".to_string(), None))?;
+
+            let mut agent = Agent::from_agent_config(
+                &self.config.ollama_url,
+                model,
+                pool,
+                &self.config.agent_config,
+            );
+
+            if let Some(ref prompt) = self.config.system_prompt {
+                agent = agent.with_system_prompt(prompt);
+            }
+
+            temp_agent = Some(agent);
+        } else {
+            // Lazily initialize default agent on first call
+            self.ensure_agent().await?;
+        }
+
+        // Get a mutable reference to the agent we'll use
         let mut agent_guard = self.agent.lock().await;
-        let agent = agent_guard.as_mut().unwrap(); // Safe: ensure_agent guarantees it's Some
+        let agent: &mut Agent = if let Some(ref mut temp) = temp_agent {
+            temp
+        } else {
+            agent_guard.as_mut().unwrap() // Safe: ensure_agent guarantees it's Some
+        };
 
         // Wire up event channel for trace collection
         let mut event_rx = if include_trace {
