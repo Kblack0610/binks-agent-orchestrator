@@ -262,6 +262,52 @@ impl Database {
         })
     }
 
+    /// Start a new run with a pre-generated ID
+    ///
+    /// Same as `start_run()` but uses the provided ID instead of generating one.
+    /// Useful when the caller needs to know the run ID before DB insertion
+    /// (e.g., to include it in an execution trace).
+    pub fn start_run_with_id(
+        &self,
+        id: &str,
+        workflow_name: &str,
+        task: &str,
+        model: &str,
+    ) -> Result<Run> {
+        let now = Utc::now();
+
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            r#"
+            INSERT INTO runs (id, workflow_name, task, status, model, started_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "#,
+            (
+                id,
+                workflow_name,
+                task,
+                RunStatus::Running.to_string(),
+                model,
+                now.to_rfc3339(),
+            ),
+        )
+        .context("Failed to start run")?;
+
+        Ok(Run {
+            id: id.to_string(),
+            workflow_name: workflow_name.to_string(),
+            task: task.to_string(),
+            status: RunStatus::Running,
+            model: model.to_string(),
+            started_at: now,
+            completed_at: None,
+            duration_ms: None,
+            context: None,
+            error: None,
+            metadata: None,
+        })
+    }
+
     /// Complete a run successfully
     pub fn complete_run(&self, id: &str, context: Option<&serde_json::Value>) -> Result<()> {
         let now = Utc::now();
