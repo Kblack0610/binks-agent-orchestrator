@@ -1,8 +1,17 @@
 //! Web server module for the chat interface
 //!
 //! Provides an HTTP server with REST API and WebSocket support for the chat UI.
+//!
+//! ## Authentication
+//!
+//! Set `BINKS_API_TOKEN` environment variable to enable bearer token auth.
+//! When set, all API endpoints except health checks require:
+//! `Authorization: Bearer <token>`
+//!
+//! If not set, all endpoints are accessible without authentication (backwards compatible).
 
 pub mod api;
+pub mod auth;
 pub mod runs;
 pub mod state;
 pub mod workflows;
@@ -11,6 +20,7 @@ pub mod ws;
 use anyhow::Result;
 use axum::{
     http::{header, StatusCode, Uri},
+    middleware,
     response::{Html, Response},
     routing::{delete, get, patch, post},
     Router,
@@ -41,6 +51,14 @@ pub struct WebConfig {
 
 /// Start the web server
 pub async fn serve(config: WebConfig) -> Result<()> {
+    // Initialize authentication
+    auth::init_auth();
+    if auth::is_auth_enabled() {
+        tracing::info!("API authentication enabled (BINKS_API_TOKEN set)");
+    } else {
+        tracing::warn!("API authentication disabled (set BINKS_API_TOKEN to enable)");
+    }
+
     // Initialize database
     let db = Database::open()?;
     tracing::info!("Database opened at {:?}", Database::default_path()?);
@@ -73,7 +91,13 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let api_routes = Router::new()
+    // Public routes (no authentication required)
+    let public_routes = Router::new()
+        .route("/health", get(api::health_check))
+        .route("/mcp/health", get(api::mcp_health));
+
+    // Protected routes (require authentication when BINKS_API_TOKEN is set)
+    let protected_routes = Router::new()
         // Conversations
         .route("/conversations", get(api::list_conversations))
         .route("/conversations", post(api::create_conversation))
@@ -101,11 +125,18 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         .route("/runs/:id/metrics", get(runs::get_run_metrics))
         .route("/runs/:id/export", get(runs::export_run))
         .route("/improvements", get(runs::list_improvements).post(runs::create_improvement))
-        // Health
-        .route("/health", get(api::health_check))
-        .route("/mcp/health", get(api::mcp_health));
+        // Apply auth middleware to protected routes
+        .layer(middleware::from_fn(auth::auth_middleware));
 
-    let ws_routes = Router::new().route("/chat/:conversation_id", get(ws::chat_handler));
+    // Combine public and protected routes under /api
+    let api_routes = Router::new()
+        .merge(public_routes)
+        .merge(protected_routes);
+
+    // WebSocket routes (protected - require auth)
+    let ws_routes = Router::new()
+        .route("/chat/:conversation_id", get(ws::chat_handler))
+        .layer(middleware::from_fn(auth::auth_middleware));
 
     let trace_layer =
         TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
