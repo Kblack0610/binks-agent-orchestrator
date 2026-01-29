@@ -1,0 +1,27 @@
+[package]
+name = "sql-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "MCP server for SQL database queries"
+license = "MIT"
+
+[[bin]]
+name = "sql-mcp"
+path = "src/main.rs"
+
+[dependencies]
+mcp-common.workspace = true
+rmcp.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+# SQLite support
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Config
+dirs = "5"
+toml = "0.8"
