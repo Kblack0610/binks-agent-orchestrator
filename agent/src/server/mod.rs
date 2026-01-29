@@ -20,7 +20,7 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::agent::{detect_capabilities, Agent, DirectMessage, ModelCapabilityOverride};
+use crate::agent::{detect_capabilities, event_channel, Agent, AgentEvent, DirectMessage, ModelCapabilityOverride};
 use crate::config::AgentSectionConfig;
 use crate::db::runs::{ImprovementFilter, Run, RunEvent, RunFilter, RunMetrics, RunStatus};
 use crate::db::Database;
@@ -86,6 +86,10 @@ pub struct ChatParams {
 pub struct AgentChatParams {
     #[schemars(description = "The message to send to the agent")]
     pub message: String,
+    #[schemars(
+        description = "Optional model override (e.g., 'llama3.1:70b', 'deepseek-r1:70b'). Uses server default if not specified."
+    )]
+    pub model: Option<String>,
     #[schemars(description = "Optional system prompt for the agent")]
     pub system_prompt: Option<String>,
     #[schemars(
@@ -96,6 +100,15 @@ pub struct AgentChatParams {
         description = "Session ID for conversation continuity. Omit for stateless single-turn calls."
     )]
     pub session_id: Option<String>,
+    #[schemars(
+        description = "Include execution trace in result for debugging (default: true)"
+    )]
+    #[serde(default = "default_true")]
+    pub include_trace: Option<bool>,
+}
+
+fn default_true() -> Option<bool> {
+    Some(true)
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -314,21 +327,81 @@ impl AgentMcpServer {
         Parameters(params): Parameters<AgentChatParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(
-            "agent_chat: {} (servers: {:?}, session: {:?})",
+            "agent_chat: {} (model: {:?}, servers: {:?}, session: {:?})",
             params.message,
+            params.model,
             params.servers,
             params.session_id
         );
 
-        // Lazily initialize agent on first call
-        self.ensure_agent().await?;
+        let include_trace = params.include_trace.unwrap_or(true);
+        let run_id = uuid::Uuid::new_v4().to_string();
+        let start_time = std::time::Instant::now();
 
+        // Determine if we need a model override
+        let use_override_model = params.model.as_ref().is_some_and(|m| m != &self.config.model);
+
+        // Create temporary agent for model override, or use cached agent
+        let mut temp_agent: Option<Agent> = None;
+        if use_override_model {
+            let model = params.model.as_ref().unwrap();
+            tracing::info!("Creating temporary agent with model override: {}", model);
+
+            let pool = McpClientPool::load()
+                .map_err(|e| {
+                    McpError::internal_error(format!("Failed to load MCP config: {}", e), None)
+                })?
+                .ok_or_else(|| McpError::internal_error("No .mcp.json found".to_string(), None))?;
+
+            let mut agent = Agent::from_agent_config(
+                &self.config.ollama_url,
+                model,
+                pool,
+                &self.config.agent_config,
+            );
+
+            if let Some(ref prompt) = self.config.system_prompt {
+                agent = agent.with_system_prompt(prompt);
+            }
+
+            temp_agent = Some(agent);
+        } else {
+            // Lazily initialize default agent on first call
+            self.ensure_agent().await?;
+        }
+
+        // Get a mutable reference to the agent we'll use
         let mut agent_guard = self.agent.lock().await;
-        let agent = agent_guard.as_mut().unwrap(); // Safe: ensure_agent guarantees it's Some
+        let agent: &mut Agent = if let Some(ref mut temp) = temp_agent {
+            temp
+        } else {
+            agent_guard.as_mut().unwrap() // Safe: ensure_agent guarantees it's Some
+        };
+
+        // Wire up event channel for trace collection
+        let mut event_rx = if include_trace {
+            let (tx, rx) = event_channel();
+            agent.set_event_sender(Some(tx));
+            Some(rx)
+        } else {
+            None
+        };
+
+        // Start DB run record if database is available
+        let model_name = agent.model().to_string();
+        if let Some(ref db) = self.db {
+            if let Err(e) = db.start_run_with_id(
+                &run_id,
+                "agent_chat",
+                &params.message,
+                &model_name,
+            ) {
+                tracing::warn!("Failed to start DB run record: {}", e);
+            }
+        }
 
         // Load session history or clear for stateless calls
         if let Some(ref session_id) = params.session_id {
-            // Scope the lock to release it before chat
             let history_to_restore = {
                 let sessions = self.sessions.lock().await;
                 sessions.get(session_id).cloned()
@@ -345,7 +418,6 @@ impl AgentMcpServer {
                 agent.clear_history();
             }
         } else {
-            // No session_id = stateless, clear history
             agent.clear_history();
         }
 
@@ -354,11 +426,10 @@ impl AgentMcpServer {
             tracing::info!("Setting system prompt: {}", prompt);
             agent.set_system_prompt(Some(prompt.clone()));
         } else {
-            // Clear any previous system prompt for clean state
             agent.set_system_prompt(None);
         }
 
-        // Use filtered servers if provided, otherwise use all tools
+        // Execute the chat
         let response = if let Some(ref servers) = params.servers {
             let server_refs: Vec<&str> = servers.iter().map(|s| s.as_str()).collect();
             agent.chat_with_servers(&params.message, &server_refs).await
@@ -366,20 +437,88 @@ impl AgentMcpServer {
             agent.chat(&params.message).await
         };
 
-        let response = response.map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        // Grab metrics snapshot before releasing the agent lock
+        let metrics_snapshot = if include_trace {
+            agent.mcp_metrics().snapshot()
+        } else {
+            vec![]
+        };
 
-        // Save session history if session_id provided
-        if let Some(ref session_id) = params.session_id {
-            let mut sessions = self.sessions.lock().await;
-            sessions.insert(session_id.clone(), agent.get_history());
-            tracing::info!(
-                "Saved session '{}' with {} messages",
-                session_id,
-                agent.get_history().len()
-            );
+        // Reset event sender
+        if include_trace {
+            agent.set_event_sender(None);
         }
 
-        Ok(CallToolResult::success(vec![Content::text(response)]))
+        let total_duration_ms = start_time.elapsed().as_millis() as u64;
+
+        // Drain collected events
+        let collected_events: Vec<AgentEvent> = if let Some(ref mut rx) = event_rx {
+            let mut events = Vec::new();
+            while let Ok(event) = rx.try_recv() {
+                events.push(event);
+            }
+            events
+        } else {
+            vec![]
+        };
+
+        // Handle the response (success or error)
+        match response {
+            Ok(response_text) => {
+                // Save session history if session_id provided
+                if let Some(ref session_id) = params.session_id {
+                    let mut sessions = self.sessions.lock().await;
+                    sessions.insert(session_id.clone(), agent.get_history());
+                    tracing::info!(
+                        "Saved session '{}' with {} messages",
+                        session_id,
+                        agent.get_history().len()
+                    );
+                }
+
+                // Persist events and complete run in DB
+                if let Some(ref db) = self.db {
+                    for (i, event) in collected_events.iter().enumerate() {
+                        if let Err(e) = db.record_event(&run_id, i, event) {
+                            tracing::warn!("Failed to record event {}: {}", i, e);
+                        }
+                    }
+                    if let Err(e) = db.complete_run(&run_id, None) {
+                        tracing::warn!("Failed to complete DB run: {}", e);
+                    }
+                }
+
+                // Build result with optional execution trace
+                let mut content_blocks = vec![Content::text(&response_text)];
+
+                if include_trace && !collected_events.is_empty() {
+                    let trace = format_execution_trace(
+                        &run_id,
+                        &collected_events,
+                        &metrics_snapshot,
+                        total_duration_ms,
+                    );
+                    content_blocks.push(Content::text(trace));
+                }
+
+                Ok(CallToolResult::success(content_blocks))
+            }
+            Err(e) => {
+                // Persist failure in DB
+                if let Some(ref db) = self.db {
+                    for (i, event) in collected_events.iter().enumerate() {
+                        if let Err(e) = db.record_event(&run_id, i, event) {
+                            tracing::warn!("Failed to record event {}: {}", i, e);
+                        }
+                    }
+                    if let Err(err) = db.fail_run(&run_id, &e.to_string()) {
+                        tracing::warn!("Failed to record run failure: {}", err);
+                    }
+                }
+
+                Err(McpError::internal_error(e.to_string(), None))
+            }
+        }
     }
 
     #[tool(description = "Clear a specific session's conversation history.")]
@@ -747,6 +886,163 @@ fn format_duration(ms: i64) -> String {
     } else {
         format!("{}ms", ms)
     }
+}
+
+// ============================================================================
+// Execution Trace Formatting
+// ============================================================================
+
+/// Summary of a single tool call extracted from events
+struct ToolCallSummary {
+    name: String,
+    duration_ms: u64,
+    is_error: bool,
+    error_type: Option<String>,
+    result_preview: String,
+}
+
+/// Format duration in milliseconds (u64 variant for trace formatting)
+fn format_trace_duration(ms: u64) -> String {
+    format_duration(ms as i64)
+}
+
+/// Format collected agent events into a markdown execution trace
+fn format_execution_trace(
+    run_id: &str,
+    events: &[AgentEvent],
+    server_metrics: &[crate::agent::metrics::ServerMetrics],
+    total_duration_ms: u64,
+) -> String {
+    let mut output = String::new();
+    let mut tool_calls: Vec<ToolCallSummary> = Vec::new();
+    let mut iterations = 0;
+    let mut errors: Vec<(String, String)> = Vec::new(); // (tool_name, error_description)
+
+    // Extract tool calls and iteration count from events
+    for event in events {
+        match event {
+            AgentEvent::ToolComplete {
+                name,
+                result,
+                duration,
+                is_error,
+                error_type,
+            } => {
+                let duration_ms = duration.as_millis() as u64;
+                let preview = if result.len() > 60 {
+                    format!("{}...", &result[..57])
+                } else {
+                    result.clone()
+                };
+
+                if *is_error {
+                    let err_desc = error_type
+                        .as_deref()
+                        .unwrap_or("unknown");
+                    errors.push((name.clone(), format!("{}: {}", err_desc, preview)));
+                }
+
+                tool_calls.push(ToolCallSummary {
+                    name: name.clone(),
+                    duration_ms,
+                    is_error: *is_error,
+                    error_type: error_type.clone(),
+                    result_preview: preview,
+                });
+            }
+            AgentEvent::Iteration { number, .. } => {
+                iterations = iterations.max(*number);
+            }
+            _ => {}
+        }
+    }
+
+    // Cap tool calls table at 50 rows
+    let display_calls = if tool_calls.len() > 50 {
+        &tool_calls[..50]
+    } else {
+        &tool_calls
+    };
+    let truncated = tool_calls.len() > 50;
+
+    // Header
+    output.push_str("\n---\n## Execution Trace\n");
+    output.push_str(&format!("**Run ID:** `{}`\n", &run_id[..8.min(run_id.len())]));
+    output.push_str(&format!(
+        "**Summary:** {} iteration{}, {} tool call{}, {}\n\n",
+        iterations,
+        if iterations != 1 { "s" } else { "" },
+        tool_calls.len(),
+        if tool_calls.len() != 1 { "s" } else { "" },
+        format_trace_duration(total_duration_ms),
+    ));
+
+    // Tool calls table
+    if !display_calls.is_empty() {
+        output.push_str("### Tool Calls\n");
+        output.push_str("| # | Tool | Duration | Status | Result Preview |\n");
+        output.push_str("|---|------|----------|--------|----------------|\n");
+
+        for (i, call) in display_calls.iter().enumerate() {
+            let status = if call.is_error {
+                format!(
+                    "ERR ({})",
+                    call.error_type.as_deref().unwrap_or("error")
+                )
+            } else {
+                "OK".to_string()
+            };
+            // Escape pipe characters in preview for table rendering
+            let preview = call.result_preview.replace('|', "\\|");
+            output.push_str(&format!(
+                "| {} | `{}` | {} | {} | {} |\n",
+                i + 1,
+                call.name,
+                format_trace_duration(call.duration_ms),
+                status,
+                preview,
+            ));
+        }
+        if truncated {
+            output.push_str(&format!(
+                "\n_...and {} more tool calls (truncated)_\n",
+                tool_calls.len() - 50
+            ));
+        }
+        output.push('\n');
+    }
+
+    // Errors section
+    if !errors.is_empty() {
+        output.push_str("### Errors\n");
+        for (tool, desc) in &errors {
+            output.push_str(&format!("- **{}**: {}\n", tool, desc));
+        }
+        output.push('\n');
+    }
+
+    // Server metrics section
+    if !server_metrics.is_empty() {
+        output.push_str("### Server Metrics\n");
+        for sm in server_metrics {
+            output.push_str(&format!(
+                "- **{}**: {} call{}, {:.0}% success, avg {}\n",
+                sm.server_name,
+                sm.total_calls,
+                if sm.total_calls != 1 { "s" } else { "" },
+                sm.success_rate(),
+                format_trace_duration(sm.avg_duration_ms),
+            ));
+        }
+        output.push('\n');
+    }
+
+    output.push_str(&format!(
+        "_Use `get_run` with ID `{}` for full analysis._\n",
+        &run_id[..8.min(run_id.len())]
+    ));
+
+    output
 }
 
 /// Export run as markdown analysis report
