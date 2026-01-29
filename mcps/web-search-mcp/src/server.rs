@@ -80,7 +80,9 @@ pub struct ParseHtmlParams {
     #[schemars(description = "The URL to fetch HTML from")]
     pub url: String,
     /// CSS selector to extract elements
-    #[schemars(description = "CSS selector to extract matching elements (e.g., 'h1', '.class', '#id', 'div > p')")]
+    #[schemars(
+        description = "CSS selector to extract matching elements (e.g., 'h1', '.class', '#id', 'div > p')"
+    )]
     pub selector: String,
 }
 
@@ -196,23 +198,23 @@ impl WebSearchMcpServer {
     // Fetch Tools
     // ========================================================================
 
-    #[tool(description = "Fetch a URL and return the raw response content with status code, content type, and body.")]
+    #[tool(
+        description = "Fetch a URL and return the raw response content with status code, content type, and body."
+    )]
     async fn fetch(
         &self,
         Parameters(params): Parameters<FetchParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!("Fetching URL: {}", params.url);
 
-        let result = self
-            .fetch_service
-            .fetch(&params.url)
-            .await
-            .to_mcp_err()?;
+        let result = self.fetch_service.fetch(&params.url).await.to_mcp_err()?;
 
         json_success(&result)
     }
 
-    #[tool(description = "Fetch a URL and parse the response as JSON. Returns the parsed JSON value.")]
+    #[tool(
+        description = "Fetch a URL and parse the response as JSON. Returns the parsed JSON value."
+    )]
     async fn fetch_json(
         &self,
         Parameters(params): Parameters<FetchJsonParams>,
@@ -228,7 +230,9 @@ impl WebSearchMcpServer {
         json_success(&value)
     }
 
-    #[tool(description = "Fetch a URL and extract HTML elements matching a CSS selector. Returns matching elements with text, HTML, tag names, and attributes.")]
+    #[tool(
+        description = "Fetch a URL and extract HTML elements matching a CSS selector. Returns matching elements with text, HTML, tag names, and attributes."
+    )]
     async fn parse_html(
         &self,
         Parameters(params): Parameters<ParseHtmlParams>,

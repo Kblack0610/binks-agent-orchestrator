@@ -51,10 +51,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Result<Response, S
             if token == expected_token {
                 Ok(next.run(request).await)
             } else {
-                tracing::warn!(
-                    "Invalid bearer token provided for {}",
-                    request.uri().path()
-                );
+                tracing::warn!("Invalid bearer token provided for {}", request.uri().path());
                 Err(StatusCode::UNAUTHORIZED)
             }
         }
@@ -66,10 +63,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Result<Response, S
             Err(StatusCode::UNAUTHORIZED)
         }
         None => {
-            tracing::warn!(
-                "Missing Authorization header for {}",
-                request.uri().path()
-            );
+            tracing::warn!("Missing Authorization header for {}", request.uri().path());
             Err(StatusCode::UNAUTHORIZED)
         }
     }

@@ -56,15 +56,15 @@ fn default_shell() -> String {
 
 fn default_deny_patterns() -> Vec<String> {
     vec![
-        r"rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)?/\s*$".to_string(),  // rm -rf /
-        r"rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)?/\s".to_string(),      // rm -rf / <more>
+        r"rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)?/\s*$".to_string(), // rm -rf /
+        r"rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)?/\s".to_string(),   // rm -rf / <more>
         r"mkfs\.".to_string(),
         r"^\s*dd\s+.*of=/dev/".to_string(),
-        r":\(\)\{.*\|.*&.*\}".to_string(),                       // fork bomb
+        r":\(\)\{.*\|.*&.*\}".to_string(), // fork bomb
         r"^\s*(shutdown|reboot|halt|poweroff)\b".to_string(),
         r"^\s*chmod\s+(-[a-zA-Z]*)?\s*777\s+/".to_string(),
         r">\s*/dev/sd[a-z]".to_string(),
-        r"^\s*:\(\)\{ :\|:& \};:".to_string(),                    // fork bomb variant
+        r"^\s*:\(\)\{ :\|:& \};:".to_string(), // fork bomb variant
     ]
 }
 

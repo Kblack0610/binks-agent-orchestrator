@@ -20,7 +20,9 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::agent::{detect_capabilities, event_channel, Agent, AgentEvent, DirectMessage, ModelCapabilityOverride};
+use crate::agent::{
+    detect_capabilities, event_channel, Agent, AgentEvent, DirectMessage, ModelCapabilityOverride,
+};
 use crate::config::AgentSectionConfig;
 use crate::db::runs::{ImprovementFilter, Run, RunEvent, RunFilter, RunMetrics, RunStatus};
 use crate::db::Database;
@@ -100,9 +102,7 @@ pub struct AgentChatParams {
         description = "Session ID for conversation continuity. Omit for stateless single-turn calls."
     )]
     pub session_id: Option<String>,
-    #[schemars(
-        description = "Include execution trace in result for debugging (default: true)"
-    )]
+    #[schemars(description = "Include execution trace in result for debugging (default: true)")]
     #[serde(default = "default_true")]
     pub include_trace: Option<bool>,
 }
@@ -339,7 +339,10 @@ impl AgentMcpServer {
         let start_time = std::time::Instant::now();
 
         // Determine if we need a model override
-        let use_override_model = params.model.as_ref().is_some_and(|m| m != &self.config.model);
+        let use_override_model = params
+            .model
+            .as_ref()
+            .is_some_and(|m| m != &self.config.model);
 
         // Create temporary agent for model override, or use cached agent
         let mut temp_agent: Option<Agent> = None;
@@ -390,12 +393,9 @@ impl AgentMcpServer {
         // Start DB run record if database is available
         let model_name = agent.model().to_string();
         if let Some(ref db) = self.db {
-            if let Err(e) = db.start_run_with_id(
-                &run_id,
-                "agent_chat",
-                &params.message,
-                &model_name,
-            ) {
+            if let Err(e) =
+                db.start_run_with_id(&run_id, "agent_chat", &params.message, &model_name)
+            {
                 tracing::warn!("Failed to start DB run record: {}", e);
             }
         }
@@ -936,9 +936,7 @@ fn format_execution_trace(
                 };
 
                 if *is_error {
-                    let err_desc = error_type
-                        .as_deref()
-                        .unwrap_or("unknown");
+                    let err_desc = error_type.as_deref().unwrap_or("unknown");
                     errors.push((name.clone(), format!("{}: {}", err_desc, preview)));
                 }
 
@@ -967,7 +965,10 @@ fn format_execution_trace(
 
     // Header
     output.push_str("\n---\n## Execution Trace\n");
-    output.push_str(&format!("**Run ID:** `{}`\n", &run_id[..8.min(run_id.len())]));
+    output.push_str(&format!(
+        "**Run ID:** `{}`\n",
+        &run_id[..8.min(run_id.len())]
+    ));
     output.push_str(&format!(
         "**Summary:** {} iteration{}, {} tool call{}, {}\n\n",
         iterations,
@@ -985,10 +986,7 @@ fn format_execution_trace(
 
         for (i, call) in display_calls.iter().enumerate() {
             let status = if call.is_error {
-                format!(
-                    "ERR ({})",
-                    call.error_type.as_deref().unwrap_or("error")
-                )
+                format!("ERR ({})", call.error_type.as_deref().unwrap_or("error"))
             } else {
                 "OK".to_string()
             };

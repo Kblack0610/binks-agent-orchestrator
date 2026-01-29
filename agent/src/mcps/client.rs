@@ -160,11 +160,8 @@ impl DaemonClient {
     /// Connect to the daemon socket with timeout and single retry
     async fn connect_with_retry(&self) -> Result<UnixStream> {
         // First attempt
-        match tokio::time::timeout(
-            self.connect_timeout,
-            UnixStream::connect(&self.socket_path),
-        )
-        .await
+        match tokio::time::timeout(self.connect_timeout, UnixStream::connect(&self.socket_path))
+            .await
         {
             Ok(Ok(stream)) => return Ok(stream),
             Ok(Err(e)) => {
@@ -188,22 +185,20 @@ impl DaemonClient {
         // Single retry after 500ms
         tokio::time::sleep(Duration::from_millis(500)).await;
 
-        let stream = tokio::time::timeout(
-            self.connect_timeout,
-            UnixStream::connect(&self.socket_path),
-        )
-        .await
-        .map_err(|_| {
-            anyhow::anyhow!(
-                "Daemon connect timed out after {:?} (retry) at {:?}",
-                self.connect_timeout,
-                self.socket_path
-            )
-        })?
-        .context(format!(
-            "Failed to connect to daemon at {:?} (retry)",
-            self.socket_path
-        ))?;
+        let stream =
+            tokio::time::timeout(self.connect_timeout, UnixStream::connect(&self.socket_path))
+                .await
+                .map_err(|_| {
+                    anyhow::anyhow!(
+                        "Daemon connect timed out after {:?} (retry) at {:?}",
+                        self.connect_timeout,
+                        self.socket_path
+                    )
+                })?
+                .context(format!(
+                    "Failed to connect to daemon at {:?} (retry)",
+                    self.socket_path
+                ))?;
 
         tracing::info!("Daemon connect succeeded on retry");
         Ok(stream)
@@ -227,10 +222,7 @@ impl DaemonClient {
         tokio::time::timeout(self.read_timeout, reader.read_line(&mut line))
             .await
             .map_err(|_| {
-                anyhow::anyhow!(
-                    "Daemon response timed out after {:?}",
-                    self.read_timeout
-                )
+                anyhow::anyhow!("Daemon response timed out after {:?}", self.read_timeout)
             })?
             .context("Failed to read daemon response")?;
 

@@ -124,7 +124,11 @@ impl SqlMcpServer {
         });
 
         let conn = Connection::open(&config.database.path).unwrap_or_else(|e| {
-            tracing::error!("Failed to open database at {:?}: {}", config.database.path, e);
+            tracing::error!(
+                "Failed to open database at {:?}: {}",
+                config.database.path,
+                e
+            );
             // Create in-memory database as fallback
             Connection::open_in_memory().expect("Failed to create in-memory database")
         });
@@ -159,8 +163,13 @@ impl Default for SqlMcpServer {
 #[tool_router]
 impl SqlMcpServer {
     /// Execute a SQL query and return results
-    #[tool(description = "Execute a SQL query on the database. Returns column names and rows as JSON. In read-only mode (default), only SELECT, EXPLAIN, and PRAGMA statements are allowed.")]
-    async fn sql_query(&self, Parameters(params): Parameters<QueryParams>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Execute a SQL query on the database. Returns column names and rows as JSON. In read-only mode (default), only SELECT, EXPLAIN, and PRAGMA statements are allowed."
+    )]
+    async fn sql_query(
+        &self,
+        Parameters(params): Parameters<QueryParams>,
+    ) -> Result<CallToolResult, McpError> {
         // Check write permission
         if !self.allow_writes && !Self::is_read_only_query(&params.query) {
             return Err(McpError::internal_error(
@@ -176,11 +185,7 @@ impl SqlMcpServer {
             McpError::internal_error(format!("Failed to prepare query: {}", e), None)
         })?;
 
-        let columns: Vec<String> = stmt
-            .column_names()
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let columns: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
 
         let rows: Vec<Vec<serde_json::Value>> = stmt
             .query_map([], |row| {
@@ -214,8 +219,13 @@ impl SqlMcpServer {
     }
 
     /// List tables in the database
-    #[tool(description = "List all tables in the database. Optionally filter by name pattern using SQL LIKE syntax (e.g., 'user%' for tables starting with 'user').")]
-    async fn sql_tables(&self, Parameters(params): Parameters<TablesParams>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "List all tables in the database. Optionally filter by name pattern using SQL LIKE syntax (e.g., 'user%' for tables starting with 'user')."
+    )]
+    async fn sql_tables(
+        &self,
+        Parameters(params): Parameters<TablesParams>,
+    ) -> Result<CallToolResult, McpError> {
         let conn = self.conn.lock().await;
 
         let query = match &params.pattern {
@@ -239,19 +249,29 @@ impl SqlMcpServer {
             })
             .map_err(|e| McpError::internal_error(format!("Failed to list tables: {}", e), None))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| McpError::internal_error(format!("Failed to read table info: {}", e), None))?;
+            .map_err(|e| {
+                McpError::internal_error(format!("Failed to read table info: {}", e), None)
+            })?;
 
         json_success(&tables)
     }
 
     /// Get schema for a specific table
-    #[tool(description = "Get the schema (column definitions) for a specific table. Returns column names, types, constraints, and the CREATE TABLE statement.")]
-    async fn sql_schema(&self, Parameters(params): Parameters<SchemaParams>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Get the schema (column definitions) for a specific table. Returns column names, types, constraints, and the CREATE TABLE statement."
+    )]
+    async fn sql_schema(
+        &self,
+        Parameters(params): Parameters<SchemaParams>,
+    ) -> Result<CallToolResult, McpError> {
         let conn = self.conn.lock().await;
 
         // Get column info using PRAGMA
         let mut stmt = conn
-            .prepare(&format!("PRAGMA table_info('{}')", params.table.replace('\'', "''")))
+            .prepare(&format!(
+                "PRAGMA table_info('{}')",
+                params.table.replace('\'', "''")
+            ))
             .map_err(|e| McpError::internal_error(format!("Failed to get schema: {}", e), None))?;
 
         let columns: Vec<ColumnInfo> = stmt
@@ -267,7 +287,9 @@ impl SqlMcpServer {
             })
             .map_err(|e| McpError::internal_error(format!("Failed to query schema: {}", e), None))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| McpError::internal_error(format!("Failed to read column info: {}", e), None))?;
+            .map_err(|e| {
+                McpError::internal_error(format!("Failed to read column info: {}", e), None)
+            })?;
 
         if columns.is_empty() {
             return Err(McpError::internal_error(
@@ -295,8 +317,13 @@ impl SqlMcpServer {
     }
 
     /// Explain query execution plan
-    #[tool(description = "Get the execution plan for a SQL query. Useful for understanding query performance and optimization.")]
-    async fn sql_explain(&self, Parameters(params): Parameters<ExplainParams>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Get the execution plan for a SQL query. Useful for understanding query performance and optimization."
+    )]
+    async fn sql_explain(
+        &self,
+        Parameters(params): Parameters<ExplainParams>,
+    ) -> Result<CallToolResult, McpError> {
         let conn = self.conn.lock().await;
 
         let explain_query = format!("EXPLAIN QUERY PLAN {}", params.query);
@@ -329,7 +356,11 @@ impl SqlMcpServer {
 #[tool_handler]
 impl rmcp::ServerHandler for SqlMcpServer {
     fn get_info(&self) -> ServerInfo {
-        let mode = if self.allow_writes { "read-write" } else { "read-only" };
+        let mode = if self.allow_writes {
+            "read-write"
+        } else {
+            "read-only"
+        };
         ServerInfo {
             instructions: Some(format!(
                 "SQL database query MCP server. Currently in {} mode. \
