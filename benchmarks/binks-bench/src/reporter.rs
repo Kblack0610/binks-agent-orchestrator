@@ -87,18 +87,31 @@ impl Reporter {
 
         output.push_str("# Benchmark Summary\n\n");
         output.push_str(&format!("**Model:** {}\n", summary.model));
-        output.push_str(&format!("**Date:** {}\n", summary.timestamp.format("%Y-%m-%d %H:%M:%S UTC")));
-        output.push_str(&format!("**Total Duration:** {}ms\n\n", summary.total_duration_ms));
+        output.push_str(&format!(
+            "**Date:** {}\n",
+            summary.timestamp.format("%Y-%m-%d %H:%M:%S UTC")
+        ));
+        output.push_str(&format!(
+            "**Total Duration:** {}ms\n\n",
+            summary.total_duration_ms
+        ));
 
         output.push_str("## Overall Results\n\n");
         output.push_str(&format!("- **Total Cases:** {}\n", summary.total_cases));
         output.push_str(&format!("- **Passed:** {}\n", summary.total_passed));
         output.push_str(&format!("- **Failed:** {}\n", summary.total_failed));
-        output.push_str(&format!("- **Pass Rate:** {:.1}%\n\n", summary.overall_pass_rate));
+        output.push_str(&format!(
+            "- **Pass Rate:** {:.1}%\n\n",
+            summary.overall_pass_rate
+        ));
 
         output.push_str("## Results by Tier\n\n");
-        output.push_str("| Tier | Total | Passed | Failed | Pass Rate | Avg Duration | P50 | P95 |\n");
-        output.push_str("|------|-------|--------|--------|-----------|--------------|-----|-----|\n");
+        output.push_str(
+            "| Tier | Total | Passed | Failed | Pass Rate | Avg Duration | P50 | P95 |\n",
+        );
+        output.push_str(
+            "|------|-------|--------|--------|-----------|--------------|-----|-----|\n",
+        );
 
         for tier in &summary.tiers {
             output.push_str(&format!(
@@ -123,7 +136,11 @@ impl Reporter {
         output.push_str("# Detailed Benchmark Results\n\n");
 
         for result in results {
-            let status = if result.passed { "✅ PASS" } else { "❌ FAIL" };
+            let status = if result.passed {
+                "✅ PASS"
+            } else {
+                "❌ FAIL"
+            };
             output.push_str(&format!("## {} - {}\n\n", result.case_id, status));
             output.push_str(&format!("- **Duration:** {}ms\n", result.duration_ms));
             output.push_str(&format!("- **Tool Calls:** {}\n", result.tool_calls.len()));
@@ -132,12 +149,18 @@ impl Reporter {
                 output.push_str("\n**Tools Used:**\n");
                 for tc in &result.tool_calls {
                     let status = if tc.success { "✓" } else { "✗" };
-                    output.push_str(&format!("- {} `{}` ({}ms)\n", status, tc.tool, tc.duration_ms));
+                    output.push_str(&format!(
+                        "- {} `{}` ({}ms)\n",
+                        status, tc.tool, tc.duration_ms
+                    ));
                 }
             }
 
             if !result.missing_tools.is_empty() {
-                output.push_str(&format!("\n**Missing Tools:** {}\n", result.missing_tools.join(", ")));
+                output.push_str(&format!(
+                    "\n**Missing Tools:** {}\n",
+                    result.missing_tools.join(", ")
+                ));
             }
 
             if !result.forbidden_tools_called.is_empty() {
@@ -160,12 +183,25 @@ impl Reporter {
     fn regression_markdown(&self, report: &RegressionReport) -> String {
         let mut output = String::new();
 
-        let status = if report.passed { "✅ PASSED" } else { "❌ FAILED" };
+        let status = if report.passed {
+            "✅ PASSED"
+        } else {
+            "❌ FAILED"
+        };
         output.push_str(&format!("# Regression Report - {}\n\n", status));
-        output.push_str(&format!("**Model:** {} (vs baseline: {})\n", report.model, report.baseline_model));
-        output.push_str(&format!("**Date:** {}\n", report.generated_at.format("%Y-%m-%d %H:%M:%S UTC")));
+        output.push_str(&format!(
+            "**Model:** {} (vs baseline: {})\n",
+            report.model, report.baseline_model
+        ));
+        output.push_str(&format!(
+            "**Date:** {}\n",
+            report.generated_at.format("%Y-%m-%d %H:%M:%S UTC")
+        ));
         output.push_str(&format!("**Cases Compared:** {}\n", report.cases_compared));
-        output.push_str(&format!("**Cases with Regressions:** {}\n\n", report.cases_regressed));
+        output.push_str(&format!(
+            "**Cases with Regressions:** {}\n\n",
+            report.cases_regressed
+        ));
 
         if report.regressions.is_empty() {
             output.push_str("No regressions detected.\n");
@@ -213,7 +249,9 @@ impl Reporter {
 
     fn summary_csv(&self, summary: &BenchmarkSummary) -> String {
         let mut output = String::new();
-        output.push_str("tier,total,passed,failed,pass_rate,avg_duration_ms,p50_duration_ms,p95_duration_ms\n");
+        output.push_str(
+            "tier,total,passed,failed,pass_rate,avg_duration_ms,p50_duration_ms,p95_duration_ms\n",
+        );
 
         for tier in &summary.tiers {
             output.push_str(&format!(
@@ -288,7 +326,10 @@ impl Reporter {
             "\n{} Benchmark Summary: {}/{} passed ({:.1}%)\n",
             status, summary.total_passed, summary.total_cases, summary.overall_pass_rate
         ));
-        output.push_str(&format!("   Model: {} | Duration: {}ms\n\n", summary.model, summary.total_duration_ms));
+        output.push_str(&format!(
+            "   Model: {} | Duration: {}ms\n\n",
+            summary.model, summary.total_duration_ms
+        ));
 
         for tier in &summary.tiers {
             let tier_status = if tier.pass_rate >= 90.0 {
@@ -337,7 +378,11 @@ impl Reporter {
     fn regression_terminal(&self, report: &RegressionReport) -> String {
         let mut output = String::new();
 
-        let status = if report.passed { "✅ PASSED" } else { "❌ FAILED" };
+        let status = if report.passed {
+            "✅ PASSED"
+        } else {
+            "❌ FAILED"
+        };
         output.push_str(&format!(
             "\n{} Regression Check: {} vs {}\n",
             status, report.model, report.baseline_model
@@ -374,7 +419,7 @@ impl Default for Reporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BenchmarkSummary, TierSummary, Tier};
+    use crate::{BenchmarkSummary, Tier, TierSummary};
     use chrono::Utc;
 
     fn make_summary() -> BenchmarkSummary {
@@ -432,9 +477,15 @@ mod tests {
 
     #[test]
     fn test_format_parsing() {
-        assert_eq!("markdown".parse::<OutputFormat>().unwrap(), OutputFormat::Markdown);
+        assert_eq!(
+            "markdown".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Markdown
+        );
         assert_eq!("json".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
         assert_eq!("csv".parse::<OutputFormat>().unwrap(), OutputFormat::Csv);
-        assert_eq!("terminal".parse::<OutputFormat>().unwrap(), OutputFormat::Terminal);
+        assert_eq!(
+            "terminal".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Terminal
+        );
     }
 }

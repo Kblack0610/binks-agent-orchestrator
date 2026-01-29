@@ -113,10 +113,7 @@ async fn run_bench(cli: Cli) -> Result<()> {
     let all_cases = cases::all_cases();
     let cases_to_run: Vec<BenchmarkCase> = if let Some(case_id) = &cli.case {
         // Run specific case
-        all_cases
-            .into_iter()
-            .filter(|c| c.id == *case_id)
-            .collect()
+        all_cases.into_iter().filter(|c| c.id == *case_id).collect()
     } else if let Some(tier_num) = cli.tier {
         // Run specific tier
         let target_tier = match tier_num {

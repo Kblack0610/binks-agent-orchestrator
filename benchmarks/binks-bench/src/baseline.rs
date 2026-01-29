@@ -144,7 +144,10 @@ impl Baseline {
         // Group results by case_id
         let mut grouped: HashMap<String, Vec<&BenchmarkResult>> = HashMap::new();
         for result in results {
-            grouped.entry(result.case_id.clone()).or_default().push(result);
+            grouped
+                .entry(result.case_id.clone())
+                .or_default()
+                .push(result);
         }
 
         // Create baseline for each case
@@ -219,7 +222,8 @@ impl Baseline {
                 if result.passed {
                     let threshold = baseline.p95_duration_ms as f64 * 1.5;
                     if result.duration_ms as f64 > threshold {
-                        let change = ((result.duration_ms as f64 - baseline.p50_duration_ms as f64)
+                        let change = ((result.duration_ms as f64
+                            - baseline.p50_duration_ms as f64)
                             / baseline.p50_duration_ms as f64)
                             * 100.0;
                         let severity = if change > 100.0 {
@@ -239,14 +243,18 @@ impl Baseline {
                             change_percent: change,
                             description: format!(
                                 "Case '{}' duration increased by {:.1}% ({}ms -> {}ms)",
-                                result.case_id, change, baseline.p50_duration_ms, result.duration_ms
+                                result.case_id,
+                                change,
+                                baseline.p50_duration_ms,
+                                result.duration_ms
                             ),
                         });
                     }
 
                     // Check tool count regression
-                    let tool_diff =
-                        (result.tool_calls.len() as i64 - baseline.expected_tool_count as i64).abs();
+                    let tool_diff = (result.tool_calls.len() as i64
+                        - baseline.expected_tool_count as i64)
+                        .abs();
                     if tool_diff > 2 {
                         regressions.push(Regression {
                             case_id: result.case_id.clone(),
@@ -258,7 +266,8 @@ impl Baseline {
                             },
                             baseline_value: baseline.expected_tool_count as f64,
                             current_value: result.tool_calls.len() as f64,
-                            change_percent: (tool_diff as f64 / baseline.expected_tool_count as f64)
+                            change_percent: (tool_diff as f64
+                                / baseline.expected_tool_count as f64)
                                 * 100.0,
                             description: format!(
                                 "Case '{}' tool count changed significantly ({} -> {})",
@@ -279,13 +288,12 @@ impl Baseline {
             .len();
 
         RegressionReport {
-            model: results
-                .first()
-                .map(|r| r.model.clone())
-                .unwrap_or_default(),
+            model: results.first().map(|r| r.model.clone()).unwrap_or_default(),
             baseline_model: self.model.clone(),
             generated_at: Utc::now(),
-            passed: !regressions.iter().any(|r| r.severity == RegressionSeverity::Severe),
+            passed: !regressions
+                .iter()
+                .any(|r| r.severity == RegressionSeverity::Severe),
             cases_compared: results.len(),
             cases_regressed,
             regressions,
@@ -344,7 +352,12 @@ mod tests {
     use super::*;
     use crate::ToolCallMetric;
 
-    fn make_result(case_id: &str, passed: bool, duration_ms: u64, tool_count: usize) -> BenchmarkResult {
+    fn make_result(
+        case_id: &str,
+        passed: bool,
+        duration_ms: u64,
+        tool_count: usize,
+    ) -> BenchmarkResult {
         BenchmarkResult {
             case_id: case_id.to_string(),
             model: "test-model".to_string(),

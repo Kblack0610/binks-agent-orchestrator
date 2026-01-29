@@ -28,12 +28,7 @@ fn main() {
     println!("Available benchmark cases: {}\n", all_cases.len());
 
     for case in &all_cases {
-        println!(
-            "  {} [{}] - {}",
-            case.id,
-            case.tier,
-            case.name
-        );
+        println!("  {} [{}] - {}", case.id, case.tier, case.name);
     }
 
     println!("\n---");

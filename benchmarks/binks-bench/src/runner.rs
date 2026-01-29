@@ -69,14 +69,16 @@ impl BenchmarkRunner {
         let mcp_config = if let Some(ref path) = self.config.mcp_config {
             McpConfig::load_from_path(&PathBuf::from(path))?
         } else {
-            McpConfig::load()?.ok_or_else(|| anyhow::anyhow!("No MCP config found. Create .mcp.json or specify --mcp-config"))?
+            McpConfig::load()?.ok_or_else(|| {
+                anyhow::anyhow!("No MCP config found. Create .mcp.json or specify --mcp-config")
+            })?
         };
 
         // Create MCP pool and agent with event channel
         let mcp_pool = McpClientPool::new(mcp_config);
         let (tx, rx) = event_channel();
-        let mut agent = Agent::new(&self.config.ollama_url, &self.config.model, mcp_pool)
-            .with_event_sender(tx);
+        let mut agent =
+            Agent::new(&self.config.ollama_url, &self.config.model, mcp_pool).with_event_sender(tx);
 
         // Clone servers for use in async block
         let servers = case.servers.clone();
@@ -85,7 +87,8 @@ impl BenchmarkRunner {
         // Run the benchmark with timeout
         let result = timeout(case.timeout, async {
             // Spawn collector task
-            let collector_handle = tokio::spawn(async move { BenchmarkCollector::collect(rx).await });
+            let collector_handle =
+                tokio::spawn(async move { BenchmarkCollector::collect(rx).await });
 
             // Run agent (filter by servers if specified)
             let response = if let Some(ref server_list) = servers {
@@ -212,7 +215,11 @@ impl BenchmarkRunner {
     }
 
     /// Run benchmark cases for a specific tier
-    pub async fn run_tier(&self, cases: &[BenchmarkCase], tier: Tier) -> Result<Vec<BenchmarkResult>> {
+    pub async fn run_tier(
+        &self,
+        cases: &[BenchmarkCase],
+        tier: Tier,
+    ) -> Result<Vec<BenchmarkResult>> {
         let tier_cases: Vec<_> = cases.iter().filter(|c| c.tier == tier).collect();
         let mut results = Vec::with_capacity(tier_cases.len());
 
@@ -225,6 +232,7 @@ impl BenchmarkRunner {
     }
 
     /// Create a benchmark result
+    #[allow(clippy::too_many_arguments)]
     fn create_result(
         &self,
         case: &BenchmarkCase,
@@ -251,7 +259,11 @@ impl BenchmarkRunner {
     }
 
     /// Generate a summary from results
-    pub fn summarize(&self, results: &[BenchmarkResult], cases: &[BenchmarkCase]) -> BenchmarkSummary {
+    pub fn summarize(
+        &self,
+        results: &[BenchmarkResult],
+        cases: &[BenchmarkCase],
+    ) -> BenchmarkSummary {
         let mut tier_results: std::collections::HashMap<Tier, Vec<&BenchmarkResult>> =
             std::collections::HashMap::new();
 
