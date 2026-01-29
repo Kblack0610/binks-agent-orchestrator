@@ -8,7 +8,7 @@ use thiserror::Error;
 // ============================================================================
 
 /// Configuration for command execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub commands: CommandConfig,
@@ -18,17 +18,6 @@ pub struct Config {
     pub limits: LimitsConfig,
     #[serde(default)]
     pub environment: EnvConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            commands: CommandConfig::default(),
-            timeouts: TimeoutConfig::default(),
-            limits: LimitsConfig::default(),
-            environment: EnvConfig::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

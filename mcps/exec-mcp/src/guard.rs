@@ -125,9 +125,9 @@ impl CommandGuard {
 
 /// Resolve ~ to home directory
 fn resolve_path(path: &str) -> PathBuf {
-    if path.starts_with('~') {
+    if let Some(rest) = path.strip_prefix('~') {
         if let Some(home) = dirs::home_dir() {
-            return home.join(&path[1..].trim_start_matches('/'));
+            return home.join(rest.trim_start_matches('/'));
         }
     }
     PathBuf::from(path)
