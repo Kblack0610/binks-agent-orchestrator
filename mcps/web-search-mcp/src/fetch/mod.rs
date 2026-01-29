@@ -150,12 +150,10 @@ impl FetchService {
 
         // Strip <style> and <script> tags before converting to markdown
         // to avoid CSS/JS content leaking into the output
-        static STYLE_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap()
-        });
-        static SCRIPT_RE: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"(?is)<script[^>]*>.*?</script>").unwrap()
-        });
+        static STYLE_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap());
+        static SCRIPT_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?is)<script[^>]*>.*?</script>").unwrap());
         let cleaned = STYLE_RE.replace_all(&result.content, "");
         let cleaned = SCRIPT_RE.replace_all(&cleaned, "");
 

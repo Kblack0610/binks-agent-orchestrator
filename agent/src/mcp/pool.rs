@@ -204,8 +204,7 @@ impl McpClientPool {
                 .mcp_servers
                 .get(name)
                 .context(format!("MCP server '{}' not found in config", name))?;
-            McpClient::list_tools_with_timeout(name, server_config, self.startup_timeout)
-                .await?
+            McpClient::list_tools_with_timeout(name, server_config, self.startup_timeout).await?
         };
 
         // Cache the result

@@ -26,8 +26,9 @@ impl CommandGuard {
             .deny_patterns
             .iter()
             .map(|p| {
-                Regex::new(p)
-                    .map_err(|e| ExecError::ConfigError(format!("Invalid deny pattern '{}': {}", p, e)))
+                Regex::new(p).map_err(|e| {
+                    ExecError::ConfigError(format!("Invalid deny pattern '{}': {}", p, e))
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -36,8 +37,9 @@ impl CommandGuard {
             .allow_patterns
             .iter()
             .map(|p| {
-                Regex::new(p)
-                    .map_err(|e| ExecError::ConfigError(format!("Invalid allow pattern '{}': {}", p, e)))
+                Regex::new(p).map_err(|e| {
+                    ExecError::ConfigError(format!("Invalid allow pattern '{}': {}", p, e))
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -86,9 +88,9 @@ impl CommandGuard {
         let resolved = match cwd {
             Some(dir) => {
                 let path = resolve_path(dir);
-                let canonical = path.canonicalize().map_err(|e| {
-                    ExecError::DirNotAllowed(format!("{}: {}", dir, e))
-                })?;
+                let canonical = path
+                    .canonicalize()
+                    .map_err(|e| ExecError::DirNotAllowed(format!("{}: {}", dir, e)))?;
                 canonical
             }
             None => {
@@ -123,9 +125,9 @@ impl CommandGuard {
 
 /// Resolve ~ to home directory
 fn resolve_path(path: &str) -> PathBuf {
-    if path.starts_with('~') {
+    if let Some(rest) = path.strip_prefix('~') {
         if let Some(home) = dirs::home_dir() {
-            return home.join(&path[1..].trim_start_matches('/'));
+            return home.join(rest.trim_start_matches('/'));
         }
     }
     PathBuf::from(path)

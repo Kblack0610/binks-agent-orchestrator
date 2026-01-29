@@ -12,9 +12,8 @@ use crate::params::*;
 use crate::sandbox::Sandbox;
 use crate::types::{
     Config, DeleteFileResponse, DirectoryTreeResponse, EditFileResponse, FileEntry,
-    FileInfoResponse, FileReadResult, FsError, ListDirResponse, MoveFileResponse,
-    ReadFileResponse, ReadMultipleFilesResponse, SearchFilesResponse, TreeEntry,
-    WriteFileResponse,
+    FileInfoResponse, FileReadResult, FsError, ListDirResponse, MoveFileResponse, ReadFileResponse,
+    ReadMultipleFilesResponse, SearchFilesResponse, TreeEntry, WriteFileResponse,
 };
 
 // ============================================================================
@@ -119,11 +118,7 @@ pub async fn write_file(
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "file".to_string());
-    let temp_path = parent.join(format!(
-        ".{}.tmp.{}",
-        file_name,
-        std::process::id()
-    ));
+    let temp_path = parent.join(format!(".{}.tmp.{}", file_name, std::process::id()));
 
     // Write to temp file
     let write_result = async {
@@ -589,9 +584,7 @@ async fn read_single_file(
 ) -> Result<(String, u64), String> {
     let canonical = sandbox.validate_read(path).map_err(|e| e.to_string())?;
 
-    let metadata = fs::metadata(&canonical)
-        .await
-        .map_err(|e| e.to_string())?;
+    let metadata = fs::metadata(&canonical).await.map_err(|e| e.to_string())?;
 
     if metadata.len() > config.limits.max_file_size as u64 {
         return Err(format!(

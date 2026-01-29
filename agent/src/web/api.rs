@@ -309,10 +309,7 @@ pub async fn mcp_health(
             let mut total_tools_cached = 0;
 
             for name in &server_names {
-                let tier = pool
-                    .get_server_config(name)
-                    .map(|c| c.tier)
-                    .unwrap_or(2);
+                let tier = pool.get_server_config(name).map(|c| c.tier).unwrap_or(2);
                 let tools_cached = pool.has_cached_tools(name);
                 let tool_count = if tools_cached {
                     pool.cached_tool_count(name)

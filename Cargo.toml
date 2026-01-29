@@ -4,6 +4,8 @@ members = [
     "agent",
     # Common crates
     "common/mcp-common",
+    # Benchmarks
+    "benchmarks/binks-bench",
     # MCP servers
     "mcps/sysinfo-mcp",
     "mcps/github-gh",

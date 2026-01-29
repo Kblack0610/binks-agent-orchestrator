@@ -172,8 +172,9 @@ impl Agent {
 
         // Reconfigure parser registry based on preferred format
         if self.capabilities.function_call_format != FunctionCallFormat::Native {
-            self.parser_registry =
-                ToolCallParserRegistry::with_preferred_format(self.capabilities.function_call_format);
+            self.parser_registry = ToolCallParserRegistry::with_preferred_format(
+                self.capabilities.function_call_format,
+            );
         }
 
         self
@@ -525,11 +526,8 @@ impl Agent {
                 let total_duration = total_start.elapsed();
 
                 // Emit response complete event
-                self.event_sender.response_complete(
-                    &final_content,
-                    iterations,
-                    total_duration,
-                );
+                self.event_sender
+                    .response_complete(&final_content, iterations, total_duration);
 
                 if self.verbose {
                     eprintln!(
@@ -847,8 +845,7 @@ mod tests {
         };
 
         let pool = McpClientPool::empty();
-        let agent =
-            Agent::from_agent_config("http://localhost:11434", "test-model", pool, &config);
+        let agent = Agent::from_agent_config("http://localhost:11434", "test-model", pool, &config);
 
         assert_eq!(agent.max_iterations(), 3);
         assert_eq!(agent.llm_timeout(), Duration::from_secs(120));
@@ -862,8 +859,7 @@ mod tests {
 
         let config = AgentSectionConfig::default();
         let pool = McpClientPool::empty();
-        let agent =
-            Agent::from_agent_config("http://localhost:11434", "test-model", pool, &config);
+        let agent = Agent::from_agent_config("http://localhost:11434", "test-model", pool, &config);
 
         // Should match the DEFAULT_* constants
         assert_eq!(agent.max_iterations(), DEFAULT_MAX_ITERATIONS);
@@ -898,8 +894,15 @@ mod tests {
             Agent::from_agent_config("http://localhost:11434", "test-model", pool1, &config);
 
         let pool2 = McpClientPool::empty();
-        let agent2 =
-            Agent::with_config("http://localhost:11434", "test-model", pool2, 7, 200, 45, 75);
+        let agent2 = Agent::with_config(
+            "http://localhost:11434",
+            "test-model",
+            pool2,
+            7,
+            200,
+            45,
+            75,
+        );
 
         assert_eq!(agent1.max_iterations(), agent2.max_iterations());
         assert_eq!(agent1.llm_timeout(), agent2.llm_timeout());

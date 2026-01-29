@@ -85,15 +85,15 @@ pub struct EditFileParams {
     )]
     pub old_string: String,
 
-    #[schemars(
-        description = "The replacement text. If empty, the matched old_string is deleted."
-    )]
+    #[schemars(description = "The replacement text. If empty, the matched old_string is deleted.")]
     pub new_string: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ReadMultipleFilesParams {
-    #[schemars(description = "Array of file paths to read. Each file is read independently; failures for individual files don't affect others.")]
+    #[schemars(
+        description = "Array of file paths to read. Each file is read independently; failures for individual files don't affect others."
+    )]
     pub paths: Vec<String>,
 }
 

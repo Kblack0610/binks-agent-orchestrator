@@ -41,14 +41,10 @@ pub async fn run_agent(
         );
     }
 
-    let mut agent = Agent::from_agent_config(
-        &ctx.ollama_url,
-        &ctx.model,
-        pool,
-        &ctx.file_config.agent,
-    )
-    .with_capabilities(capabilities)
-    .with_verbose(ctx.is_verbose());
+    let mut agent =
+        Agent::from_agent_config(&ctx.ollama_url, &ctx.model, pool, &ctx.file_config.agent)
+            .with_capabilities(capabilities)
+            .with_verbose(ctx.is_verbose());
 
     // Apply system prompt
     if let Some(sys) = ctx.resolve_system_prompt(system) {

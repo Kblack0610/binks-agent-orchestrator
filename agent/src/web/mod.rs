@@ -129,9 +129,7 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         .layer(middleware::from_fn(auth::auth_middleware));
 
     // Combine public and protected routes under /api
-    let api_routes = Router::new()
-        .merge(public_routes)
-        .merge(protected_routes);
+    let api_routes = Router::new().merge(public_routes).merge(protected_routes);
 
     // WebSocket routes (protected - require auth)
     let ws_routes = Router::new()
