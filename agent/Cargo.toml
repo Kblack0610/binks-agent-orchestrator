@@ -31,6 +31,7 @@ orchestrator = ["mcp"]
 # Repository monitoring agent (requires mcp)
 monitor = ["mcp"]
 
+
 # ==============================================================================
 # CORE DEPENDENCIES - Always included
 # ==============================================================================
@@ -104,6 +105,7 @@ axum-extra = { version = "0.9", features = ["typed-header"], optional = true }
 rust-embed = { version = "8", optional = true }
 mime_guess = { version = "2", optional = true }
 open = { version = "5", optional = true }
+
 
 [dev-dependencies]
 tempfile = "3"
