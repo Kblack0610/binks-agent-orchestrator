@@ -23,7 +23,7 @@ The Rust-based agent is operational with a full MCP tool ecosystem:
 │  serve (MCP server)   │                                  │
 │  web (UI backend)     │                                  │
 ├─────────────────────────────────────────────────────────┤
-│  MCP Servers (9 implemented + 2 external)                │
+│  MCP Servers (11 Rust + 2 external)                      │
 │  ┌────────────┐ ┌────────────┐ ┌──────────────┐          │
 │  │ github-gh  │ │  sysinfo   │ │  filesystem  │          │
 │  │ (44 tools) │ │ (10 tools) │ │  (14 tools)  │          │
@@ -32,14 +32,14 @@ The Rust-based agent is operational with a full MCP tool ecosystem:
 │  │ (5 tools)  │ │ (6 tools)  │ │  (5 tools)   │          │
 │  ├────────────┤ ├────────────┤ ├──────────────┤          │
 │  │  git-mcp   │ │ memory-mcp │ │  web-search  │          │
-│  │ (10 tools) │ │ (12 tools) │ │  (6 tools)   │          │
+│  │ (8 tools)  │ │ (10 tools) │ │  (6 tools)   │          │
 │  ├────────────┤ ├────────────┤                            │
 │  │ kubernetes │ │    ssh     │  (external, Node.js)       │
 │  └────────────┘ └────────────┘                            │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**112 tools** across 11 MCP servers, with structured logging, health checks, metrics, and a web UI.
+**130 tools** across 13 MCP servers, with structured logging, health checks, metrics, and a web UI.
 
 ---
 
@@ -69,7 +69,7 @@ The Rust-based agent is operational with a full MCP tool ecosystem:
 ### Phase 3: Run
 **Goal:** Multi-agent orchestration and specialization
 
-- [x] MCP integration (11 servers, full client/server protocol)
+- [x] MCP integration (13 servers, full client/server protocol)
 - [ ] Specialized worker agents:
   - Code Review Agent
   - Security Audit Agent
@@ -141,8 +141,9 @@ MCP is the standardized tool interface for the agent. All tools are implemented 
 │  ──────────           │  ──────────────                 │
 │  sysinfo-mcp          │  github-gh                      │
 │  filesystem-mcp       │  inbox-mcp                      │
-│                       │  notify-mcp                     │
+│  git-mcp              │  notify-mcp                     │
 │                       │  exec-mcp                       │
+│                       │  memory-mcp                     │
 ├───────────────────────┼─────────────────────────────────┤
 │  Tier 3 (Optional)    │  Tier 4 (Meta)                  │
 │  ────────────────     │  ────────────                   │
@@ -150,9 +151,6 @@ MCP is the standardized tool interface for the agent. All tools are implemented 
 │  ssh (Node)           │                                 │
 │  web-search-mcp       │                                 │
 ├───────────────────────┴─────────────────────────────────┤
-│  Workspace-only (not in .mcp.json)                       │
-│  git-mcp, memory-mcp                                     │
-├─────────────────────────────────────────────────────────┤
 │  Planned (skeleton only)                                 │
 │  scratchpad-mcp, semantic-mcp                            │
 └─────────────────────────────────────────────────────────┘
