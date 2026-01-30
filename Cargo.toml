@@ -19,6 +19,7 @@ members = [
     "mcps/sql-mcp",
     "mcps/task-mcp",
     "mcps/self-healing-mcp",
+    "mcps/workflow-mcp",
 ]
 
 [workspace.package]
