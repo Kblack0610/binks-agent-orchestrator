@@ -1,0 +1,7 @@
+name: task-create
+description: Decompose a plan file into database tasks
+triggers:
+  - /sc:task-create
+  - /task-create
+version: 1.0.0
+author: binks-agent
