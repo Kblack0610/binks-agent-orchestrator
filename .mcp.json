@@ -114,6 +114,15 @@
       },
       "tier": 2
     },
+    "task": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/task-mcp",
+      "args": [],
+      "env": {
+        "DB_PATH": "${HOME}/.binks/conversations.db",
+        "RUST_LOG": "info"
+      },
+      "tier": 2
+    },
     "workflow": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/workflow-mcp",
       "args": [],
