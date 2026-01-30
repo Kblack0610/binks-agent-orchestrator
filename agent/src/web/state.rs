@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::db::Database;
 use crate::mcp::McpClientPool;
+#[cfg(feature = "orchestrator")]
 use crate::orchestrator::EngineConfig;
 
 /// Shared application state
@@ -56,6 +57,7 @@ impl AppState {
     }
 
     /// Create an EngineConfig from app state
+    #[cfg(feature = "orchestrator")]
     pub fn engine_config(&self, non_interactive: bool) -> EngineConfig {
         EngineConfig {
             ollama_url: self.ollama_url.clone(),

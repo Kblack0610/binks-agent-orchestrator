@@ -2,34 +2,30 @@
 //!
 //! This module provides:
 //! - Agent configuration with per-agent model selection
-//! - Workflow primitives (sequential, checkpoint, parallel)
-//! - Workflow engine for executing multi-agent flows
-//! - Built-in workflows and custom TOML workflow support
+//! - Agent prompts for different workflow roles
 //!
-//! # Example
+//! # Note
 //!
-//! ```rust,ignore
-//! use agent::orchestrator::{WorkflowEngine, EngineConfig};
-//!
-//! let config = EngineConfig {
-//!     ollama_url: "http://localhost:11434".to_string(),
-//!     default_model: "qwen2.5-coder:14b".to_string(),
-//!     ..Default::default()
-//! };
-//! let engine = WorkflowEngine::new(config)?;
-//!
-//! let result = engine
-//!     .run("implement-feature", "Add dark mode toggle")
-//!     .await?;
-//! ```
+//! Workflow execution functionality has been extracted to workflow-mcp.
+//! For workflow execution, use the workflow-mcp MCP server via WorkflowClient.
 
 pub mod agent_config;
-pub mod checkpoint;
-pub mod engine;
 pub mod prompts;
+
+// Legacy workflow engine modules - retained for web UI compatibility
+// These are only compiled when orchestrator feature is enabled
+#[cfg(feature = "orchestrator")]
+pub mod checkpoint;
+#[cfg(feature = "orchestrator")]
+pub mod engine;
+#[cfg(feature = "orchestrator")]
 pub mod workflow;
 
 pub use agent_config::{AgentConfig, AgentRegistry};
+
+#[cfg(feature = "orchestrator")]
 pub use checkpoint::{Checkpoint, CheckpointResult};
+#[cfg(feature = "orchestrator")]
 pub use engine::{EngineConfig, WorkflowEngine};
+#[cfg(feature = "orchestrator")]
 pub use workflow::{StepResult, Workflow, WorkflowResult, WorkflowStep};

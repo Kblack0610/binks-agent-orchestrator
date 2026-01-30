@@ -14,6 +14,7 @@ pub mod api;
 pub mod auth;
 pub mod runs;
 pub mod state;
+#[cfg(feature = "orchestrator")]
 pub mod workflows;
 pub mod ws;
 
@@ -109,7 +110,11 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         // Tools
         .route("/tools", get(api::list_tools))
         // Models
-        .route("/models", get(api::list_models))
+        .route("/models", get(api::list_models));
+
+    // Workflow routes (only available with orchestrator feature)
+    #[cfg(feature = "orchestrator")]
+    let protected_routes = protected_routes
         // Workflows
         .route("/workflows", get(workflows::list_workflows))
         .route("/workflows/:name", get(workflows::get_workflow))
@@ -117,7 +122,9 @@ fn create_router(state: AppState, dev_mode: bool) -> Router {
         .route("/workflows/runs/:id", get(workflows::get_run_status))
         .route("/workflows/runs/:id/checkpoint", post(workflows::submit_checkpoint))
         // Agents (orchestrator agents)
-        .route("/agents", get(workflows::list_agents))
+        .route("/agents", get(workflows::list_agents));
+
+    let protected_routes = protected_routes
         // Runs (analysis)
         .route("/runs", get(runs::list_runs))
         .route("/runs/:id", get(runs::get_run))

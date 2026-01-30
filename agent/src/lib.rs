@@ -52,6 +52,8 @@ pub mod mcp;
 pub mod mcps;
 #[cfg(feature = "mcp")]
 pub mod server;
+#[cfg(feature = "mcp")]
+pub mod workflow_client;
 
 // =============================================================================
 // Persistence module - requires "persistence" feature

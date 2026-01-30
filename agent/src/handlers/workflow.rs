@@ -2,12 +2,12 @@
 //!
 //! Run multi-agent workflows.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use std::collections::HashMap;
 
 use super::CommandContext;
 use crate::cli::WorkflowCommands;
-use crate::orchestrator::workflow::WorkflowStep;
-use crate::orchestrator::{AgentRegistry, EngineConfig, WorkflowEngine};
+use crate::workflow_client::WorkflowClient;
 
 /// Handle the `workflow` command
 pub async fn run_workflow_command(ctx: &CommandContext, command: WorkflowCommands) -> Result<()> {
@@ -24,56 +24,48 @@ pub async fn run_workflow_command(ctx: &CommandContext, command: WorkflowCommand
 }
 
 async fn run_list(ctx: &CommandContext) -> Result<()> {
-    let engine = create_engine(ctx, true);
+    let pool = ctx.mcp_pool_required().await?;
+    let mut client = WorkflowClient::new(pool);
+
+    let workflows = client
+        .list_workflows()
+        .await
+        .context("Failed to list workflows")?;
 
     println!("Available workflows:\n");
 
-    for (name, description, is_custom) in engine.list_workflows() {
-        let marker = if is_custom { " [custom]" } else { "" };
-        println!("  {} - {}{}", name, description, marker);
+    for workflow in workflows {
+        println!("  {} - {}", workflow.name, workflow.description);
+        println!("    Steps: {}", workflow.step_count);
     }
 
     Ok(())
 }
 
 async fn run_show(ctx: &CommandContext, name: &str) -> Result<()> {
-    let engine = create_engine(ctx, true);
+    let pool = ctx.mcp_pool_required().await?;
+    let mut client = WorkflowClient::new(pool);
 
-    match engine.get_workflow(name) {
+    let workflows = client
+        .list_workflows()
+        .await
+        .context("Failed to list workflows")?;
+
+    match workflows.iter().find(|w| w.name == name) {
         Some(workflow) => {
             println!("Workflow: {}\n", workflow.name);
             println!("Description: {}\n", workflow.description);
-            println!("Steps:");
-
-            for (i, step) in workflow.steps.iter().enumerate() {
-                match step {
-                    WorkflowStep::Agent { name, task, model } => {
-                        let model_info = model
-                            .as_ref()
-                            .map(|m| format!(" (model: {})", m))
-                            .unwrap_or_default();
-                        println!("  {}. Agent '{}'{}", i + 1, name, model_info);
-                        println!("     Task: {}", task);
-                    }
-                    WorkflowStep::Checkpoint { message, show } => {
-                        let show_info = show
-                            .as_ref()
-                            .map(|s| format!(" [shows: {}]", s))
-                            .unwrap_or_default();
-                        println!("  {}. Checkpoint{}", i + 1, show_info);
-                        println!("     Message: {}", message);
-                    }
-                    _ => {
-                        println!("  {}. (other step type)", i + 1);
-                    }
-                }
-            }
+            println!("Total steps: {}\n", workflow.step_count);
+            println!(
+                "Run with: agent workflow run {} \"<your task description>\"",
+                workflow.name
+            );
         }
         None => {
             eprintln!("Error: Workflow '{}' not found", name);
             eprintln!("\nAvailable workflows:");
-            for (name, description, _) in engine.list_workflows() {
-                eprintln!("  {} - {}", name, description);
+            for w in workflows {
+                eprintln!("  {} - {}", w.name, w.description);
             }
             std::process::exit(1);
         }
@@ -86,65 +78,72 @@ async fn run_workflow(
     ctx: &CommandContext,
     name: &str,
     task: &str,
-    non_interactive: bool,
+    _non_interactive: bool,
 ) -> Result<()> {
-    let engine = create_engine(ctx, non_interactive);
+    let pool = ctx.mcp_pool_required().await?;
+    let mut client = WorkflowClient::new(pool);
 
     println!("Running workflow '{}' with task: {}\n", name, task);
 
-    match engine.run(name, task).await {
-        Ok(result) => {
-            println!("\nWorkflow completed with status: {:?}", result.status);
-            // Show the last agent's output from context if available
-            if let Some(output) = result
-                .context
-                .get("changes")
-                .or_else(|| result.context.get("plan"))
-                .or_else(|| result.context.get("review"))
-            {
-                println!("\nFinal output:\n{}", output);
+    // Start workflow execution
+    let execution_id = client
+        .execute_workflow(name, task, HashMap::new())
+        .await
+        .context("Failed to start workflow execution")?;
+
+    println!("Workflow started with execution ID: {}\n", execution_id);
+
+    // Poll for completion
+    loop {
+        let status = client
+            .get_execution_status(&execution_id)
+            .await
+            .context("Failed to get execution status")?;
+
+        println!(
+            "Status: {} (step {}/{})",
+            status.status, status.current_step, status.completed_steps
+        );
+
+        match status.status.as_str() {
+            "completed" => {
+                println!("\nWorkflow completed successfully!");
+                // Show the last agent's output from context if available
+                if let Some(output) = status
+                    .context
+                    .get("changes")
+                    .or_else(|| status.context.get("plan"))
+                    .or_else(|| status.context.get("review"))
+                {
+                    println!("\nFinal output:\n{}", output);
+                }
+                return Ok(());
             }
-            Ok(())
-        }
-        Err(e) => {
-            eprintln!("\nWorkflow failed: {}", e);
-            std::process::exit(1);
+            "failed" => {
+                eprintln!("\nWorkflow failed");
+                std::process::exit(1);
+            }
+            "waiting_for_approval" => {
+                // TODO: Handle checkpoint approval in interactive mode
+                println!("\nWorkflow paused at checkpoint - approval needed");
+                // For now, auto-approve
+                client
+                    .resume_from_checkpoint(&execution_id, true, None)
+                    .await
+                    .context("Failed to resume from checkpoint")?;
+            }
+            _ => {
+                // Still running, wait and poll again
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            }
         }
     }
 }
 
-async fn run_agents(ctx: &CommandContext) -> Result<()> {
-    let registry = AgentRegistry::with_defaults(&ctx.model);
-
-    println!("Available agents:\n");
-
-    for (name, config) in registry.iter() {
-        println!("  {} - {}", name, config.display_name);
-        println!("    Model: {}", config.model);
-        println!("    Temperature: {}", config.temperature);
-        if !config.tools.is_empty() {
-            println!("    Tools: {}", config.tools.join(", "));
-        }
-        if !config.can_handoff_to.is_empty() {
-            println!("    Handoffs: {}", config.can_handoff_to.join(", "));
-        }
-        println!();
-    }
-
-    Ok(())
-}
-
-fn create_engine(ctx: &CommandContext, non_interactive: bool) -> WorkflowEngine {
-    let config = EngineConfig {
-        ollama_url: ctx.ollama_url.clone(),
-        default_model: ctx.model.clone(),
-        non_interactive,
-        verbose: ctx.is_verbose(),
-        custom_workflows_dir: None,
-        record_runs: true, // Enable run recording by default
-        db_path: None,     // Use default path
-        agent_config: ctx.file_config.agent.clone(),
-    };
-    let registry = AgentRegistry::with_defaults(&ctx.model);
-    WorkflowEngine::new(registry, config)
+async fn run_agents(_ctx: &CommandContext) -> Result<()> {
+    // TODO: This command will be replaced by a skill in Phase 4
+    // For now, return an error directing users to use workflow-mcp directly
+    eprintln!("The 'agents' command has been moved to workflow-mcp.");
+    eprintln!("This command will be replaced by a skill in a future update.");
+    std::process::exit(1);
 }

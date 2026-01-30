@@ -4,6 +4,7 @@
 //! CommandContext provides lazy-loaded resources shared across handlers.
 
 use anyhow::Result;
+use std::cell::RefCell;
 use tokio::sync::OnceCell;
 
 use crate::config::AgentFileConfig;
@@ -90,9 +91,9 @@ pub struct CommandContext {
     pub verbose: u8,
     pub file_config: AgentFileConfig,
 
-    /// Lazy-loaded MCP client pool
+    /// Lazy-loaded MCP client pool with interior mutability for tool calls
     #[cfg(feature = "mcp")]
-    mcp_pool: OnceCell<Option<crate::mcp::McpClientPool>>,
+    mcp_pool: OnceCell<Option<RefCell<crate::mcp::McpClientPool>>>,
 }
 
 impl CommandContext {
@@ -135,16 +136,22 @@ impl CommandContext {
     /// Get MCP pool, loading lazily if not already loaded.
     /// Returns None if no .mcp.json is found.
     #[cfg(feature = "mcp")]
-    pub async fn mcp_pool(&self) -> Result<Option<&crate::mcp::McpClientPool>> {
+    pub async fn mcp_pool(&self) -> Result<Option<&RefCell<crate::mcp::McpClientPool>>> {
         self.mcp_pool
-            .get_or_try_init(|| async { crate::mcp::McpClientPool::load() })
+            .get_or_try_init(|| async {
+                match crate::mcp::McpClientPool::load() {
+                    Ok(Some(pool)) => Ok(Some(RefCell::new(pool))),
+                    Ok(None) => Ok(None),
+                    Err(e) => Err(e),
+                }
+            })
             .await
             .map(|opt| opt.as_ref())
     }
 
     /// Get MCP pool, returning an error if not available.
     #[cfg(feature = "mcp")]
-    pub async fn mcp_pool_required(&self) -> Result<&crate::mcp::McpClientPool> {
+    pub async fn mcp_pool_required(&self) -> Result<&RefCell<crate::mcp::McpClientPool>> {
         self.mcp_pool()
             .await?
             .ok_or_else(|| anyhow::anyhow!("No .mcp.json found - MCP tools required"))
