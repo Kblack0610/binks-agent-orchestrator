@@ -1,0 +1,11 @@
+name: self-heal
+description: Analyze workflow failures and propose/apply improvements
+compat:
+  binks_agent: true
+io:
+  input: failure notification or manual trigger
+  output: improvement proposal + inbox notification
+tools:
+  - self_healing_mcp::*
+  - inbox_mcp::write_inbox
+  - memory_mcp::learn

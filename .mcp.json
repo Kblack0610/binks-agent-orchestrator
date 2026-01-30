@@ -105,6 +105,14 @@
         "RUST_LOG": "info"
       },
       "tier": 2
+    },
+    "self-healing": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/self-healing-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      },
+      "tier": 2
     }
   }
 }

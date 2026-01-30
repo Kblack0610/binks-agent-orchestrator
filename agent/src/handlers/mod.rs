@@ -65,10 +65,14 @@ pub use web::run_web;
 #[cfg(feature = "orchestrator")]
 pub mod runs;
 #[cfg(feature = "orchestrator")]
+pub mod selfheal;
+#[cfg(feature = "orchestrator")]
 pub mod workflow;
 
 #[cfg(feature = "orchestrator")]
 pub use runs::run_runs_command;
+#[cfg(feature = "orchestrator")]
+pub use selfheal::run_selfheal_command;
 #[cfg(feature = "orchestrator")]
 pub use workflow::run_workflow_command;
 

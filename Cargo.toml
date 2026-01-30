@@ -17,6 +17,8 @@ members = [
     "mcps/memory-mcp",
     "mcps/exec-mcp",
     "mcps/sql-mcp",
+    "mcps/task-mcp",
+    "mcps/self-healing-mcp",
 ]
 
 [workspace.package]

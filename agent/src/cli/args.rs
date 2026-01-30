@@ -9,6 +9,8 @@ use super::mcps_args::McpsCommands;
 #[cfg(feature = "orchestrator")]
 use super::runs_args::RunsCommands;
 #[cfg(feature = "orchestrator")]
+use super::selfheal_args::SelfHealCommands;
+#[cfg(feature = "orchestrator")]
 use super::workflow_args::WorkflowCommands;
 
 #[derive(Parser)]
@@ -159,5 +161,11 @@ pub enum Commands {
     Runs {
         #[command(subcommand)]
         command: RunsCommands,
+    },
+    /// Analyze failures and apply automated improvements
+    #[cfg(feature = "orchestrator")]
+    SelfHeal {
+        #[command(subcommand)]
+        command: Option<SelfHealCommands>,
     },
 }
