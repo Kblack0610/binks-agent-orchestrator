@@ -71,8 +71,8 @@ pub fn compute_pattern_confidence(
     context_similarity: f64,
     time_span_days: f64,
 ) -> f64 {
-    // Base confidence from occurrence count
-    let size_factor = (occurrences as f64).ln() / 10.0;
+    // Base confidence from occurrence count (using sqrt for less conservative scaling)
+    let size_factor = (occurrences as f64).sqrt() / 3.5;
     let size_confidence = size_factor.min(1.0);
 
     // Adjust by context similarity
