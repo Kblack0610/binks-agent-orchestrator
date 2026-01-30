@@ -1,0 +1,36 @@
+[package]
+name = "doctl-mcp"
+version.workspace = true
+edition.workspace = true
+description = "MCP server wrapping DigitalOcean CLI (doctl) for platform operations"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+# Internal crates
+mcp-common.workspace = true
+
+# MCP SDK
+rmcp.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[[bin]]
+name = "doctl-mcp"
+path = "src/main.rs"
