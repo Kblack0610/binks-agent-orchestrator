@@ -1,0 +1,76 @@
+[workflow]
+name = "task-execution"
+description = "End-to-end task execution workflow with planning, implementation, testing, and PR creation"
+
+[[steps]]
+role = "planner"
+goal = "Analyze the task and create a detailed implementation plan"
+prompt = """You are a planning agent. Your role is to analyze the given task and create a detailed implementation plan.
+
+Task: {task_description}
+
+Please provide:
+1. High-level approach
+2. List of files that need to be modified or created
+3. Potential risks or challenges
+4. Testing strategy
+5. Estimated complexity
+
+Output your plan in a structured format."""
+requires_approval = true
+checkpoint_message = "Review the implementation plan before proceeding"
+
+[[steps]]
+role = "implementer"
+goal = "Implement the planned changes"
+prompt = """You are an implementation agent. Your role is to execute the plan created in the previous step.
+
+Task: {task_description}
+Plan: {planner_output}
+
+Please:
+1. Follow the plan carefully
+2. Write clean, well-documented code
+3. Follow the project's coding standards
+4. Make atomic, logical commits
+5. Note any deviations from the plan
+
+Output a summary of changes made."""
+requires_approval = true
+checkpoint_message = "Review the implementation before proceeding to tests"
+
+[[steps]]
+role = "tester"
+goal = "Test the implementation and verify correctness"
+prompt = """You are a testing agent. Your role is to verify that the implementation is correct and complete.
+
+Task: {task_description}
+Implementation Summary: {implementer_output}
+
+Please:
+1. Run all relevant tests
+2. Verify the implementation matches the requirements
+3. Check for edge cases
+4. Run linting and formatting checks
+5. Report any issues found
+
+Output test results and verification status."""
+requires_approval = false
+
+[[steps]]
+role = "reviewer"
+goal = "Create a pull request with the changes"
+prompt = """You are a review agent. Your role is to prepare and create a pull request.
+
+Task: {task_description}
+Test Results: {tester_output}
+
+Please:
+1. Ensure all tests pass
+2. Create a descriptive PR title and body
+3. Reference any related issues
+4. Add appropriate labels
+5. Request reviews if needed
+
+Output the PR URL once created."""
+requires_approval = false
