@@ -204,8 +204,9 @@ pub fn estimate_impact(error_type: &str, correlation_score: f64) -> String {
             "70-80% reduction in connection errors".to_string()
         }
         "ConnectionRefused" => "50-70% reduction in connection errors".to_string(),
-        "ServerCrashed" => "90% reduction in cascade failures (may not prevent all crashes)"
-            .to_string(),
+        "ServerCrashed" => {
+            "90% reduction in cascade failures (may not prevent all crashes)".to_string()
+        }
         "ToolError" if correlation_score > 0.7 => "50-70% reduction in tool errors".to_string(),
         "ToolError" => "30-50% reduction in tool errors".to_string(),
         _ => "Unknown impact - requires further analysis".to_string(),

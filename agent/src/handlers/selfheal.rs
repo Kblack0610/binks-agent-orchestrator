@@ -8,7 +8,10 @@ use super::CommandContext;
 use crate::cli::selfheal_args::SelfHealCommands;
 
 /// Handle the `self-heal` command
-pub async fn run_selfheal_command(ctx: &CommandContext, command: Option<SelfHealCommands>) -> Result<()> {
+pub async fn run_selfheal_command(
+    ctx: &CommandContext,
+    command: Option<SelfHealCommands>,
+) -> Result<()> {
     // If no subcommand provided, default to Detect
     let command = command.unwrap_or(SelfHealCommands::Detect {
         since: "-7d".to_string(),
@@ -24,9 +27,10 @@ pub async fn run_selfheal_command(ctx: &CommandContext, command: Option<SelfHeal
         } => detect_patterns(ctx, &since, min_occurrences, confidence).await,
         SelfHealCommands::Show { pattern_id } => show_pattern(ctx, &pattern_id).await,
         SelfHealCommands::Test { improvement_id } => test_improvement(ctx, &improvement_id).await,
-        SelfHealCommands::Apply { improvement_id, yes } => {
-            apply_improvement(ctx, &improvement_id, yes).await
-        }
+        SelfHealCommands::Apply {
+            improvement_id,
+            yes,
+        } => apply_improvement(ctx, &improvement_id, yes).await,
         SelfHealCommands::Verify {
             improvement_id,
             window_days,
@@ -45,8 +49,12 @@ async fn detect_patterns(
     min_occurrences: usize,
     confidence: f64,
 ) -> Result<()> {
-    println!("🔍 Detecting failure patterns (last {}, min {} occurrences, confidence >= {:.0}%)...",
-        since, min_occurrences, confidence * 100.0);
+    println!(
+        "🔍 Detecting failure patterns (last {}, min {} occurrences, confidence >= {:.0}%)...",
+        since,
+        min_occurrences,
+        confidence * 100.0
+    );
 
     // Get MCP pool to call self-healing-mcp tools
     let mut pool = crate::mcp::McpClientPool::load()?
@@ -76,13 +84,11 @@ async fn detect_patterns(
         .next()
         .ok_or_else(|| anyhow::anyhow!("No text content returned from detect_failure_patterns"))?;
 
-    let patterns: serde_json::Value = serde_json::from_str(text)
-        .context("Failed to parse pattern detection result")?;
+    let patterns: serde_json::Value =
+        serde_json::from_str(text).context("Failed to parse pattern detection result")?;
 
     // Check if any patterns found - MCP tool returns array directly
-    let pattern_list = patterns
-        .as_array()
-        .context("Expected patterns array")?;
+    let pattern_list = patterns.as_array().context("Expected patterns array")?;
 
     if pattern_list.is_empty() {
         println!("✅ System healthy - no recurring failure patterns detected");
@@ -120,7 +126,10 @@ async fn detect_patterns(
                 })),
             )
             .await
-            .context(format!("Failed to propose improvement for pattern {}", pattern_id))?;
+            .context(format!(
+                "Failed to propose improvement for pattern {}",
+                pattern_id
+            ))?;
 
         // Extract text from Content
         let text = proposal_result
@@ -133,8 +142,8 @@ async fn detect_patterns(
             .next()
             .ok_or_else(|| anyhow::anyhow!("No text content returned from propose_improvement"))?;
 
-        let proposal: serde_json::Value = serde_json::from_str(text)
-            .context("Failed to parse proposal")?;
+        let proposal: serde_json::Value =
+            serde_json::from_str(text).context("Failed to parse proposal")?;
 
         let improvement_id = proposal["improvement_id"].as_str().unwrap_or("unknown");
         let description = proposal["description"].as_str().unwrap_or("No description");
@@ -203,7 +212,10 @@ async fn verify_improvement(
     improvement_id: &str,
     window_days: u32,
 ) -> Result<()> {
-    println!("📊 Verifying improvement: {} ({} day window)", improvement_id, window_days);
+    println!(
+        "📊 Verifying improvement: {} ({} day window)",
+        improvement_id, window_days
+    );
     println!("⚠️  Not yet implemented - will:");
     println!("  - Compare metrics before vs after");
     println!("  - Calculate actual impact percentage");
@@ -236,7 +248,10 @@ async fn list_improvements(
     limit: u32,
 ) -> Result<()> {
     let status_filter = status.as_deref().unwrap_or("all");
-    println!("📋 Listing improvements (status: {}, limit: {})\n", status_filter, limit);
+    println!(
+        "📋 Listing improvements (status: {}, limit: {})\n",
+        status_filter, limit
+    );
 
     println!("⚠️  Not yet implemented - will show:");
     println!("  - Improvement ID");

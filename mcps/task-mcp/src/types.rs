@@ -67,6 +67,7 @@ pub struct TaskDependency {
 
 /// Task execution representation
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[allow(dead_code)]
 pub struct TaskExecution {
     pub id: String,
     pub task_id: String,

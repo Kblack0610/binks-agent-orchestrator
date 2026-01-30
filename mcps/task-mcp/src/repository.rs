@@ -116,8 +116,9 @@ impl TaskRepository {
                 params![id, format!("{}%", id)],
                 |row| {
                     let status_str: String = row.get(3)?;
-                    let status = TaskStatus::from_str(&status_str)
-                        .map_err(|e| FromSqlError::Other(format!("Invalid status: {}", e).into()))?;
+                    let status = TaskStatus::from_str(&status_str).map_err(|e| {
+                        FromSqlError::Other(format!("Invalid status: {}", e).into())
+                    })?;
 
                     Ok(Task {
                         id: row.get(0)?,
@@ -220,6 +221,7 @@ impl TaskRepository {
     }
 
     /// Update task status
+    #[allow(dead_code)]
     pub fn update_status(&self, id: &str, status: TaskStatus) -> Result<()> {
         let conn = self.db.lock().unwrap();
 
@@ -252,6 +254,7 @@ impl TaskRepository {
     }
 
     /// Update multiple task fields
+    #[allow(clippy::too_many_arguments)]
     pub fn update_task_fields(
         &self,
         id: &str,
@@ -276,7 +279,10 @@ impl TaskRepository {
         }
 
         if let Some(pr) = pr_url {
-            conn.execute("UPDATE tasks SET pr_url = ?1 WHERE id = ?2", params![pr, id])?;
+            conn.execute(
+                "UPDATE tasks SET pr_url = ?1 WHERE id = ?2",
+                params![pr, id],
+            )?;
         }
 
         if let Some(assigned) = assigned_to {

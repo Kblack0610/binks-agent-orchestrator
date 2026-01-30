@@ -12,9 +12,10 @@ pub async fn analyze_run_health(
     server: &SelfHealingMcpServer,
     params: AnalyzeRunHealthParams,
 ) -> Result<CallToolResult, McpError> {
-    let db = server.db.lock().map_err(|e| {
-        internal_error(format!("Failed to acquire database lock: {}", e))
-    })?;
+    let db = server
+        .db
+        .lock()
+        .map_err(|e| internal_error(format!("Failed to acquire database lock: {}", e)))?;
 
     // 1. Query run from database by ID
     let run_query = "SELECT id, workflow_name, status, duration_ms, error FROM runs WHERE id = ?1 OR id LIKE ?1 || '%' LIMIT 1";
@@ -89,7 +90,9 @@ pub async fn analyze_run_health(
                            LIMIT 10";
 
     let historical_rate: Option<f64> = db
-        .query_row(historical_query, [&workflow_name, &run_id], |row| row.get(0))
+        .query_row(historical_query, [&workflow_name, &run_id], |row| {
+            row.get(0)
+        })
         .ok();
 
     let trend = if let Some(hist_rate) = historical_rate {
@@ -123,9 +126,10 @@ pub async fn detect_failure_patterns(
     server: &SelfHealingMcpServer,
     params: DetectPatternsParams,
 ) -> Result<CallToolResult, McpError> {
-    let db = server.db.lock().map_err(|e| {
-        internal_error(format!("Failed to acquire database lock: {}", e))
-    })?;
+    let db = server
+        .db
+        .lock()
+        .map_err(|e| internal_error(format!("Failed to acquire database lock: {}", e)))?;
 
     // Parse since parameter to get start timestamp
     let since_days = params
@@ -165,10 +169,8 @@ pub async fn detect_failure_patterns(
         })
         .map_err(|e| internal_error(format!("Query failed: {}", e)))?;
 
-    for row in rows {
-        if let Ok(data) = row {
-            events.push(data);
-        }
+    for data in rows.flatten() {
+        events.push(data);
     }
 
     // Parse events and group by (error_type, tool_name)
@@ -198,7 +200,10 @@ pub async fn detect_failure_patterns(
         };
 
         // Check if it's an error event
-        let is_error = event.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_error = event
+            .get("is_error")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if !is_error {
             continue;
         }
@@ -316,9 +321,10 @@ pub async fn compute_agent_metrics(
     server: &SelfHealingMcpServer,
     params: ComputeAgentMetricsParams,
 ) -> Result<CallToolResult, McpError> {
-    let db = server.db.lock().map_err(|e| {
-        internal_error(format!("Failed to acquire database lock: {}", e))
-    })?;
+    let db = server
+        .db
+        .lock()
+        .map_err(|e| internal_error(format!("Failed to acquire database lock: {}", e)))?;
 
     // Parse since parameter for lookback period
     let since_days = params
@@ -330,8 +336,7 @@ pub async fn compute_agent_metrics(
 
     // Query runs grouped by workflow_name (agent identifier)
     let query = if params.agent_name.is_some() {
-        format!(
-            r#"
+        r#"
             SELECT
                 workflow_name,
                 COUNT(*) as total,
@@ -343,7 +348,7 @@ pub async fn compute_agent_metrics(
             AND workflow_name = ?
             GROUP BY workflow_name
             "#
-        )
+        .to_string()
     } else {
         r#"
             SELECT
@@ -373,75 +378,70 @@ pub async fn compute_agent_metrics(
     };
 
     let rows = stmt
-        .query_map(
-            rusqlite::params_from_iter(query_params.iter()),
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, i64>(2)?,
-                    row.get::<_, i64>(3)?,
-                    row.get::<_, f64>(4)?,
-                ))
-            },
-        )
+        .query_map(rusqlite::params_from_iter(query_params.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, f64>(4)?,
+            ))
+        })
         .map_err(|e| internal_error(format!("Query failed: {}", e)))?;
 
-    for row in rows {
-        if let Ok((agent_name, total, successful, failed, avg_duration)) = row {
-            let total_runs = total as usize;
-            let successful_runs = successful as usize;
-            let failed_runs = failed as usize;
+    for (agent_name, total, successful, failed, avg_duration) in rows.flatten() {
+        let total_runs = total as usize;
+        let successful_runs = successful as usize;
+        let failed_runs = failed as usize;
 
-            let success_rate = if total_runs > 0 {
-                successful_runs as f64 / total_runs as f64
-            } else {
-                0.0
-            };
+        let success_rate = if total_runs > 0 {
+            successful_runs as f64 / total_runs as f64
+        } else {
+            0.0
+        };
 
-            // Detect trend by comparing recent vs historical
-            let historical_query = r#"
-                SELECT AVG(CASE WHEN status = 'completed' THEN 1.0 ELSE 0.0 END) as hist_rate
-                FROM runs
-                WHERE workflow_name = ?1
-                AND datetime(started_at) < datetime('now', ?2 || ' days')
-                AND datetime(started_at) >= datetime('now', ?3 || ' days')
-            "#;
+        // Detect trend by comparing recent vs historical
+        let historical_query = r#"
+            SELECT AVG(CASE WHEN status = 'completed' THEN 1.0 ELSE 0.0 END) as hist_rate
+            FROM runs
+            WHERE workflow_name = ?1
+            AND datetime(started_at) < datetime('now', ?2 || ' days')
+            AND datetime(started_at) >= datetime('now', ?3 || ' days')
+        "#;
 
-            let historical_rate: Option<f64> = db
-                .query_row(
-                    historical_query,
-                    [
-                        &agent_name,
-                        &format!("-{}", since_days),
-                        &format!("-{}", since_days * 2),
-                    ],
-                    |row| row.get(0),
-                )
-                .ok();
+        let historical_rate: Option<f64> = db
+            .query_row(
+                historical_query,
+                [
+                    &agent_name,
+                    &format!("-{}", since_days),
+                    &format!("-{}", since_days * 2),
+                ],
+                |row| row.get(0),
+            )
+            .ok();
 
-            let trend = if let Some(hist_rate) = historical_rate {
-                crate::analysis::detect_trend(success_rate, hist_rate, 0.05)
-            } else {
-                "Stable".to_string()
-            };
+        let trend = if let Some(hist_rate) = historical_rate {
+            crate::analysis::detect_trend(success_rate, hist_rate, 0.05)
+        } else {
+            "Stable".to_string()
+        };
 
-            let trend_enum = match trend.as_str() {
-                "Improving" => Trend::Improving,
-                "Degrading" => Trend::Degrading,
-                _ => Trend::Stable,
-            };
+        let trend_enum = match trend.as_str() {
+            "Improving" => Trend::Improving,
+            "Degrading" => Trend::Degrading,
+            _ => Trend::Stable,
+        };
 
-            metrics.push(AgentMetric {
-                agent_name,
-                total_runs,
-                successful_runs,
-                failed_runs,
-                success_rate,
-                avg_duration_ms: avg_duration,
-                trend: trend_enum,
-            });
-        }
+        metrics.push(AgentMetric {
+            agent_name,
+            total_runs,
+            successful_runs,
+            failed_runs,
+            success_rate,
+            avg_duration_ms: avg_duration,
+            trend: trend_enum,
+        });
     }
 
     // Sort by total runs (most active agents first)
@@ -455,9 +455,10 @@ pub async fn compute_tool_reliability(
     server: &SelfHealingMcpServer,
     params: ComputeToolReliabilityParams,
 ) -> Result<CallToolResult, McpError> {
-    let db = server.db.lock().map_err(|e| {
-        internal_error(format!("Failed to acquire database lock: {}", e))
-    })?;
+    let db = server
+        .db
+        .lock()
+        .map_err(|e| internal_error(format!("Failed to acquire database lock: {}", e)))?;
 
     // Parse since parameter for lookback period
     let since_days = params
@@ -480,38 +481,34 @@ pub async fn compute_tool_reliability(
         .map_err(|e| internal_error(format!("Failed to prepare query: {}", e)))?;
 
     // Parse events and group by tool name
-    let mut tool_stats: std::collections::HashMap<
-        String,
-        (usize, usize, Vec<f64>, Vec<String>),
-    > = std::collections::HashMap::new();
+    let mut tool_stats: std::collections::HashMap<String, (usize, usize, Vec<f64>, Vec<String>)> =
+        std::collections::HashMap::new();
 
     let rows = stmt
-        .query_map([format!("-{}", since_days)], |row| {
-            Ok(row.get::<_, String>(0)?)
-        })
+        .query_map([format!("-{}", since_days)], |row| row.get::<_, String>(0))
         .map_err(|e| internal_error(format!("Query failed: {}", e)))?;
 
-    for row in rows {
-        if let Ok(event_data_json) = row {
-            // Parse JSON event data
-            if let Ok(event) = serde_json::from_str::<serde_json::Value>(&event_data_json) {
-                let tool_name = event["name"].as_str().unwrap_or("unknown").to_string();
-                let is_error = event["is_error"].as_bool().unwrap_or(false);
-                let duration = event["duration"].as_f64().unwrap_or(0.0);
-                let error_type = event["error_type"].as_str().map(|s| s.to_string());
+    for event_data_json in rows.flatten() {
+        // Parse JSON event data
+        if let Ok(event) = serde_json::from_str::<serde_json::Value>(&event_data_json) {
+            let tool_name = event["name"].as_str().unwrap_or("unknown").to_string();
+            let is_error = event["is_error"].as_bool().unwrap_or(false);
+            let duration = event["duration"].as_f64().unwrap_or(0.0);
+            let error_type = event["error_type"].as_str().map(|s| s.to_string());
 
-                let entry = tool_stats.entry(tool_name).or_insert((0, 0, Vec::new(), Vec::new()));
-                entry.0 += 1; // total calls
-                if !is_error {
-                    entry.1 += 1; // successful calls
-                }
-                entry.2.push(duration); // durations
+            let entry = tool_stats
+                .entry(tool_name)
+                .or_insert((0, 0, Vec::new(), Vec::new()));
+            entry.0 += 1; // total calls
+            if !is_error {
+                entry.1 += 1; // successful calls
+            }
+            entry.2.push(duration); // durations
 
-                // Collect error types
-                if let Some(err_type) = error_type {
-                    if !entry.3.contains(&err_type) {
-                        entry.3.push(err_type);
-                    }
+            // Collect error types
+            if let Some(err_type) = error_type {
+                if !entry.3.contains(&err_type) {
+                    entry.3.push(err_type);
                 }
             }
         }
@@ -567,9 +564,10 @@ pub async fn propose_improvement(
     server: &SelfHealingMcpServer,
     params: ProposeImprovementParams,
 ) -> Result<CallToolResult, McpError> {
-    let db = server.db.lock().map_err(|e| {
-        internal_error(format!("Failed to acquire database lock: {}", e))
-    })?;
+    let db = server
+        .db
+        .lock()
+        .map_err(|e| internal_error(format!("Failed to acquire database lock: {}", e)))?;
 
     // Parse pattern_id to extract error_type and optional tool_name
     // Format: "error_type:tool_name" or just "error_type"
@@ -614,35 +612,33 @@ pub async fn propose_improvement(
                 LIMIT 100
             "#
         }
+    } else if error_type == "Unknown" {
+        r#"
+            SELECT
+                event_data,
+                timestamp,
+                run_id
+            FROM run_events
+            WHERE event_type = 'tool_complete'
+            AND json_extract(event_data, '$.is_error') = 1
+            AND (json_extract(event_data, '$.error_type') IS NULL
+                 OR json_extract(event_data, '$.error_type') = 'Unknown')
+            ORDER BY timestamp DESC
+            LIMIT 100
+        "#
     } else {
-        if error_type == "Unknown" {
-            r#"
-                SELECT
-                    event_data,
-                    timestamp,
-                    run_id
-                FROM run_events
-                WHERE event_type = 'tool_complete'
-                AND json_extract(event_data, '$.is_error') = 1
-                AND (json_extract(event_data, '$.error_type') IS NULL
-                     OR json_extract(event_data, '$.error_type') = 'Unknown')
-                ORDER BY timestamp DESC
-                LIMIT 100
-            "#
-        } else {
-            r#"
-                SELECT
-                    event_data,
-                    timestamp,
-                    run_id
-                FROM run_events
-                WHERE event_type = 'tool_complete'
-                AND json_extract(event_data, '$.is_error') = 1
-                AND json_extract(event_data, '$.error_type') = ?
-                ORDER BY timestamp DESC
-                LIMIT 100
-            "#
-        }
+        r#"
+            SELECT
+                event_data,
+                timestamp,
+                run_id
+            FROM run_events
+            WHERE event_type = 'tool_complete'
+            AND json_extract(event_data, '$.is_error') = 1
+            AND json_extract(event_data, '$.error_type') = ?
+            ORDER BY timestamp DESC
+            LIMIT 100
+        "#
     };
 
     let mut stmt = db
@@ -653,9 +649,9 @@ pub async fn propose_improvement(
         // For "Unknown" error type, we don't bind error_type as a parameter
         // since it's hardcoded in the query as "IS NULL OR = 'Unknown'"
         if let Some(ref tool) = tool_name {
-            vec![tool.clone()]  // Only tool name parameter
+            vec![tool.clone()] // Only tool name parameter
         } else {
-            vec![]  // No parameters needed
+            vec![] // No parameters needed
         }
     } else {
         // For other error types, bind error_type (and tool_name if present)
@@ -682,18 +678,16 @@ pub async fn propose_improvement(
     let mut last_seen: Option<DateTime<Utc>> = None;
     let mut occurrences = 0;
 
-    for row in rows {
-        if let Ok((_event_data, timestamp_str, run_id)) = row {
-            occurrences += 1;
-            affected_runs.push(run_id);
+    for (_event_data, timestamp_str, run_id) in rows.flatten() {
+        occurrences += 1;
+        affected_runs.push(run_id);
 
-            if let Ok(timestamp) = DateTime::parse_from_rfc3339(&timestamp_str) {
-                let utc_timestamp = timestamp.with_timezone(&Utc);
-                if first_seen.is_none() {
-                    first_seen = Some(utc_timestamp);
-                }
-                last_seen = Some(utc_timestamp);
+        if let Ok(timestamp) = DateTime::parse_from_rfc3339(&timestamp_str) {
+            let utc_timestamp = timestamp.with_timezone(&Utc);
+            if first_seen.is_none() {
+                first_seen = Some(utc_timestamp);
             }
+            last_seen = Some(utc_timestamp);
         }
     }
 
@@ -775,9 +769,10 @@ pub async fn test_improvement(
     server: &SelfHealingMcpServer,
     params: TestImprovementParams,
 ) -> Result<CallToolResult, McpError> {
-    let db = server.db.lock().map_err(|e| {
-        internal_error(format!("Failed to acquire database lock: {}", e))
-    })?;
+    let db = server
+        .db
+        .lock()
+        .map_err(|e| internal_error(format!("Failed to acquire database lock: {}", e)))?;
 
     // Load improvement from database (would query improvements table if it exists)
     // For now, we'll construct a test result based on the test mode
@@ -819,15 +814,13 @@ pub async fn test_improvement(
             let mut total_failures = 0;
             let mut potentially_fixed = 0;
 
-            for row in runs {
-                if let Ok((_run_id, _workflow, _agent, _status, _created_at)) = row {
-                    total_failures += 1;
-                    // In a real implementation, we would analyze if this failure
-                    // matches the pattern that the improvement targets
-                    // For now, estimate 60% would be fixed
-                    if total_failures % 5 > 1 {
-                        potentially_fixed += 1;
-                    }
+            for (_run_id, _workflow, _agent, _status, _created_at) in runs.flatten() {
+                total_failures += 1;
+                // In a real implementation, we would analyze if this failure
+                // matches the pattern that the improvement targets
+                // For now, estimate 60% would be fixed
+                if total_failures % 5 > 1 {
+                    potentially_fixed += 1;
                 }
             }
 
@@ -994,9 +987,10 @@ pub async fn verify_improvement(
 ) -> Result<CallToolResult, McpError> {
     // Scope block for database access - ensures lock is released before async operations
     let (before_total, before_successful, after_total, after_successful, now) = {
-        let db = server.db.lock().map_err(|e| {
-            internal_error(format!("Failed to acquire database lock: {}", e))
-        })?;
+        let db = server
+            .db
+            .lock()
+            .map_err(|e| internal_error(format!("Failed to acquire database lock: {}", e)))?;
 
         // Calculate time windows for comparison
         let now = Utc::now();
@@ -1021,9 +1015,11 @@ pub async fn verify_improvement(
         "#;
 
         let (before_total, before_successful): (i64, i64) = db
-            .query_row(before_query, [before_start.to_rfc3339(), before_end.to_rfc3339()], |row| {
-                Ok((row.get(0)?, row.get(1)?))
-            })
+            .query_row(
+                before_query,
+                [before_start.to_rfc3339(), before_end.to_rfc3339()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
             .map_err(|e| internal_error(format!("Failed to query before period: {}", e)))?;
 
         // Query runs in "after" period (post-improvement)
@@ -1040,7 +1036,13 @@ pub async fn verify_improvement(
             })
             .map_err(|e| internal_error(format!("Failed to query after period: {}", e)))?;
 
-        (before_total, before_successful, after_total, after_successful, now)
+        (
+            before_total,
+            before_successful,
+            after_total,
+            after_successful,
+            now,
+        )
     }; // Database lock released here when db goes out of scope
 
     // Compute success rates
@@ -1064,32 +1066,45 @@ pub async fn verify_improvement(
     let (recommendation, explanation) = if after_total < 10 {
         (
             "Insufficient data",
-            format!("Only {} runs in measurement window - need more data for reliable verification", after_total)
+            format!(
+                "Only {} runs in measurement window - need more data for reliable verification",
+                after_total
+            ),
         )
     } else if success_rate_after >= success_rate_before + 0.05 {
         (
             "Keep - improvement exceeded expectations",
-            format!("Success rate improved by {:.1}% ({:.1}% → {:.1}%)",
-                    absolute_change,
-                    success_rate_before * 100.0,
-                    success_rate_after * 100.0)
+            format!(
+                "Success rate improved by {:.1}% ({:.1}% → {:.1}%)",
+                absolute_change,
+                success_rate_before * 100.0,
+                success_rate_after * 100.0
+            ),
         )
     } else if success_rate_after >= success_rate_before - 0.02 {
         (
             "Keep - improvement stable",
-            format!("Success rate maintained at {:.1}% (before: {:.1}%)",
-                    success_rate_after * 100.0,
-                    success_rate_before * 100.0)
+            format!(
+                "Success rate maintained at {:.1}% (before: {:.1}%)",
+                success_rate_after * 100.0,
+                success_rate_before * 100.0
+            ),
         )
     } else if success_rate_after >= success_rate_before - 0.10 {
         (
             "Monitor - slight degradation",
-            format!("Success rate dropped by {:.1}% - continue monitoring", absolute_change.abs())
+            format!(
+                "Success rate dropped by {:.1}% - continue monitoring",
+                absolute_change.abs()
+            ),
         )
     } else {
         (
             "Rollback - negative impact detected",
-            format!("Success rate dropped by {:.1}% - consider reverting changes", absolute_change.abs())
+            format!(
+                "Success rate dropped by {:.1}% - consider reverting changes",
+                absolute_change.abs()
+            ),
         )
     };
 
@@ -1098,8 +1113,7 @@ pub async fn verify_improvement(
         expected_impact: "40-60% reduction in target error pattern".to_string(), // TODO: Load from improvements table
         actual_impact: format!(
             "{:.1}% change in success rate ({} runs analyzed)",
-            absolute_change,
-            after_total
+            absolute_change, after_total
         ),
         success_rate_before,
         success_rate_after,
@@ -1131,13 +1145,13 @@ pub async fn get_health_dashboard(
     server: &SelfHealingMcpServer,
     params: GetHealthDashboardParams,
 ) -> Result<CallToolResult, McpError> {
-    let db = server.db.lock().map_err(|e| {
-        internal_error(format!("Failed to acquire database lock: {}", e))
-    })?;
+    let db = server
+        .db
+        .lock()
+        .map_err(|e| internal_error(format!("Failed to acquire database lock: {}", e)))?;
 
     // Parse time period (e.g., "-7d", "-30d")
-    let days = parse_since_duration(&params.since)
-        .unwrap_or(7); // Default to 7 days if parsing fails
+    let days = parse_since_duration(&params.since).unwrap_or(7); // Default to 7 days if parsing fails
 
     let now = Utc::now();
     let since_time = now - chrono::Duration::days(days);
@@ -1185,7 +1199,7 @@ pub async fn get_health_dashboard(
         .query_row(
             historical_query,
             [historical_start.to_rfc3339(), historical_end.to_rfc3339()],
-            |row| Ok((row.get(0)?, row.get(1)?))
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .unwrap_or((0, 0));
 
@@ -1216,25 +1230,32 @@ pub async fn get_health_dashboard(
         .map_err(|e| internal_error(format!("Failed to prepare agents query: {}", e)))?;
 
     let top_agents: Vec<AgentMetric> = stmt
-        .query_map([since_time.to_rfc3339(), params.top_agents.to_string()], |row| {
-            let agent_name: String = row.get(0)?;
-            let total: i64 = row.get(1)?;
-            let successful: i64 = row.get(2)?;
-            let avg_duration: f64 = row.get(3)?;
+        .query_map(
+            [since_time.to_rfc3339(), params.top_agents.to_string()],
+            |row| {
+                let agent_name: String = row.get(0)?;
+                let total: i64 = row.get(1)?;
+                let successful: i64 = row.get(2)?;
+                let avg_duration: f64 = row.get(3)?;
 
-            let failed = total - successful;
-            let success_rate_val = if total > 0 { successful as f64 / total as f64 } else { 0.0 };
+                let failed = total - successful;
+                let success_rate_val = if total > 0 {
+                    successful as f64 / total as f64
+                } else {
+                    0.0
+                };
 
-            Ok(AgentMetric {
-                agent_name,
-                total_runs: total as usize,
-                successful_runs: successful as usize,
-                failed_runs: failed as usize,
-                success_rate: success_rate_val,
-                avg_duration_ms: avg_duration,
-                trend: Trend::Stable, // TODO: Calculate trend based on historical data
-            })
-        })
+                Ok(AgentMetric {
+                    agent_name,
+                    total_runs: total as usize,
+                    successful_runs: successful as usize,
+                    failed_runs: failed as usize,
+                    success_rate: success_rate_val,
+                    avg_duration_ms: avg_duration,
+                    trend: Trend::Stable, // TODO: Calculate trend based on historical data
+                })
+            },
+        )
         .map_err(|e| internal_error(format!("Failed to query agents: {}", e)))?
         .filter_map(|r| r.ok())
         .collect();
@@ -1262,28 +1283,31 @@ pub async fn get_health_dashboard(
         .map_err(|e| internal_error(format!("Failed to prepare tools query: {}", e)))?;
 
     let top_failing_tools: Vec<ToolReliability> = stmt
-        .query_map([since_time.to_rfc3339(), params.top_tools.to_string()], |row| {
-            let tool_name: String = row.get(0)?;
-            let total_calls: i64 = row.get(1)?;
-            let errors: i64 = row.get(2)?;
-            let avg_duration: f64 = row.get(3)?;
+        .query_map(
+            [since_time.to_rfc3339(), params.top_tools.to_string()],
+            |row| {
+                let tool_name: String = row.get(0)?;
+                let total_calls: i64 = row.get(1)?;
+                let errors: i64 = row.get(2)?;
+                let avg_duration: f64 = row.get(3)?;
 
-            let successful = total_calls - errors;
+                let successful = total_calls - errors;
 
-            Ok(ToolReliability {
-                tool_name,
-                total_calls: total_calls as usize,
-                successful_calls: successful as usize,
-                failed_calls: errors as usize,
-                success_rate: if total_calls > 0 {
-                    successful as f64 / total_calls as f64
-                } else {
-                    0.0
-                },
-                avg_duration_ms: avg_duration,
-                common_errors: vec![], // TODO: Query most common error types
-            })
-        })
+                Ok(ToolReliability {
+                    tool_name,
+                    total_calls: total_calls as usize,
+                    successful_calls: successful as usize,
+                    failed_calls: errors as usize,
+                    success_rate: if total_calls > 0 {
+                        successful as f64 / total_calls as f64
+                    } else {
+                        0.0
+                    },
+                    avg_duration_ms: avg_duration,
+                    common_errors: vec![], // TODO: Query most common error types
+                })
+            },
+        )
         .map_err(|e| internal_error(format!("Failed to query tools: {}", e)))?
         .filter_map(|r| r.ok())
         .collect();
@@ -1293,7 +1317,8 @@ pub async fn get_health_dashboard(
     // =========================================================================
 
     let success_rate_trend = if historical_success_rate > 0.0 {
-        let change_percent = ((success_rate - historical_success_rate) / historical_success_rate) * 100.0;
+        let change_percent =
+            ((success_rate - historical_success_rate) / historical_success_rate) * 100.0;
         let trend = if change_percent > 5.0 {
             Trend::Improving
         } else if change_percent < -5.0 {
@@ -1332,9 +1357,11 @@ pub async fn get_health_dashboard(
 
     let tool_reliability = if !top_failing_tools.is_empty() {
         // Average reliability of top tools
-        top_failing_tools.iter()
+        top_failing_tools
+            .iter()
             .map(|t| t.success_rate)
-            .sum::<f64>() / top_failing_tools.len() as f64
+            .sum::<f64>()
+            / top_failing_tools.len() as f64
     } else {
         0.9 // Default if no tool data
     };

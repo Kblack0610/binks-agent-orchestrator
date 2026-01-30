@@ -89,9 +89,7 @@ impl SelfHealingMcpServer {
     }
 
     /// Compute success metrics per agent
-    #[tool(
-        description = "Compute success rates and performance metrics for each agent"
-    )]
+    #[tool(description = "Compute success rates and performance metrics for each agent")]
     async fn compute_agent_metrics(
         &self,
         Parameters(params): Parameters<crate::params::ComputeAgentMetricsParams>,
@@ -111,9 +109,7 @@ impl SelfHealingMcpServer {
     }
 
     /// Propose an improvement based on a detected pattern
-    #[tool(
-        description = "Generate an improvement proposal based on a detected failure pattern"
-    )]
+    #[tool(description = "Generate an improvement proposal based on a detected failure pattern")]
     async fn propose_improvement(
         &self,
         Parameters(params): Parameters<crate::params::ProposeImprovementParams>,
@@ -122,9 +118,7 @@ impl SelfHealingMcpServer {
     }
 
     /// Test an improvement in simulation mode
-    #[tool(
-        description = "Test an improvement using simulation, canary, or sandbox mode"
-    )]
+    #[tool(description = "Test an improvement using simulation, canary, or sandbox mode")]
     async fn test_improvement(
         &self,
         Parameters(params): Parameters<crate::params::TestImprovementParams>,
@@ -133,9 +127,7 @@ impl SelfHealingMcpServer {
     }
 
     /// Apply an approved improvement
-    #[tool(
-        description = "Mark an improvement as applied and record the changes made"
-    )]
+    #[tool(description = "Mark an improvement as applied and record the changes made")]
     async fn apply_improvement(
         &self,
         Parameters(params): Parameters<crate::params::ApplyImprovementParams>,
@@ -155,9 +147,7 @@ impl SelfHealingMcpServer {
     }
 
     /// Get overall system health dashboard
-    #[tool(
-        description = "Get a comprehensive dashboard of system health metrics and trends"
-    )]
+    #[tool(description = "Get a comprehensive dashboard of system health metrics and trends")]
     async fn get_health_dashboard(
         &self,
         Parameters(params): Parameters<crate::params::GetHealthDashboardParams>,

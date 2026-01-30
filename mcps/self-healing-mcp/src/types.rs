@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunHealthReport {
     pub run_id: String,
-    pub health_score: f64,  // 0.0 to 100.0
+    pub health_score: f64, // 0.0 to 100.0
     pub success_rate: f64,
     pub avg_duration_ms: f64,
     pub tool_reliability: f64,
@@ -26,7 +26,7 @@ pub struct ErrorPattern {
     pub first_seen: DateTime<Utc>,
     pub last_seen: DateTime<Utc>,
     pub affected_runs: Vec<String>,
-    pub correlation_score: f64,  // 0.0 to 1.0
+    pub correlation_score: f64, // 0.0 to 1.0
     pub suggested_fix: Option<String>,
 }
 
@@ -59,7 +59,7 @@ pub struct ToolReliability {
 pub struct ImprovementProposal {
     pub id: String,
     pub pattern_id: String,
-    pub category: String,  // prompt, workflow, agent, tool, other
+    pub category: String, // prompt, workflow, agent, tool, other
     pub priority: Priority,
     pub description: String,
     pub suggested_changes: String,
@@ -77,7 +77,7 @@ pub struct VerificationResult {
     pub success_rate_before: f64,
     pub success_rate_after: f64,
     pub runs_analyzed: usize,
-    pub recommendation: String,  // Keep, Rollback, Adjust
+    pub recommendation: String, // Keep, Rollback, Adjust
     pub verified_at: DateTime<Utc>,
 }
 

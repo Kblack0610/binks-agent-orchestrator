@@ -8,9 +8,7 @@ use serde_json::json;
 
 use crate::params::*;
 use crate::repository::{NewTask, TaskFilter, TaskRepository};
-use crate::types::{
-    BlockingCheckResponse, DependencyListResponse, TaskListResponse, TaskStatus,
-};
+use crate::types::{BlockingCheckResponse, DependencyListResponse, TaskListResponse, TaskStatus};
 
 // ============================================================================
 // CRUD Operations

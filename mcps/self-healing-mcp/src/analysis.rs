@@ -44,6 +44,7 @@ pub fn detect_trend(recent_value: f64, historical_value: f64, threshold: f64) ->
 /// Compute Jaccard similarity between two sets of contexts
 ///
 /// Used for correlating error patterns based on context similarity
+#[allow(dead_code)]
 pub fn jaccard_similarity(set1: &[String], set2: &[String]) -> f64 {
     let set1: std::collections::HashSet<_> = set1.iter().collect();
     let set2: std::collections::HashSet<_> = set2.iter().collect();
@@ -64,6 +65,7 @@ pub fn jaccard_similarity(set1: &[String], set2: &[String]) -> f64 {
 /// - Sample size (more occurrences = higher confidence)
 /// - Consistency (similar error messages = higher confidence)
 /// - Temporal distribution (clustered vs spread out)
+#[allow(dead_code)]
 pub fn compute_pattern_confidence(
     occurrences: usize,
     context_similarity: f64,
@@ -78,11 +80,7 @@ pub fn compute_pattern_confidence(
 
     // Penalize if pattern is too spread out (low frequency)
     let frequency = occurrences as f64 / time_span_days;
-    let frequency_factor = if frequency > 1.0 {
-        1.0
-    } else {
-        frequency
-    };
+    let frequency_factor = if frequency > 1.0 { 1.0 } else { frequency };
 
     similarity_adjusted * frequency_factor
 }
@@ -106,8 +104,16 @@ mod tests {
 
     #[test]
     fn test_jaccard_similarity() {
-        let set1 = vec!["error".to_string(), "timeout".to_string(), "kubernetes".to_string()];
-        let set2 = vec!["error".to_string(), "timeout".to_string(), "docker".to_string()];
+        let set1 = vec![
+            "error".to_string(),
+            "timeout".to_string(),
+            "kubernetes".to_string(),
+        ];
+        let set2 = vec![
+            "error".to_string(),
+            "timeout".to_string(),
+            "docker".to_string(),
+        ];
         let similarity = jaccard_similarity(&set1, &set2);
         assert!((similarity - 0.5).abs() < 0.01); // 2/4 = 0.5
     }

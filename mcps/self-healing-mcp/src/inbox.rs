@@ -12,6 +12,7 @@ use tokio::io::AsyncWriteExt;
 /// Priority level for inbox messages
 #[derive(Debug, Clone, Copy)]
 pub enum Priority {
+    #[allow(dead_code)]
     Low,
     Normal,
     High,
@@ -19,7 +20,7 @@ pub enum Priority {
 }
 
 impl Priority {
-    fn to_markdown(&self) -> &'static str {
+    fn to_markdown(self) -> &'static str {
         match self {
             Priority::Low => "[LOW]",
             Priority::Normal => "",
@@ -102,6 +103,7 @@ pub async fn send_notification(
 }
 
 /// Send pattern detection notification
+#[allow(dead_code)]
 pub async fn notify_pattern_detected(
     pattern_id: &str,
     error_type: &str,
@@ -186,7 +188,10 @@ pub async fn notify_verification_result(
     recommendation: &str,
 ) -> Result<()> {
     let impact_comparison = if actual_impact > 0.0 {
-        format!("{}% improvement (better than expected!)", actual_impact * 100.0)
+        format!(
+            "{}% improvement (better than expected!)",
+            actual_impact * 100.0
+        )
     } else if actual_impact < 0.0 {
         format!("{}% degradation", actual_impact.abs() * 100.0)
     } else {
@@ -219,11 +224,5 @@ pub async fn notify_verification_result(
         Priority::High
     };
 
-    send_notification(
-        &message,
-        priority,
-        &["improvement", "verified"],
-        None,
-    )
-    .await
+    send_notification(&message, priority, &["improvement", "verified"], None).await
 }

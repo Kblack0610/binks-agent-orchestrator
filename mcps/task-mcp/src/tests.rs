@@ -1,6 +1,7 @@
 //! Tests for task-mcp repository
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use super::super::repository::{NewTask, TaskFilter, TaskRepository};
     use super::super::types::TaskStatus;
