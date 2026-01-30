@@ -1,7 +1,5 @@
 //! Analysis algorithms for pattern detection and health scoring
 
-use anyhow::Result;
-
 /// Compute health score for a run
 ///
 /// Formula: weighted_sum([

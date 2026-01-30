@@ -31,14 +31,18 @@ pub mod mcps_args;
 pub use mcps_args::McpsCommands;
 
 // =============================================================================
-// Orchestrator feature - WorkflowCommands, RunsCommands
+// Orchestrator feature - WorkflowCommands, RunsCommands, SelfHealCommands
 // =============================================================================
 #[cfg(feature = "orchestrator")]
 pub mod runs_args;
 #[cfg(feature = "orchestrator")]
+pub mod selfheal_args;
+#[cfg(feature = "orchestrator")]
 pub mod workflow_args;
 #[cfg(feature = "orchestrator")]
 pub use runs_args::RunsCommands;
+#[cfg(feature = "orchestrator")]
+pub use selfheal_args::SelfHealCommands;
 #[cfg(feature = "orchestrator")]
 pub use workflow_args::WorkflowCommands;
 

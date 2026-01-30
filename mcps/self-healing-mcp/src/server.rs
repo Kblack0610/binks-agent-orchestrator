@@ -3,8 +3,8 @@
 use anyhow::Context;
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::CallToolResult,
-    tool, tool_router, ErrorData as McpError,
+    model::{CallToolResult, ServerCapabilities, ServerInfo},
+    tool, tool_handler, tool_router, ErrorData as McpError,
 };
 use rusqlite::Connection;
 use std::path::PathBuf;
@@ -163,5 +163,31 @@ impl SelfHealingMcpServer {
         Parameters(params): Parameters<crate::params::GetHealthDashboardParams>,
     ) -> Result<CallToolResult, McpError> {
         handlers::get_health_dashboard(self, params).await
+    }
+}
+
+// ============================================================================
+// Server Handler Implementation
+// ============================================================================
+
+#[tool_handler]
+impl rmcp::ServerHandler for SelfHealingMcpServer {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            instructions: Some(
+                "Self-Healing MCP server for workflow health analysis and automated improvement proposals. \
+                 Analyzes run history from ~/.binks/conversations.db to detect patterns, propose fixes, and verify improvements. \
+                 Integrates with inbox-mcp for notifications."
+                    .into(),
+            ),
+            capabilities: ServerCapabilities::builder().enable_tools().build(),
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for SelfHealingMcpServer {
+    fn default() -> Self {
+        Self::new().expect("Failed to create SelfHealingMcpServer")
     }
 }

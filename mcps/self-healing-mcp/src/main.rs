@@ -5,6 +5,7 @@
 
 mod analysis;
 mod handlers;
+mod inbox;
 mod params;
 mod server;
 mod strategies;

@@ -127,5 +127,8 @@ async fn dispatch(cmd: Commands, ctx: CommandContext) -> Result<()> {
 
         #[cfg(feature = "orchestrator")]
         Commands::Runs { command } => runs::run_runs_command(&ctx, command).await,
+
+        #[cfg(feature = "orchestrator")]
+        Commands::SelfHeal { command } => selfheal::run_selfheal_command(&ctx, command).await,
     }
 }
