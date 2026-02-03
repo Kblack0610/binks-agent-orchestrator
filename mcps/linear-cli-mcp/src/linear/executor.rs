@@ -3,7 +3,6 @@
 //! Provides safe, async wrappers around the `linear` CLI with
 //! proper error handling and optional JSON parsing.
 
-#[cfg(feature = "documents")]
 use serde::de::DeserializeOwned;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -46,7 +45,6 @@ pub async fn execute_linear(args: &[&str]) -> LinearResult<String> {
 /// Execute a linear command with `--json` flag and parse output
 ///
 /// Used for commands that support JSON output (primarily document commands).
-#[cfg(feature = "documents")]
 #[instrument(fields(cmd = %args.join(" ")))]
 pub async fn execute_linear_json<T: DeserializeOwned>(args: &[&str]) -> LinearResult<T> {
     let mut full_args: Vec<&str> = args.to_vec();

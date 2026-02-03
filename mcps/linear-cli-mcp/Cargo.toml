@@ -19,10 +19,7 @@ tracing.workspace = true
 
 [features]
 default = []
-teams = []
-projects = []
-documents = []
-full = ["teams", "projects", "documents"]
+readwrite = []
 
 [[bin]]
 name = "linear-cli-mcp"

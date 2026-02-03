@@ -3,9 +3,9 @@
 use mcp_common::{text_success, CallToolResult, McpError};
 
 use crate::linear::execute_linear;
-use crate::params::{
-    IssueCommentAddParams, IssueCreateParams, IssueListParams, IssueStartParams, IssueViewParams,
-};
+use crate::params::{IssueListParams, IssueViewParams};
+#[cfg(feature = "readwrite")]
+use crate::params::{IssueCommentAddParams, IssueCreateParams, IssueStartParams};
 
 use super::linear_to_mcp_error;
 
@@ -54,6 +54,7 @@ pub async fn issue_view(params: IssueViewParams) -> Result<CallToolResult, McpEr
 }
 
 /// Create a new issue
+#[cfg(feature = "readwrite")]
 pub async fn issue_create(params: IssueCreateParams) -> Result<CallToolResult, McpError> {
     let mut args = vec!["issue", "create", "--title", &params.title];
 
@@ -73,6 +74,7 @@ pub async fn issue_create(params: IssueCreateParams) -> Result<CallToolResult, M
 }
 
 /// Start an issue (changes status and creates a git branch)
+#[cfg(feature = "readwrite")]
 pub async fn issue_start(params: IssueStartParams) -> Result<CallToolResult, McpError> {
     let mut args = vec!["issue", "start"];
 
@@ -87,6 +89,7 @@ pub async fn issue_start(params: IssueStartParams) -> Result<CallToolResult, Mcp
 }
 
 /// Add a comment to an issue
+#[cfg(feature = "readwrite")]
 pub async fn issue_comment_add(
     params: IssueCommentAddParams,
 ) -> Result<CallToolResult, McpError> {

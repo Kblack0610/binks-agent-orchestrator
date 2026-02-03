@@ -24,6 +24,7 @@ pub struct IssueViewParams {
 }
 
 /// Parameters for creating an issue
+#[cfg(feature = "readwrite")]
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct IssueCreateParams {
     #[schemars(description = "Title for the new issue")]
@@ -34,6 +35,7 @@ pub struct IssueCreateParams {
 }
 
 /// Parameters for starting an issue
+#[cfg(feature = "readwrite")]
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct IssueStartParams {
     #[schemars(description = "Issue identifier to start (e.g., 'ENG-123'). If omitted, uses the current git branch")]
@@ -41,6 +43,7 @@ pub struct IssueStartParams {
 }
 
 /// Parameters for adding a comment to an issue
+#[cfg(feature = "readwrite")]
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct IssueCommentAddParams {
     #[schemars(description = "Issue identifier (e.g., 'ENG-123'). If omitted, uses the current git branch")]

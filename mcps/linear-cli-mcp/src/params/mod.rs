@@ -1,11 +1,9 @@
 //! Parameter types for Linear CLI MCP tools
 
 mod issue;
-#[cfg(feature = "documents")]
 mod document;
 
 pub use issue::*;
-#[cfg(feature = "documents")]
 pub use document::*;
 
 use schemars::JsonSchema;
