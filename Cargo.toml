@@ -20,6 +20,7 @@ members = [
     "mcps/task-mcp",
     "mcps/self-healing-mcp",
     "mcps/workflow-mcp",
+    "mcps/linear-cli-mcp",
 ]
 
 [workspace.package]

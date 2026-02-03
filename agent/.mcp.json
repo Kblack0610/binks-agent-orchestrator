@@ -81,6 +81,14 @@
         "RUST_LOG": "info"
       },
       "tier": 2
+    },
+    "linear": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/linear-cli-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      },
+      "tier": 2
     }
   }
 }

@@ -1,0 +1,29 @@
+[package]
+name = "linear-cli-mcp"
+version.workspace = true
+edition.workspace = true
+description = "Lightweight MCP server wrapping the linear CLI for Linear issue tracking"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+mcp-common.workspace = true
+rmcp.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+[features]
+default = []
+teams = []
+projects = []
+documents = []
+full = ["teams", "projects", "documents"]
+
+[[bin]]
+name = "linear-cli-mcp"
+path = "src/main.rs"
