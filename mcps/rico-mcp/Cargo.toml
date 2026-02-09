@@ -1,0 +1,43 @@
+[package]
+name = "rico-mcp"
+version.workspace = true
+edition.workspace = true
+description = "RICO UI dataset MCP server for mobile design similarity search"
+license = "MIT"
+
+[dependencies]
+# Internal crates
+mcp-common.workspace = true
+
+# MCP SDK
+rmcp.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+chrono.workspace = true
+toml.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# RICO-specific
+ndarray = { version = "0.16", features = ["rayon"] }
+ndarray-npy = "0.9"
+lru = "0.12"
+ordered-float = "4"
+rayon = "1.10"
+dirs = "5"
+parking_lot = "0.12"
+
+[[bin]]
+name = "rico-mcp"
+path = "src/main.rs"

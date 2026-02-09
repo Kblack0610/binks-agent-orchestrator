@@ -138,6 +138,15 @@
         "RUST_LOG": "info"
       },
       "tier": 2
+    },
+    "rico": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/rico-mcp",
+      "args": [],
+      "env": {
+        "RICO_DATA_DIR": "${HOME}/.rico-mcp/data",
+        "RUST_LOG": "info"
+      },
+      "tier": 3
     }
   }
 }

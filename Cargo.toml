@@ -21,6 +21,7 @@ members = [
     "mcps/self-healing-mcp",
     "mcps/workflow-mcp",
     "mcps/linear-cli-mcp",
+    "mcps/rico-mcp",
 ]
 
 [workspace.package]

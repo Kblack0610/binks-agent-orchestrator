@@ -1,0 +1,14 @@
+name: mobile-audit
+description: Audit mobile UI designs using RICO dataset patterns and best practices
+compat:
+  binks_agent: true
+io:
+  input: screenshot path, directory, or Playwright capture
+  output: design audit report + inbox notification
+tools:
+  - rico_mcp::*
+  - playwright_mcp::browser_snapshot
+  - playwright_mcp::browser_take_screenshot
+  - filesystem_mcp::read_file
+  - inbox_mcp::write_inbox
+  - memory_mcp::learn
