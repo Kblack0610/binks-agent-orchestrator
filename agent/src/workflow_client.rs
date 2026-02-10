@@ -3,6 +3,10 @@
 //! This module provides a type-safe interface for interacting with the workflow-mcp
 //! MCP server, abstracting the raw MCP tool calls.
 
+// Allow RefCell borrows across await - the borrows are scoped within blocks
+// and dropped before the await actually suspends, but clippy can't see this.
+#![allow(clippy::await_holding_refcell_ref)]
+
 use anyhow::{Context, Result};
 use serde_json::json;
 use std::cell::RefCell;

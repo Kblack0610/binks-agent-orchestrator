@@ -169,9 +169,6 @@ pub const COMPONENT_TYPES: &[&str] = &[
 impl ScreenMetadata {
     /// Get component type names as strings
     pub fn component_names(&self) -> Vec<String> {
-        self.components
-            .iter()
-            .map(|c| c.name.clone())
-            .collect()
+        self.components.iter().map(|c| c.name.clone()).collect()
     }
 }

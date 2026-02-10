@@ -3,9 +3,9 @@
 use mcp_common::{text_success, CallToolResult, McpError};
 
 use crate::linear::execute_linear;
-use crate::params::{IssueListParams, IssueViewParams};
 #[cfg(feature = "readwrite")]
 use crate::params::{IssueCommentAddParams, IssueCreateParams, IssueStartParams};
+use crate::params::{IssueListParams, IssueViewParams};
 
 use super::linear_to_mcp_error;
 
@@ -90,9 +90,7 @@ pub async fn issue_start(params: IssueStartParams) -> Result<CallToolResult, Mcp
 
 /// Add a comment to an issue
 #[cfg(feature = "readwrite")]
-pub async fn issue_comment_add(
-    params: IssueCommentAddParams,
-) -> Result<CallToolResult, McpError> {
+pub async fn issue_comment_add(params: IssueCommentAddParams) -> Result<CallToolResult, McpError> {
     let mut args = vec!["issue", "comment", "add"];
 
     let issue_id;
@@ -103,9 +101,7 @@ pub async fn issue_comment_add(
 
     args.extend(["--body", &params.body]);
 
-    let output = execute_linear(&args)
-        .await
-        .map_err(linear_to_mcp_error)?;
+    let output = execute_linear(&args).await.map_err(linear_to_mcp_error)?;
 
     let msg = if output.is_empty() {
         "Comment added successfully".to_string()

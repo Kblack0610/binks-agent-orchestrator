@@ -5,6 +5,9 @@
 //! - Semantic annotations (24 component types, 197 button concepts, 97 icon classes)
 //! - Design pattern guidance and best practices
 
+// Allow dead code for now - this is a new crate with planned features not yet wired up
+#![allow(dead_code)]
+
 mod config;
 mod dataset;
 mod params;
