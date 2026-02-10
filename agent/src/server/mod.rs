@@ -88,9 +88,7 @@ pub struct ChatParams {
 pub struct AgentChatParams {
     #[schemars(description = "The message to send to the agent")]
     pub message: String,
-    #[schemars(
-        description = "Optional model override. Uses server default if not specified."
-    )]
+    #[schemars(description = "Optional model override. Uses server default if not specified.")]
     pub model: Option<String>,
     #[schemars(description = "Optional system prompt for the agent")]
     pub system_prompt: Option<String>,
