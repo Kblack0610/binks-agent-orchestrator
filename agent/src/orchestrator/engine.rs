@@ -33,7 +33,7 @@ pub struct EngineConfig {
     /// Ollama URL
     pub ollama_url: String,
 
-    /// Default model (used if agent doesn't specify one)
+    /// Default model - must be specified in .agent.toml
     pub default_model: String,
 
     /// Directory for custom workflows
@@ -59,7 +59,7 @@ impl Default for EngineConfig {
     fn default() -> Self {
         Self {
             ollama_url: AgentFileConfig::default_ollama_url(),
-            default_model: AgentFileConfig::default_model(),
+            default_model: String::new(), // Must be specified in .agent.toml
             custom_workflows_dir: None,
             non_interactive: false,
             verbose: false,

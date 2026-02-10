@@ -164,7 +164,8 @@ impl From<ModelOverrideConfig> for ModelCapabilityOverride {
 pub struct LlmConfig {
     #[serde(default = "default_ollama_url")]
     pub url: String,
-    #[serde(default = "default_model")]
+    /// Model name - must be specified in .agent.toml, no default
+    #[serde(default)]
     pub model: String,
 }
 
@@ -244,9 +245,8 @@ fn default_ollama_url() -> String {
     "http://localhost:11434".to_string()
 }
 
-fn default_model() -> String {
-    "qwen3-coder:30b".to_string()
-}
+// No default_model() - model must be specified in .agent.toml
+// This is intentional to avoid hardcoded model names that become outdated
 
 fn default_interval() -> u64 {
     300
@@ -256,7 +256,7 @@ impl Default for LlmConfig {
     fn default() -> Self {
         Self {
             url: default_ollama_url(),
-            model: default_model(),
+            model: String::new(), // No default - must be specified in .agent.toml
         }
     }
 }
@@ -421,11 +421,6 @@ impl AgentFileConfig {
         Ok(config)
     }
 
-    /// Get the default model (for use elsewhere)
-    pub fn default_model() -> String {
-        default_model()
-    }
-
     /// Get the default Ollama URL (for use elsewhere)
     pub fn default_ollama_url() -> String {
         default_ollama_url()
@@ -547,7 +542,8 @@ mod tests {
         let config = AgentFileConfig::default();
 
         assert_eq!(config.llm.url, "http://localhost:11434");
-        assert_eq!(config.llm.model, "qwen3-coder:30b");
+        // No default model - must be specified in .agent.toml
+        assert!(config.llm.model.is_empty());
         assert_eq!(config.monitor.interval, 300);
         assert!(config.monitor.repos.is_empty());
         assert!(config.agent.system_prompt.is_none());
@@ -720,11 +716,6 @@ model = "custom-model"
     }
 
     // ============== Static Method Tests ==============
-
-    #[test]
-    fn test_default_model_value() {
-        assert_eq!(AgentFileConfig::default_model(), "qwen3-coder:30b");
-    }
 
     #[test]
     fn test_default_ollama_url_value() {

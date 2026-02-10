@@ -28,6 +28,7 @@ pub mod config;
 pub mod context;
 pub mod handlers;
 pub mod llm;
+pub mod models;
 pub mod output;
 
 // CLI module has mixed availability:

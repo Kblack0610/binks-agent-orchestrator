@@ -47,7 +47,7 @@ impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             ollama_url: "http://localhost:11434".to_string(),
-            model: "qwen3-coder:30b".to_string(),
+            model: String::new(), // Must be specified in .agent.toml
             system_prompt: None,
             enable_runs: true,
             agent_config: AgentSectionConfig::default(),
@@ -89,7 +89,7 @@ pub struct AgentChatParams {
     #[schemars(description = "The message to send to the agent")]
     pub message: String,
     #[schemars(
-        description = "Optional model override (e.g., 'llama3.1:70b', 'deepseek-r1:70b'). Uses server default if not specified."
+        description = "Optional model override. Uses server default if not specified."
     )]
     pub model: Option<String>,
     #[schemars(description = "Optional system prompt for the agent")]

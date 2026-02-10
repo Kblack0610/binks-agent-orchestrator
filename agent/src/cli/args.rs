@@ -24,7 +24,7 @@ pub struct Cli {
     #[arg(long, env = "OLLAMA_URL", global = true)]
     pub ollama_url: Option<String>,
 
-    /// Model to use (default: from .agent.toml or qwen2.5-coder:32b)
+    /// Model to use (required: must be specified in .agent.toml or via -m flag)
     #[arg(short = 'm', long, env = "OLLAMA_MODEL", global = true)]
     pub model: Option<String>,
 

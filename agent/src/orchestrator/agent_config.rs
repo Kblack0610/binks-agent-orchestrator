@@ -227,17 +227,13 @@ impl AgentRegistry {
 /// Configuration file format for agent registry
 #[derive(Debug, Deserialize)]
 pub struct AgentRegistryConfig {
-    /// Default model for agents that don't specify one
-    #[serde(default = "default_model")]
+    /// Default model - must be specified in .agent.toml, no hardcoded fallback
+    #[serde(default)]
     pub default_model: String,
 
     /// Agent configurations
     #[serde(default)]
     pub agents: Vec<AgentConfig>,
-}
-
-fn default_model() -> String {
-    "qwen3:14b".to_string()
 }
 
 impl AgentRegistryConfig {
