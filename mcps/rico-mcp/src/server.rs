@@ -83,6 +83,65 @@ impl RicoMcpServer {
     }
 
     #[tool(
+        description = "Encode a screenshot image into a 64-dimensional layout vector. Can optionally search for similar screens in the RICO dataset."
+    )]
+    async fn encode_screenshot(
+        &self,
+        Parameters(params): Parameters<EncodeScreenshotParams>,
+    ) -> Result<CallToolResult, McpError> {
+        use std::process::Command;
+
+        // Find the encoder script
+        let script_path = self.find_encoder_script();
+
+        // Run the Python encoder
+        let output = Command::new("python3")
+            .arg(&script_path)
+            .arg(&params.image_path)
+            .arg("--json")
+            .output()
+            .map_err(|e| McpError::internal_error(format!("Failed to run encoder: {}", e), None))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Ok(CallToolResult::error(vec![Content::text(format!(
+                "Encoding failed: {}",
+                stderr
+            ))]));
+        }
+
+        // Parse the vector from JSON output
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let vector: Vec<f32> = serde_json::from_str(&stdout)
+            .map_err(|e| McpError::internal_error(format!("Failed to parse vector: {}", e), None))?;
+
+        let mut result = serde_json::json!({
+            "vector": vector,
+            "dimensions": vector.len(),
+            "source_image": params.image_path
+        });
+
+        // Optionally search for similar screens
+        if params.search_similar {
+            let mut query_arr = [0.0f32; 64];
+            for (i, &v) in vector.iter().take(64).enumerate() {
+                query_arr[i] = v;
+            }
+
+            let top_k = params.top_k.unwrap_or(5);
+            let search = VectorSearch::new(&self.loader);
+            let similar = search.search(&query_arr, top_k, self.config.min_similarity, None);
+
+            result["similar_screens"] = serde_json::to_value(&similar)
+                .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        }
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
         description = "Get detailed metadata for a specific RICO screen by ID. Includes components, text buttons, icons, and screenshot availability."
     )]
     async fn get_screen_details(
@@ -356,6 +415,68 @@ impl RicoMcpServer {
         let json = serde_json::to_string_pretty(&result)
             .map_err(|e| McpError::internal_error(e.to_string(), None))?;
         Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    // ========================================================================
+    // Helper Methods
+    // ========================================================================
+
+    /// Find the Python encoder script for screenshot-to-vector conversion.
+    /// Looks in several locations: beside the binary, in scripts/, or via env var.
+    fn find_encoder_script(&self) -> String {
+        use std::env;
+        use std::path::PathBuf;
+
+        // Check environment variable first
+        if let Ok(path) = env::var("RICO_ENCODER_SCRIPT") {
+            return path;
+        }
+
+        // Try to find relative to the executable
+        if let Ok(exe_path) = env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                // Check beside the binary
+                let beside_exe = exe_dir.join("rico-encode.py");
+                if beside_exe.exists() {
+                    return beside_exe.to_string_lossy().to_string();
+                }
+
+                // Check in scripts/ relative to binary
+                let in_scripts = exe_dir.join("scripts").join("rico-encode.py");
+                if in_scripts.exists() {
+                    return in_scripts.to_string_lossy().to_string();
+                }
+
+                // Check parent directories (for dev builds)
+                let mut search_dir = exe_dir.to_path_buf();
+                for _ in 0..5 {
+                    let scripts_path = search_dir.join("scripts").join("rico-encode.py");
+                    if scripts_path.exists() {
+                        return scripts_path.to_string_lossy().to_string();
+                    }
+                    if !search_dir.pop() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Check common locations
+        let common_paths = [
+            PathBuf::from("/usr/local/share/rico-mcp/rico-encode.py"),
+            PathBuf::from(env::var("HOME").unwrap_or_default())
+                .join(".rico-mcp")
+                .join("rico-encode.py"),
+        ];
+
+        for path in &common_paths {
+            if path.exists() {
+                return path.to_string_lossy().to_string();
+            }
+        }
+
+        // Fallback: assume it's in PATH or current directory
+        "rico-encode.py".to_string()
     }
 }
 

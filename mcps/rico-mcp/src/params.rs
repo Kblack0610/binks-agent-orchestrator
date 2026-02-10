@@ -74,3 +74,16 @@ pub struct SearchByDescriptionParams {
 /// Empty parameters for status/info tools
 #[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
 pub struct EmptyParams {}
+
+/// Parameters for encoding a screenshot to a layout vector
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+pub struct EncodeScreenshotParams {
+    /// Path to the screenshot image file (PNG, JPG, etc.)
+    pub image_path: String,
+    /// Whether to also search for similar screens after encoding
+    #[serde(default)]
+    pub search_similar: bool,
+    /// Number of similar screens to return if search_similar is true (default: 5)
+    #[serde(default)]
+    pub top_k: Option<usize>,
+}
