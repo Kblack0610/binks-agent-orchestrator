@@ -274,4 +274,27 @@ impl DatasetLoader {
     pub fn screen_ids(&self) -> impl Iterator<Item = u32> + '_ {
         self.screen_to_row.keys().copied()
     }
+
+    /// Search for screens matching a pattern in app name or package
+    /// Returns screen IDs that match the pattern (case-insensitive)
+    pub fn search_by_app_pattern(&self, pattern: &str, limit: usize) -> Vec<u32> {
+        let pattern_lower = pattern.to_lowercase();
+        self.metadata
+            .values()
+            .filter(|meta| {
+                meta.app_package.to_lowercase().contains(&pattern_lower)
+                    || meta
+                        .app_name
+                        .as_ref()
+                        .is_some_and(|n| n.to_lowercase().contains(&pattern_lower))
+            })
+            .take(limit)
+            .map(|meta| meta.screen_id)
+            .collect()
+    }
+
+    /// Get all metadata entries (for aggregation)
+    pub fn all_metadata(&self) -> impl Iterator<Item = &ScreenMetadata> {
+        self.metadata.values()
+    }
 }

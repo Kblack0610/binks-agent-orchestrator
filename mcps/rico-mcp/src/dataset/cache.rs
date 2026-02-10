@@ -59,6 +59,7 @@ impl ScreenCache {
     }
 
     /// Clear the cache
+    #[allow(dead_code)]
     pub fn clear(&self) {
         let mut cache = self.cache.lock();
         cache.clear();
@@ -73,11 +74,13 @@ pub struct CacheStats {
     pub hits: u64,
     pub misses: u64,
     pub size: usize,
+    #[allow(dead_code)]
     pub capacity: usize,
 }
 
 impl CacheStats {
     /// Calculate hit rate as a percentage
+    #[allow(dead_code)]
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
         if total == 0 {

@@ -61,20 +61,6 @@ pub struct BatchAnalyzeParams {
     pub analyze_flow: bool,
 }
 
-/// Parameters for searching by description
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
-pub struct SearchByDescriptionParams {
-    /// Natural language description of desired UI pattern
-    pub description: String,
-    /// Maximum number of results
-    #[serde(default)]
-    pub top_k: Option<usize>,
-}
-
-/// Empty parameters for status/info tools
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
-pub struct EmptyParams {}
-
 /// Parameters for encoding a screenshot to a layout vector
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 pub struct EncodeScreenshotParams {

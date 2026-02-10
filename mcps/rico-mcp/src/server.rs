@@ -14,7 +14,7 @@ use crate::config::RicoConfig;
 use crate::dataset::{DatasetLoader, ScreenCache};
 use crate::params::*;
 use crate::search::VectorSearch;
-use crate::types::{DatasetStatus, PatternGuidance, COMPONENT_TYPES};
+use crate::types::{ComponentFrequency, DatasetStatus, PatternGuidance, COMPONENT_TYPES};
 
 /// The main RICO MCP Server
 pub struct RicoMcpServer {
@@ -214,124 +214,108 @@ impl RicoMcpServer {
         &self,
         Parameters(params): Parameters<GetPatternGuidanceParams>,
     ) -> Result<CallToolResult, McpError> {
-        // Return pattern-specific guidance
-        let guidance = match params.pattern_name.to_lowercase().as_str() {
-            name if name.contains("login") => PatternGuidance {
-                pattern_name: "Login Screen".to_string(),
-                common_components: vec![
-                    "Text Input (username/email)".to_string(),
-                    "Text Input (password)".to_string(),
-                    "Text Button (Sign In)".to_string(),
-                    "Text Button (Forgot Password)".to_string(),
-                    "Image (logo)".to_string(),
-                ],
-                typical_layout:
-                    "Centered form with logo at top, inputs in middle, buttons at bottom"
-                        .to_string(),
-                example_apps: vec![
-                    "Instagram".to_string(),
-                    "Facebook".to_string(),
-                    "Twitter".to_string(),
-                ],
-                design_tips: vec![
-                    "Keep form fields minimal - username/email and password only".to_string(),
-                    "Make the primary action button prominent".to_string(),
-                    "Provide clear error states for invalid input".to_string(),
-                    "Consider biometric login options".to_string(),
-                ],
-                accessibility_notes: if params.include_accessibility {
-                    vec![
-                        "Label all form fields properly".to_string(),
-                        "Ensure sufficient color contrast".to_string(),
-                        "Support password visibility toggle".to_string(),
-                        "Provide clear focus indicators".to_string(),
-                    ]
+        use std::collections::HashMap;
+
+        // Map pattern names to search keywords
+        let pattern_lower = params.pattern_name.to_lowercase();
+        let (pattern_name, search_keywords): (&str, Vec<&str>) = if pattern_lower.contains("login")
+            || pattern_lower.contains("signin")
+            || pattern_lower.contains("sign in")
+        {
+            ("Login Screen", vec!["login", "signin", "auth"])
+        } else if pattern_lower.contains("list") {
+            ("List View", vec!["list", "feed", "timeline"])
+        } else if pattern_lower.contains("nav")
+            || pattern_lower.contains("drawer")
+            || pattern_lower.contains("menu")
+        {
+            ("Navigation Drawer", vec!["drawer", "menu", "nav"])
+        } else if pattern_lower.contains("settings") || pattern_lower.contains("preference") {
+            ("Settings Screen", vec!["settings", "preference", "config"])
+        } else if pattern_lower.contains("profile") || pattern_lower.contains("account") {
+            ("Profile Screen", vec!["profile", "account", "user"])
+        } else if pattern_lower.contains("search") {
+            ("Search Screen", vec!["search", "find", "query"])
+        } else if pattern_lower.contains("home") || pattern_lower.contains("dashboard") {
+            ("Home Screen", vec!["home", "dashboard", "main"])
+        } else if pattern_lower.contains("detail") || pattern_lower.contains("view") {
+            ("Detail View", vec!["detail", "view", "info"])
+        } else if pattern_lower.contains("form") || pattern_lower.contains("input") {
+            ("Form/Input Screen", vec!["form", "input", "edit"])
+        } else if pattern_lower.contains("chat") || pattern_lower.contains("message") {
+            ("Chat/Messaging", vec!["chat", "message", "conversation"])
+        } else {
+            (params.pattern_name.as_str(), vec![pattern_lower.as_str()])
+        };
+
+        // Search for matching screens from the dataset
+        let mut matching_screen_ids: Vec<u32> = Vec::new();
+        for keyword in &search_keywords {
+            let ids = self.loader.search_by_app_pattern(keyword, 100);
+            matching_screen_ids.extend(ids);
+        }
+        matching_screen_ids.sort();
+        matching_screen_ids.dedup();
+
+        // Aggregate component frequencies from matching screens
+        let mut component_counts: HashMap<String, usize> = HashMap::new();
+        let mut app_names: Vec<String> = Vec::new();
+        let screens_analyzed = matching_screen_ids.len();
+
+        for screen_id in &matching_screen_ids {
+            if let Some(meta) = self.loader.get_metadata(*screen_id) {
+                // Count components
+                for component in &meta.components {
+                    *component_counts.entry(component.name.clone()).or_insert(0) += 1;
+                }
+                // Collect app names
+                if let Some(ref name) = meta.app_name {
+                    if !app_names.contains(name) {
+                        app_names.push(name.clone());
+                    }
+                } else if !app_names.contains(&meta.app_package) {
+                    app_names.push(meta.app_package.clone());
+                }
+            }
+        }
+
+        // Convert to frequencies sorted by occurrence
+        let mut component_frequencies: Vec<ComponentFrequency> = component_counts
+            .into_iter()
+            .map(|(name, count)| ComponentFrequency {
+                name,
+                frequency: if screens_analyzed > 0 {
+                    count as f32 / screens_analyzed as f32
                 } else {
-                    vec![]
+                    0.0
                 },
-            },
-            name if name.contains("list") => PatternGuidance {
-                pattern_name: "List View".to_string(),
-                common_components: vec![
-                    "List Item".to_string(),
-                    "Image/Icon".to_string(),
-                    "Text (title)".to_string(),
-                    "Text (subtitle)".to_string(),
-                ],
-                typical_layout: "Vertical scrolling list with consistent item heights".to_string(),
-                example_apps: vec![
-                    "Gmail".to_string(),
-                    "Contacts".to_string(),
-                    "Settings".to_string(),
-                ],
-                design_tips: vec![
-                    "Use consistent item heights for smooth scrolling".to_string(),
-                    "Include visual hierarchy in list items".to_string(),
-                    "Support swipe actions for common operations".to_string(),
-                    "Consider pull-to-refresh for updatable content".to_string(),
-                ],
-                accessibility_notes: if params.include_accessibility {
-                    vec![
-                        "Ensure list items are focusable".to_string(),
-                        "Provide content descriptions for images".to_string(),
-                        "Support keyboard navigation".to_string(),
-                    ]
-                } else {
-                    vec![]
-                },
-            },
-            name if name.contains("nav") || name.contains("drawer") => PatternGuidance {
-                pattern_name: "Navigation Drawer".to_string(),
-                common_components: vec![
-                    "Drawer".to_string(),
-                    "List Item".to_string(),
-                    "Icon".to_string(),
-                    "Text".to_string(),
-                    "Image (profile)".to_string(),
-                ],
-                typical_layout: "Slide-in panel from left with menu items".to_string(),
-                example_apps: vec![
-                    "Gmail".to_string(),
-                    "Google Drive".to_string(),
-                    "Spotify".to_string(),
-                ],
-                design_tips: vec![
-                    "Group related navigation items".to_string(),
-                    "Highlight the current section".to_string(),
-                    "Keep navigation items to essential destinations".to_string(),
-                    "Consider using bottom navigation for <5 destinations".to_string(),
-                ],
-                accessibility_notes: if params.include_accessibility {
-                    vec![
-                        "Announce drawer open/close state".to_string(),
-                        "Trap focus within open drawer".to_string(),
-                        "Support escape key to close".to_string(),
-                    ]
-                } else {
-                    vec![]
-                },
-            },
-            _ => PatternGuidance {
-                pattern_name: params.pattern_name.clone(),
-                common_components: vec!["See similar screens for component suggestions".to_string()],
-                typical_layout: "Use search_by_vector to find similar patterns in RICO dataset"
-                    .to_string(),
-                example_apps: vec![],
-                design_tips: vec![
-                    "Follow Material Design guidelines".to_string(),
-                    "Maintain consistent spacing and typography".to_string(),
-                    "Test on multiple screen sizes".to_string(),
-                ],
-                accessibility_notes: if params.include_accessibility {
-                    vec![
-                        "Follow WCAG 2.1 guidelines".to_string(),
-                        "Test with TalkBack/VoiceOver".to_string(),
-                        "Ensure touch targets are at least 48dp".to_string(),
-                    ]
-                } else {
-                    vec![]
-                },
-            },
+            })
+            .collect();
+        component_frequencies.sort_by(|a, b| b.frequency.partial_cmp(&a.frequency).unwrap());
+        component_frequencies.truncate(10); // Top 10 components
+
+        // Limit app examples
+        app_names.truncate(5);
+
+        // Curated design tips based on pattern
+        let design_tips = get_curated_design_tips(pattern_name);
+        let accessibility_notes = if params.include_accessibility {
+            get_curated_accessibility_notes(pattern_name)
+        } else {
+            vec![]
+        };
+
+        // Derive typical layout from component distribution
+        let typical_layout = derive_layout_description(pattern_name, &component_frequencies);
+
+        let guidance = PatternGuidance {
+            pattern_name: pattern_name.to_string(),
+            screens_analyzed,
+            component_frequencies,
+            typical_layout,
+            example_apps: app_names,
+            design_tips,
+            accessibility_notes,
         };
 
         let json = serde_json::to_string_pretty(&guidance)
@@ -526,5 +510,156 @@ impl rmcp::ServerHandler for RicoMcpServer {
 impl Default for RicoMcpServer {
     fn default() -> Self {
         Self::new().expect("Failed to create RicoMcpServer")
+    }
+}
+
+// ============================================================================
+// Helper Functions for Pattern Guidance
+// ============================================================================
+
+/// Get curated design tips for a pattern
+fn get_curated_design_tips(pattern_name: &str) -> Vec<String> {
+    match pattern_name {
+        "Login Screen" => vec![
+            "Keep form fields minimal - username/email and password only".to_string(),
+            "Make the primary action button prominent".to_string(),
+            "Provide clear error states for invalid input".to_string(),
+            "Consider biometric login options".to_string(),
+        ],
+        "List View" => vec![
+            "Use consistent item heights for smooth scrolling".to_string(),
+            "Include visual hierarchy in list items".to_string(),
+            "Support swipe actions for common operations".to_string(),
+            "Consider pull-to-refresh for updatable content".to_string(),
+        ],
+        "Navigation Drawer" => vec![
+            "Group related navigation items".to_string(),
+            "Highlight the current section".to_string(),
+            "Keep navigation items to essential destinations".to_string(),
+            "Consider using bottom navigation for <5 destinations".to_string(),
+        ],
+        "Settings Screen" => vec![
+            "Group related settings into categories".to_string(),
+            "Use clear, descriptive labels".to_string(),
+            "Show current values for selections".to_string(),
+            "Provide search for large settings lists".to_string(),
+        ],
+        "Profile Screen" => vec![
+            "Display key user info prominently".to_string(),
+            "Make edit actions easily accessible".to_string(),
+            "Use avatar/photo as visual anchor".to_string(),
+            "Consider privacy controls visibility".to_string(),
+        ],
+        "Search Screen" => vec![
+            "Auto-focus the search input".to_string(),
+            "Show recent searches".to_string(),
+            "Provide search suggestions".to_string(),
+            "Display results as user types".to_string(),
+        ],
+        "Home Screen" | "Dashboard" => vec![
+            "Prioritize most-used actions".to_string(),
+            "Use cards to group related content".to_string(),
+            "Consider personalization".to_string(),
+            "Keep navigation clear and accessible".to_string(),
+        ],
+        "Detail View" => vec![
+            "Show key information first".to_string(),
+            "Use hierarchy to organize content".to_string(),
+            "Provide clear back navigation".to_string(),
+            "Consider sharing and action options".to_string(),
+        ],
+        "Form/Input Screen" => vec![
+            "Use appropriate input types".to_string(),
+            "Validate input in real-time".to_string(),
+            "Show progress for multi-step forms".to_string(),
+            "Save draft content automatically".to_string(),
+        ],
+        "Chat/Messaging" => vec![
+            "Keep message bubbles readable".to_string(),
+            "Show delivery/read status".to_string(),
+            "Support rich content (images, links)".to_string(),
+            "Optimize keyboard interactions".to_string(),
+        ],
+        _ => vec![
+            "Follow Material Design guidelines".to_string(),
+            "Maintain consistent spacing and typography".to_string(),
+            "Test on multiple screen sizes".to_string(),
+        ],
+    }
+}
+
+/// Get curated accessibility notes for a pattern
+fn get_curated_accessibility_notes(pattern_name: &str) -> Vec<String> {
+    match pattern_name {
+        "Login Screen" => vec![
+            "Label all form fields properly".to_string(),
+            "Ensure sufficient color contrast".to_string(),
+            "Support password visibility toggle".to_string(),
+            "Provide clear focus indicators".to_string(),
+        ],
+        "List View" => vec![
+            "Ensure list items are focusable".to_string(),
+            "Provide content descriptions for images".to_string(),
+            "Support keyboard navigation".to_string(),
+        ],
+        "Navigation Drawer" => vec![
+            "Announce drawer open/close state".to_string(),
+            "Trap focus within open drawer".to_string(),
+            "Support escape key to close".to_string(),
+        ],
+        "Settings Screen" => vec![
+            "Use proper heading levels".to_string(),
+            "Announce toggle/switch states".to_string(),
+            "Provide descriptive labels for all controls".to_string(),
+        ],
+        "Profile Screen" => vec![
+            "Describe images with alt text".to_string(),
+            "Use semantic headings".to_string(),
+            "Make edit buttons clearly labeled".to_string(),
+        ],
+        "Search Screen" => vec![
+            "Label the search field".to_string(),
+            "Announce result counts".to_string(),
+            "Make results keyboard navigable".to_string(),
+        ],
+        _ => vec![
+            "Follow WCAG 2.1 guidelines".to_string(),
+            "Test with TalkBack/VoiceOver".to_string(),
+            "Ensure touch targets are at least 48dp".to_string(),
+        ],
+    }
+}
+
+/// Derive layout description from component frequencies
+fn derive_layout_description(pattern_name: &str, frequencies: &[ComponentFrequency]) -> String {
+    // Start with pattern-specific layouts
+    let base = match pattern_name {
+        "Login Screen" => "Centered form with logo at top, inputs in middle, buttons at bottom",
+        "List View" => "Vertical scrolling list with consistent item heights",
+        "Navigation Drawer" => "Slide-in panel from left with menu items",
+        "Settings Screen" => "Scrollable list of grouped preference items",
+        "Profile Screen" => "Header with avatar, followed by user details and actions",
+        "Search Screen" => "Search bar at top, results list below",
+        "Home Screen" | "Dashboard" => "Grid or list of cards/tiles with key actions",
+        "Detail View" => "Hero image or header, followed by content sections",
+        "Form/Input Screen" => "Vertical stack of labeled input fields with submit action",
+        "Chat/Messaging" => "Message list with input bar at bottom",
+        _ => "Layout varies by implementation",
+    };
+
+    // Add component insights if we have data
+    if !frequencies.is_empty() {
+        let top_components: Vec<&str> = frequencies
+            .iter()
+            .take(3)
+            .map(|c| c.name.as_str())
+            .collect();
+        format!(
+            "{}. Common components: {}",
+            base,
+            top_components.join(", ")
+        )
+    } else {
+        base.to_string()
     }
 }

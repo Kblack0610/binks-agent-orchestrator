@@ -109,16 +109,27 @@ pub struct SimilarityResult {
 pub struct PatternGuidance {
     /// Pattern name (e.g., "Login Screen", "List View", "Navigation Drawer")
     pub pattern_name: String,
-    /// Common components in this pattern
-    pub common_components: Vec<String>,
+    /// Number of screens analyzed to generate this guidance
+    pub screens_analyzed: usize,
+    /// Common components with their frequency (0.0-1.0)
+    pub component_frequencies: Vec<ComponentFrequency>,
     /// Description of typical layout structure
     pub typical_layout: String,
-    /// Example apps using this pattern
+    /// Real example apps from the dataset using this pattern
     pub example_apps: Vec<String>,
     /// Design best practices and considerations
     pub design_tips: Vec<String>,
     /// Accessibility considerations
     pub accessibility_notes: Vec<String>,
+}
+
+/// Component with frequency information
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ComponentFrequency {
+    /// Component name
+    pub name: String,
+    /// Frequency (0.0-1.0) - how often this component appears in matching screens
+    pub frequency: f32,
 }
 
 /// Dataset status information
