@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 /// Parameters for listing issues
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct IssueListParams {
-    #[schemars(description = "Filter by issue state (e.g., 'started', 'unstarted', 'completed', 'canceled')")]
+    #[schemars(
+        description = "Filter by issue state (e.g., 'started', 'unstarted', 'completed', 'canceled')"
+    )]
     pub state: Option<String>,
 
     #[schemars(description = "Sort order (e.g., 'created', 'updated', 'priority')")]
@@ -19,7 +21,9 @@ pub struct IssueListParams {
 /// Parameters for viewing an issue
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct IssueViewParams {
-    #[schemars(description = "Issue identifier (e.g., 'ENG-123'). If omitted, uses the current git branch")]
+    #[schemars(
+        description = "Issue identifier (e.g., 'ENG-123'). If omitted, uses the current git branch"
+    )]
     pub issue_id: Option<String>,
 }
 
@@ -38,7 +42,9 @@ pub struct IssueCreateParams {
 #[cfg(feature = "readwrite")]
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct IssueStartParams {
-    #[schemars(description = "Issue identifier to start (e.g., 'ENG-123'). If omitted, uses the current git branch")]
+    #[schemars(
+        description = "Issue identifier to start (e.g., 'ENG-123'). If omitted, uses the current git branch"
+    )]
     pub issue_id: Option<String>,
 }
 
@@ -46,7 +52,9 @@ pub struct IssueStartParams {
 #[cfg(feature = "readwrite")]
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct IssueCommentAddParams {
-    #[schemars(description = "Issue identifier (e.g., 'ENG-123'). If omitted, uses the current git branch")]
+    #[schemars(
+        description = "Issue identifier (e.g., 'ENG-123'). If omitted, uses the current git branch"
+    )]
     pub issue_id: Option<String>,
 
     #[schemars(description = "Comment body text (markdown supported)")]

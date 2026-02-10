@@ -50,9 +50,7 @@ impl LinearCliMcpServer {
         handlers::issue_view(params).await
     }
 
-    #[tool(
-        description = "Get the Linear issue ID associated with the current git branch"
-    )]
+    #[tool(description = "Get the Linear issue ID associated with the current git branch")]
     async fn linear_issue_id(
         &self,
         Parameters(_): Parameters<EmptyParams>,

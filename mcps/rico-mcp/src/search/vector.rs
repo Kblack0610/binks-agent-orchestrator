@@ -48,7 +48,9 @@ impl<'a> VectorSearch<'a> {
                     if let Some(meta) = self.loader.get_metadata(screen_id) {
                         let component_names: Vec<String> = meta.component_names();
                         let has_match = filter.iter().any(|f| {
-                            component_names.iter().any(|c| c.to_lowercase().contains(&f.to_lowercase()))
+                            component_names
+                                .iter()
+                                .any(|c| c.to_lowercase().contains(&f.to_lowercase()))
                         });
                         if !has_match {
                             return None;
@@ -61,7 +63,11 @@ impl<'a> VectorSearch<'a> {
                     return None;
                 }
 
-                let dot_product: f32 = query_vec.iter().zip(row_vec.iter()).map(|(a, b)| a * b).sum();
+                let dot_product: f32 = query_vec
+                    .iter()
+                    .zip(row_vec.iter())
+                    .map(|(a, b)| a * b)
+                    .sum();
                 let similarity = dot_product / (query_norm * row_norm);
 
                 if similarity >= min_similarity {
@@ -88,9 +94,7 @@ impl<'a> VectorSearch<'a> {
                     app_package: meta
                         .map(|m| m.app_package.clone())
                         .unwrap_or_else(|| "unknown".to_string()),
-                    components: meta
-                        .map(|m| m.component_names())
-                        .unwrap_or_default(),
+                    components: meta.map(|m| m.component_names()).unwrap_or_default(),
                     screenshot_available: self.loader.screenshot_exists(screen_id),
                 }
             })
@@ -125,7 +129,9 @@ impl<'a> VectorSearch<'a> {
         let vectors: Vec<Array1<f32>> = screen_ids
             .iter()
             .filter_map(|&id| {
-                self.loader.get_vector(id).map(|v| Array1::from_vec(v.0.to_vec()))
+                self.loader
+                    .get_vector(id)
+                    .map(|v| Array1::from_vec(v.0.to_vec()))
             })
             .collect();
 
@@ -142,7 +148,11 @@ impl<'a> VectorSearch<'a> {
                 let norm_j = l2_norm(&vectors[j]);
 
                 if norm_i > 0.0 && norm_j > 0.0 {
-                    let dot: f32 = vectors[i].iter().zip(vectors[j].iter()).map(|(a, b)| a * b).sum();
+                    let dot: f32 = vectors[i]
+                        .iter()
+                        .zip(vectors[j].iter())
+                        .map(|(a, b)| a * b)
+                        .sum();
                     total_sim += dot / (norm_i * norm_j);
                     count += 1;
                 }

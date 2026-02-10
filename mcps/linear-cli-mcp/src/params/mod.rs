@@ -1,10 +1,10 @@
 //! Parameter types for Linear CLI MCP tools
 
-mod issue;
 mod document;
+mod issue;
 
-pub use issue::*;
 pub use document::*;
+pub use issue::*;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

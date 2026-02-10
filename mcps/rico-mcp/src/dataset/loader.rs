@@ -76,9 +76,8 @@ impl DatasetLoader {
         info!("Loaded {} vectors", vectors.nrows());
 
         // Build screen ID to row mapping (assuming sequential IDs starting at 0)
-        let screen_to_row: HashMap<u32, usize> = (0..vectors.nrows())
-            .map(|i| (i as u32, i))
-            .collect();
+        let screen_to_row: HashMap<u32, usize> =
+            (0..vectors.nrows()).map(|i| (i as u32, i)).collect();
 
         // Load metadata
         let mut metadata = Self::load_metadata(&config.metadata_path())?;
@@ -115,14 +114,11 @@ impl DatasetLoader {
         let file = File::open(path)
             .with_context(|| format!("Failed to open vectors file: {}", path.display()))?;
         let reader = BufReader::new(file);
-        let vectors: Array2<f32> = Array2::read_npy(reader)
-            .with_context(|| "Failed to parse NPY file")?;
+        let vectors: Array2<f32> =
+            Array2::read_npy(reader).with_context(|| "Failed to parse NPY file")?;
 
         if vectors.ncols() != 64 {
-            anyhow::bail!(
-                "Expected 64-dimensional vectors, got {}",
-                vectors.ncols()
-            );
+            anyhow::bail!("Expected 64-dimensional vectors, got {}", vectors.ncols());
         }
 
         Ok(vectors)
@@ -133,8 +129,8 @@ impl DatasetLoader {
         let file = File::open(path)
             .with_context(|| format!("Failed to open metadata file: {}", path.display()))?;
         let reader = BufReader::new(file);
-        let raw: Vec<RawMetadata> = serde_json::from_reader(reader)
-            .with_context(|| "Failed to parse metadata JSON")?;
+        let raw: Vec<RawMetadata> =
+            serde_json::from_reader(reader).with_context(|| "Failed to parse metadata JSON")?;
 
         let metadata: HashMap<u32, ScreenMetadata> = raw
             .into_iter()
@@ -159,10 +155,7 @@ impl DatasetLoader {
     }
 
     /// Load semantic annotations from directory
-    fn load_annotations(
-        dir: &Path,
-        metadata: &mut HashMap<u32, ScreenMetadata>,
-    ) -> Result<usize> {
+    fn load_annotations(dir: &Path, metadata: &mut HashMap<u32, ScreenMetadata>) -> Result<usize> {
         let mut count = 0;
 
         for entry in std::fs::read_dir(dir)? {

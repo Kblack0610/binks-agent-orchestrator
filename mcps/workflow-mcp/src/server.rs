@@ -2,7 +2,9 @@
 
 use crate::engine::ExecutionRegistry;
 use crate::loader::{builtin_workflows, load_custom_workflows};
-use crate::params::{ExecuteWorkflowParams, ExecutionStatusParams, ListWorkflowsParams, ResumeCheckpointParams};
+use crate::params::{
+    ExecuteWorkflowParams, ExecutionStatusParams, ListWorkflowsParams, ResumeCheckpointParams,
+};
 use crate::types::{Workflow, WorkflowStep};
 use mcp_common::{McpError, ResultExt};
 use rmcp::{
@@ -79,9 +81,7 @@ impl WorkflowMcpServer {
     // ========================================================================
 
     /// List all available workflows (built-in and custom)
-    #[tool(
-        description = "List all available workflows with their descriptions and steps"
-    )]
+    #[tool(description = "List all available workflows with their descriptions and steps")]
     async fn list_workflows(
         &self,
         Parameters(_params): Parameters<ListWorkflowsParams>,
@@ -158,9 +158,9 @@ impl WorkflowMcpServer {
         Parameters(params): Parameters<ExecuteWorkflowParams>,
     ) -> Result<CallToolResult, McpError> {
         // Get the workflow by name
-        let workflow = self
-            .get_workflow(&params.workflow)
-            .ok_or_else(|| McpError::invalid_params(format!("Workflow not found: {}", params.workflow), None))?;
+        let workflow = self.get_workflow(&params.workflow).ok_or_else(|| {
+            McpError::invalid_params(format!("Workflow not found: {}", params.workflow), None)
+        })?;
 
         // Create initial context with the task
         let mut context = params.context;
@@ -191,9 +191,7 @@ impl WorkflowMcpServer {
     }
 
     /// Get the status of a workflow execution
-    #[tool(
-        description = "Get the current status and progress of a workflow execution by ID"
-    )]
+    #[tool(description = "Get the current status and progress of a workflow execution by ID")]
     async fn get_execution_status(
         &self,
         Parameters(params): Parameters<ExecutionStatusParams>,
@@ -202,9 +200,9 @@ impl WorkflowMcpServer {
             McpError::internal_error(format!("Failed to lock execution registry: {}", e), None)
         })?;
 
-        let state = registry.get(&params.execution_id).map_err(|e| {
-            McpError::invalid_params(e.to_string(), None)
-        })?;
+        let state = registry
+            .get(&params.execution_id)
+            .map_err(|e| McpError::invalid_params(e.to_string(), None))?;
 
         let response = serde_json::json!({
             "execution_id": state.id,
@@ -232,17 +230,22 @@ impl WorkflowMcpServer {
             McpError::internal_error(format!("Failed to lock execution registry: {}", e), None)
         })?;
 
-        let state = registry.get_mut(&params.execution_id).map_err(|e| {
-            McpError::invalid_params(e.to_string(), None)
-        })?;
+        let state = registry
+            .get_mut(&params.execution_id)
+            .map_err(|e| McpError::invalid_params(e.to_string(), None))?;
 
         // Add feedback to context if provided
         if let Some(feedback) = &params.feedback {
-            state.context.insert("checkpoint_feedback".to_string(), feedback.clone());
+            state
+                .context
+                .insert("checkpoint_feedback".to_string(), feedback.clone());
         }
 
         // Add approval status to context
-        state.context.insert("checkpoint_approved".to_string(), params.approved.to_string());
+        state.context.insert(
+            "checkpoint_approved".to_string(),
+            params.approved.to_string(),
+        );
 
         let response = serde_json::json!({
             "execution_id": state.id,

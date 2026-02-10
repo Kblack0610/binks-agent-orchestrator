@@ -2,15 +2,15 @@
 //!
 //! Organized by domain: issue, team, project, document
 
-mod issue;
-mod team;
-mod project;
 mod document;
+mod issue;
+mod project;
+mod team;
 
-pub use issue::*;
-pub use team::*;
-pub use project::*;
 pub use document::*;
+pub use issue::*;
+pub use project::*;
+pub use team::*;
 
 use mcp_common::{internal_error, McpError};
 

@@ -112,8 +112,9 @@ impl RicoMcpServer {
 
         // Parse the vector from JSON output
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let vector: Vec<f32> = serde_json::from_str(&stdout)
-            .map_err(|e| McpError::internal_error(format!("Failed to parse vector: {}", e), None))?;
+        let vector: Vec<f32> = serde_json::from_str(&stdout).map_err(|e| {
+            McpError::internal_error(format!("Failed to parse vector: {}", e), None)
+        })?;
 
         let mut result = serde_json::json!({
             "vector": vector,
@@ -224,8 +225,14 @@ impl RicoMcpServer {
                     "Text Button (Forgot Password)".to_string(),
                     "Image (logo)".to_string(),
                 ],
-                typical_layout: "Centered form with logo at top, inputs in middle, buttons at bottom".to_string(),
-                example_apps: vec!["Instagram".to_string(), "Facebook".to_string(), "Twitter".to_string()],
+                typical_layout:
+                    "Centered form with logo at top, inputs in middle, buttons at bottom"
+                        .to_string(),
+                example_apps: vec![
+                    "Instagram".to_string(),
+                    "Facebook".to_string(),
+                    "Twitter".to_string(),
+                ],
                 design_tips: vec![
                     "Keep form fields minimal - username/email and password only".to_string(),
                     "Make the primary action button prominent".to_string(),
@@ -252,7 +259,11 @@ impl RicoMcpServer {
                     "Text (subtitle)".to_string(),
                 ],
                 typical_layout: "Vertical scrolling list with consistent item heights".to_string(),
-                example_apps: vec!["Gmail".to_string(), "Contacts".to_string(), "Settings".to_string()],
+                example_apps: vec![
+                    "Gmail".to_string(),
+                    "Contacts".to_string(),
+                    "Settings".to_string(),
+                ],
                 design_tips: vec![
                     "Use consistent item heights for smooth scrolling".to_string(),
                     "Include visual hierarchy in list items".to_string(),
@@ -279,7 +290,11 @@ impl RicoMcpServer {
                     "Image (profile)".to_string(),
                 ],
                 typical_layout: "Slide-in panel from left with menu items".to_string(),
-                example_apps: vec!["Gmail".to_string(), "Google Drive".to_string(), "Spotify".to_string()],
+                example_apps: vec![
+                    "Gmail".to_string(),
+                    "Google Drive".to_string(),
+                    "Spotify".to_string(),
+                ],
                 design_tips: vec![
                     "Group related navigation items".to_string(),
                     "Highlight the current section".to_string(),
@@ -299,7 +314,8 @@ impl RicoMcpServer {
             _ => PatternGuidance {
                 pattern_name: params.pattern_name.clone(),
                 common_components: vec!["See similar screens for component suggestions".to_string()],
-                typical_layout: "Use search_by_vector to find similar patterns in RICO dataset".to_string(),
+                typical_layout: "Use search_by_vector to find similar patterns in RICO dataset"
+                    .to_string(),
                 example_apps: vec![],
                 design_tips: vec![
                     "Follow Material Design guidelines".to_string(),
@@ -337,7 +353,11 @@ impl RicoMcpServer {
             vectors_loaded: self.loader.screen_count(),
             metadata_loaded: self.loader.screen_count(),
             annotations_loaded: self.loader.has_annotations(),
-            screenshots_available: self.loader.screen_ids().filter(|&id| self.loader.screenshot_exists(id)).count(),
+            screenshots_available: self
+                .loader
+                .screen_ids()
+                .filter(|&id| self.loader.screenshot_exists(id))
+                .count(),
             cache_hits: cache_stats.hits,
             cache_misses: cache_stats.misses,
             cache_size: cache_stats.size,
@@ -387,15 +407,18 @@ impl RicoMcpServer {
             // Compute flow cohesion (average pairwise similarity)
             if let Some(cohesion) = search.flow_cohesion(&params.screen_ids) {
                 result["flow_cohesion"] = serde_json::json!(cohesion);
-                result["cohesion_rating"] = serde_json::json!(
-                    if cohesion > 0.8 { "High - consistent UI flow" }
-                    else if cohesion > 0.6 { "Medium - mostly consistent" }
-                    else { "Low - consider improving consistency" }
-                );
+                result["cohesion_rating"] = serde_json::json!(if cohesion > 0.8 {
+                    "High - consistent UI flow"
+                } else if cohesion > 0.6 {
+                    "Medium - mostly consistent"
+                } else {
+                    "Low - consider improving consistency"
+                });
             }
 
             // Analyze component consistency
-            let mut component_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            let mut component_counts: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
             for screen in &screens {
                 for comp in screen.component_names() {
                     *component_counts.entry(comp).or_insert(0) += 1;
