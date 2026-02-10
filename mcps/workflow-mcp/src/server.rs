@@ -95,39 +95,36 @@ impl WorkflowMcpServer {
                 .steps
                 .iter()
                 .enumerate()
-                .map(|(idx, step)| {
-                    let step_info = match step {
-                        WorkflowStep::Agent { name, task, model } => {
-                            serde_json::json!({
-                                "index": idx,
-                                "type": "agent",
-                                "agent": name,
-                                "task_template": task,
-                                "model": model,
-                            })
-                        }
-                        WorkflowStep::Checkpoint { message, show } => {
-                            serde_json::json!({
-                                "index": idx,
-                                "type": "checkpoint",
-                                "message": message,
-                                "show": show,
-                            })
-                        }
-                        WorkflowStep::Parallel(_) => {
-                            serde_json::json!({
-                                "index": idx,
-                                "type": "parallel",
-                            })
-                        }
-                        WorkflowStep::Branch { .. } => {
-                            serde_json::json!({
-                                "index": idx,
-                                "type": "branch",
-                            })
-                        }
-                    };
-                    step_info
+                .map(|(idx, step)| match step {
+                    WorkflowStep::Agent { name, task, model } => {
+                        serde_json::json!({
+                            "index": idx,
+                            "type": "agent",
+                            "agent": name,
+                            "task_template": task,
+                            "model": model,
+                        })
+                    }
+                    WorkflowStep::Checkpoint { message, show } => {
+                        serde_json::json!({
+                            "index": idx,
+                            "type": "checkpoint",
+                            "message": message,
+                            "show": show,
+                        })
+                    }
+                    WorkflowStep::Parallel(_) => {
+                        serde_json::json!({
+                            "index": idx,
+                            "type": "parallel",
+                        })
+                    }
+                    WorkflowStep::Branch { .. } => {
+                        serde_json::json!({
+                            "index": idx,
+                            "type": "branch",
+                        })
+                    }
                 })
                 .collect();
 
