@@ -41,6 +41,10 @@ use tools::mcp_tools_to_direct;
 pub mod metrics;
 use metrics::McpMetrics;
 
+// AgentBuilder for ergonomic construction
+pub mod builder;
+pub use builder::AgentBuilder;
+
 /// Default maximum iterations (used when config not provided)
 const DEFAULT_MAX_ITERATIONS: usize = 10;
 /// Default LLM timeout in seconds (5 minutes)

@@ -49,6 +49,10 @@ pub mod streaming;
 pub mod agent;
 #[cfg(feature = "mcp")]
 pub mod mcp;
+
+// Re-export key types at crate root for convenience
+#[cfg(feature = "mcp")]
+pub use agent::{Agent, AgentBuilder};
 #[cfg(feature = "mcp")]
 pub mod mcps;
 #[cfg(feature = "mcp")]

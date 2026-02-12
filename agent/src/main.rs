@@ -7,9 +7,9 @@ use anyhow::Result;
 use clap::Parser;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use agent::cli::{Cli, Commands};
-use agent::config::AgentFileConfig;
-use agent::handlers::CommandContext;
+use binks_agent::cli::{Cli, Commands};
+use binks_agent::config::AgentFileConfig;
+use binks_agent::handlers::CommandContext;
 
 /// Initialize tracing with the given verbosity level
 ///
@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
 }
 
 async fn dispatch(cmd: Commands, ctx: CommandContext) -> Result<()> {
-    use ::agent::handlers::*;
+    use ::binks_agent::handlers::*;
 
     match cmd {
         // =================================================================

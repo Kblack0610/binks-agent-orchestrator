@@ -4,8 +4,22 @@
 //! This struct is Send-safe and can be used in async contexts that require Send.
 //! When the MCP daemon is running, it uses the daemon for all operations.
 //! Otherwise, it falls back to spawn-per-call.
+//!
+//! # Embedded MCPs
+//!
+//! With the `embedded` feature, MCPs can be registered for in-process execution
+//! without subprocess spawning. This provides lower latency and tighter integration.
+//!
+//! ```rust,ignore
+//! use sysinfo_mcp::SysInfoMcpServer;
+//!
+//! let mut pool = McpClientPool::new(config);
+//! pool.register_embedded(SysInfoMcpServer::new());
+//! ```
 
 use std::collections::HashMap;
+#[cfg(feature = "embedded")]
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -18,11 +32,22 @@ use super::types::McpTool;
 use crate::config::{McpConfig, McpProfile, McpServerConfig};
 use crate::mcps::{is_daemon_running, DaemonClient};
 
+#[cfg(feature = "embedded")]
+use mcp_common::EmbeddableMcp;
+
 /// Pool for managing MCP server access with tool caching
 ///
 /// This struct is Send-safe and can be used in async contexts that require Send.
 /// When the MCP daemon is running, it uses the daemon for all operations.
 /// Otherwise, it falls back to spawn-per-call.
+///
+/// # Embedded MCPs
+///
+/// With the `embedded` feature, MCPs can be registered for in-process execution:
+///
+/// ```rust,ignore
+/// pool.register_embedded(SysInfoMcpServer::new());
+/// ```
 pub struct McpClientPool {
     config: McpConfig,
     /// Cache of tools per server
@@ -37,6 +62,9 @@ pub struct McpClientPool {
     startup_timeout: Duration,
     /// Timeout for individual tool calls
     tool_timeout: Duration,
+    /// Embedded MCP servers (in-process, no subprocess spawning)
+    #[cfg(feature = "embedded")]
+    embedded_mcps: HashMap<String, Arc<dyn EmbeddableMcp>>,
 }
 
 /// Default connect timeout (daemon socket or spawn connection)
@@ -47,6 +75,28 @@ const DEFAULT_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_TOOL_TIMEOUT: Duration = Duration::from_secs(60);
 
 impl McpClientPool {
+    /// Create an empty pool (no subprocess MCPs)
+    ///
+    /// Use this when building an embedded-only agent where all MCPs
+    /// are registered via `register_embedded()`.
+    pub fn empty() -> Self {
+        Self {
+            config: McpConfig {
+                mcp_servers: HashMap::new(),
+            },
+            tools_cache: HashMap::new(),
+            daemon_available: None,
+            daemon_client: DaemonClient::new()
+                .with_connect_timeout(DEFAULT_CONNECT_TIMEOUT)
+                .with_read_timeout(DEFAULT_TOOL_TIMEOUT),
+            connect_timeout: DEFAULT_CONNECT_TIMEOUT,
+            startup_timeout: DEFAULT_STARTUP_TIMEOUT,
+            tool_timeout: DEFAULT_TOOL_TIMEOUT,
+            #[cfg(feature = "embedded")]
+            embedded_mcps: HashMap::new(),
+        }
+    }
+
     /// Create a new pool from config (uses default timeouts)
     pub fn new(config: McpConfig) -> Self {
         Self {
@@ -59,6 +109,8 @@ impl McpClientPool {
             connect_timeout: DEFAULT_CONNECT_TIMEOUT,
             startup_timeout: DEFAULT_STARTUP_TIMEOUT,
             tool_timeout: DEFAULT_TOOL_TIMEOUT,
+            #[cfg(feature = "embedded")]
+            embedded_mcps: HashMap::new(),
         }
     }
 
@@ -78,13 +130,63 @@ impl McpClientPool {
         self
     }
 
-    /// Create an empty pool for testing purposes
-    #[cfg(test)]
-    pub fn empty() -> Self {
-        Self::new(McpConfig {
-            mcp_servers: HashMap::new(),
-        })
+    /// Register an embedded MCP server for in-process execution
+    ///
+    /// Embedded MCPs are called directly without subprocess spawning,
+    /// providing lower latency and tighter integration.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use sysinfo_mcp::SysInfoMcpServer;
+    ///
+    /// let mut pool = McpClientPool::new(config);
+    /// pool.register_embedded(SysInfoMcpServer::new());
+    /// ```
+    #[cfg(feature = "embedded")]
+    pub fn register_embedded<S: EmbeddableMcp + 'static>(&mut self, server: S) {
+        let name = server.server_name().to_string();
+        tracing::info!("Registered embedded MCP server: {}", name);
+        self.embedded_mcps.insert(name, Arc::new(server));
     }
+
+    /// Register an embedded MCP server from an Arc (for builder pattern)
+    ///
+    /// This variant accepts an already-wrapped Arc, useful when the server
+    /// is stored as a trait object.
+    #[cfg(feature = "embedded")]
+    pub fn register_embedded_arc(&mut self, server: Arc<dyn EmbeddableMcp>) {
+        let name = server.server_name().to_string();
+        tracing::info!("Registered embedded MCP server: {}", name);
+        self.embedded_mcps.insert(name, server);
+    }
+
+    /// Check if a server is registered as embedded
+    #[cfg(feature = "embedded")]
+    pub fn is_embedded(&self, name: &str) -> bool {
+        self.embedded_mcps.contains_key(name)
+    }
+
+    /// Get list of embedded server names
+    #[cfg(feature = "embedded")]
+    pub fn embedded_server_names(&self) -> Vec<String> {
+        self.embedded_mcps.keys().cloned().collect()
+    }
+
+    /// Get all server names (configured + embedded)
+    ///
+    /// Returns configured servers plus any embedded MCPs.
+    #[cfg(feature = "embedded")]
+    pub fn all_server_names(&self) -> Vec<String> {
+        let mut names = self.server_names();
+        for name in self.embedded_mcps.keys() {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+        names
+    }
+
 
     /// Check if daemon is available (with caching)
     async fn check_daemon(&mut self) -> bool {
@@ -179,10 +281,32 @@ impl McpClientPool {
     }
 
     /// List tools from a specific server (with caching)
+    ///
+    /// Checks in order: cache, embedded MCPs, daemon, spawn-per-call
     pub async fn list_tools_from(&mut self, name: &str) -> Result<Vec<McpTool>> {
         // Check cache first
         if let Some(tools) = self.tools_cache.get(name) {
             return Ok(tools.clone());
+        }
+
+        // Check embedded MCPs (feature-gated)
+        #[cfg(feature = "embedded")]
+        if let Some(embedded) = self.embedded_mcps.get(name) {
+            let tools: Vec<McpTool> = embedded
+                .list_tools()
+                .into_iter()
+                .map(|t| McpTool {
+                    server: name.to_string(),
+                    name: t.name.to_string(),
+                    description: t.description.map(|d| d.to_string()),
+                    input_schema: Some(Value::Object((*t.input_schema).clone())),
+                })
+                .collect();
+
+            // Cache the result
+            self.tools_cache.insert(name.to_string(), tools.clone());
+            tracing::info!("Server '{}': {} tools (embedded, cached)", name, tools.len());
+            return Ok(tools);
         }
 
         let tools = if self.check_daemon().await {
@@ -214,11 +338,17 @@ impl McpClientPool {
         Ok(tools)
     }
 
-    /// List all tools from all configured servers
+    /// List all tools from all servers (configured + embedded)
     pub async fn list_all_tools(&mut self) -> Result<Vec<McpTool>> {
         let mut all_tools = Vec::new();
 
-        for name in self.server_names() {
+        // Get server names (use all_server_names if embedded feature is enabled)
+        #[cfg(feature = "embedded")]
+        let names = self.all_server_names();
+        #[cfg(not(feature = "embedded"))]
+        let names = self.server_names();
+
+        for name in names {
             match self.list_tools_from(&name).await {
                 Ok(tools) => {
                     all_tools.extend(tools);
@@ -232,13 +362,31 @@ impl McpClientPool {
         Ok(all_tools)
     }
 
-    /// Call a tool by name (uses daemon if available, otherwise spawn-per-call)
+    /// Call a tool by name
+    ///
+    /// Checks in order: embedded MCPs, daemon, spawn-per-call
     pub async fn call_tool(
         &mut self,
         tool_name: &str,
         arguments: Option<Value>,
     ) -> Result<CallToolResult> {
-        // Find which server has this tool
+        // Check embedded MCPs first (feature-gated)
+        #[cfg(feature = "embedded")]
+        {
+            for (name, embedded) in &self.embedded_mcps {
+                let tools = embedded.list_tools();
+                if tools.iter().any(|t| t.name.as_ref() == tool_name) {
+                    tracing::debug!("Calling embedded MCP '{}' tool '{}'", name, tool_name);
+                    let result = embedded
+                        .call_tool(tool_name, arguments.unwrap_or(Value::Null))
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Embedded MCP error: {}", e))?;
+                    return Ok(result);
+                }
+            }
+        }
+
+        // Find which server has this tool (daemon/spawn-per-call)
         let server_name = {
             let mut found = None;
             for name in self.server_names() {
@@ -306,11 +454,20 @@ impl McpClientPool {
         }
     }
 
-    /// Look up which server owns a tool (from the tools cache)
+    /// Look up which server owns a tool (from cache or embedded MCPs)
     ///
-    /// Returns the server name if the tool is found in the cache.
+    /// Returns the server name if the tool is found in the cache or embedded MCPs.
     /// This is useful for recording per-server metrics after a tool call.
     pub fn server_for_tool(&self, tool_name: &str) -> Option<String> {
+        // Check embedded MCPs first (feature-gated)
+        #[cfg(feature = "embedded")]
+        for (server_name, embedded) in &self.embedded_mcps {
+            if embedded.list_tools().iter().any(|t| t.name.as_ref() == tool_name) {
+                return Some(server_name.clone());
+            }
+        }
+
+        // Check tools cache
         for (server_name, tools) in &self.tools_cache {
             if tools.iter().any(|t| t.name == tool_name) {
                 return Some(server_name.clone());

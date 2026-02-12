@@ -4,6 +4,14 @@ version = "0.1.0"
 edition = "2021"
 description = "Minimal Rust agent with Ollama and MCP support"
 
+[lib]
+name = "binks_agent"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agent"
+path = "src/main.rs"
+
 # ==============================================================================
 # FEATURES - Build profiles for different use cases
 # ==============================================================================
@@ -30,6 +38,9 @@ orchestrator = ["mcp"]
 
 # Repository monitoring agent (requires mcp)
 monitor = ["mcp"]
+
+# Embeddable agent - enables in-process MCP execution without subprocess spawning
+embedded = ["mcp", "dep:mcp-common"]
 
 
 # ==============================================================================
@@ -93,6 +104,9 @@ futures-util = "0.3"
 
 # MCP protocol (optional: mcp feature)
 rmcp = { version = "0.13", features = ["server", "client", "macros", "transport-io", "transport-child-process"], optional = true }
+
+# MCP common utilities (optional: embedded feature)
+mcp-common = { path = "../common/mcp-common", optional = true }
 
 # Database (optional: persistence feature)
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }

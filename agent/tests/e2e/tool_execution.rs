@@ -1,6 +1,6 @@
 //! E2E test: Direct tool execution via MCP client
 
-use agent::mcp::McpClientPool;
+use binks_agent::mcp::McpClientPool;
 use std::path::PathBuf;
 
 /// Get the workspace root directory (contains target/ and Cargo.toml with [workspace])

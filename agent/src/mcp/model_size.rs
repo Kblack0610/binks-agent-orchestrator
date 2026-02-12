@@ -37,7 +37,7 @@ static SIZE_REGEX: LazyLock<Regex> =
 /// # Examples
 ///
 /// ```
-/// use agent::mcp::model_size::parse_model_size;
+/// use binks_agent::mcp::model_size::parse_model_size;
 ///
 /// assert_eq!(parse_model_size("llama3.1:8b").default_max_tier(), 1);  // Small
 /// assert_eq!(parse_model_size("qwen3-coder:30b").default_max_tier(), 2);  // Medium
