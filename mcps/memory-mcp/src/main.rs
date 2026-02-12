@@ -1,17 +1,7 @@
-//! Memory MCP - Dual-layer memory server with session and persistent storage
-//!
-//! Session layer: In-memory, ephemeral storage for reasoning chains and working memory
-//! Persistent layer: SQLite-backed knowledge graph that survives across sessions
+//! Memory MCP Server binary entry point
 
-mod handlers;
-mod params;
-mod persistent;
-mod server;
-mod session;
-mod types;
-
+use memory_mcp::MemoryMcpServer;
 use rmcp::{transport::io::stdio, ServiceExt};
-use server::MemoryMcpServer;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

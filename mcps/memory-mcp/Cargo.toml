@@ -5,6 +5,10 @@ edition.workspace = true
 description = "Dual-layer memory MCP server with session and persistent storage"
 license = "MIT"
 
+[lib]
+name = "memory_mcp"
+path = "src/lib.rs"
+
 [dependencies]
 # Internal crates
 mcp-common.workspace = true

@@ -1,18 +1,7 @@
-//! Self-Healing MCP - Workflow health analysis and automated improvement proposals
-//!
-//! Analyzes run history from ~/.binks/conversations.db to detect patterns,
-//! propose fixes, and verify improvements. Integrates with inbox-mcp for notifications.
-
-mod analysis;
-mod handlers;
-mod inbox;
-mod params;
-mod server;
-mod strategies;
-mod types;
+//! Self-Healing MCP Server binary entry point
 
 use rmcp::{transport::io::stdio, ServiceExt};
-use server::SelfHealingMcpServer;
+use self_healing_mcp::SelfHealingMcpServer;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

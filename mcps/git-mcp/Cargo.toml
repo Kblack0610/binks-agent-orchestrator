@@ -31,6 +31,10 @@ tracing.workspace = true
 # Git library (libgit2 bindings) - git-mcp specific
 git2 = "0.20"
 
+[lib]
+name = "git_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "git-mcp"
 path = "src/main.rs"

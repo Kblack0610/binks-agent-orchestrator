@@ -31,6 +31,10 @@ tracing.workspace = true
 [dev-dependencies]
 tokio-test = "0.4"
 
+[lib]
+name = "github_gh_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "github-gh-mcp"
 path = "src/main.rs"

@@ -1,16 +1,5 @@
-//! Web Search MCP Server
-//!
-//! Web search via SearXNG backend - self-hosted meta-search engine.
-//!
-//! # Configuration
-//! Set `SEARXNG_URL` env var or configure in `~/.binks/web-search.toml`
+//! Web Search MCP Server binary entry point
 
-mod backends;
-mod config;
-mod fetch;
-mod server;
-mod types;
-
-use server::WebSearchMcpServer;
+use web_search_mcp::WebSearchMcpServer;
 
 mcp_common::serve_stdio!(WebSearchMcpServer, "web_search_mcp");

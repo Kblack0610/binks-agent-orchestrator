@@ -32,6 +32,10 @@ dirs = "5"
 # Logging
 tracing.workspace = true
 
+[lib]
+name = "inbox_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "inbox-mcp"
 path = "src/main.rs"

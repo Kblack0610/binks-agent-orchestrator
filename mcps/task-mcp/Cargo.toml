@@ -3,6 +3,10 @@ name = "task-mcp"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "task_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "task-mcp"
 path = "src/main.rs"

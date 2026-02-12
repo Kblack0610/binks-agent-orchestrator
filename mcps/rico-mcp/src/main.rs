@@ -1,22 +1,7 @@
-//! RICO MCP - Mobile UI design similarity search using the RICO dataset
-//!
-//! Provides access to 66,000+ Android UI screens with:
-//! - 64-dimensional layout vectors for similarity search
-//! - Semantic annotations (24 component types, 197 button concepts, 97 icon classes)
-//! - Design pattern guidance and best practices
+//! RICO MCP Server binary entry point
 
-// Allow dead code for now - this is a new crate with planned features not yet wired up
-#![allow(dead_code)]
-
-mod config;
-mod dataset;
-mod params;
-mod search;
-mod server;
-mod types;
-
+use rico_mcp::RicoMcpServer;
 use rmcp::{transport::io::stdio, ServiceExt};
-use server::RicoMcpServer;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

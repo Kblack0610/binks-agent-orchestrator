@@ -3,6 +3,14 @@ name = "exec-mcp"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "exec_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "exec-mcp"
+path = "src/main.rs"
+
 [dependencies]
 mcp-common.workspace = true
 rmcp.workspace = true

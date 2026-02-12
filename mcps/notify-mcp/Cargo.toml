@@ -32,6 +32,10 @@ anyhow.workspace = true
 # Logging
 tracing.workspace = true
 
+[lib]
+name = "notify_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "notify-mcp"
 path = "src/main.rs"

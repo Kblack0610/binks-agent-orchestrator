@@ -5,6 +5,10 @@ edition.workspace = true
 description = "RICO UI dataset MCP server for mobile design similarity search"
 license = "MIT"
 
+[lib]
+name = "rico_mcp"
+path = "src/lib.rs"
+
 [dependencies]
 # Internal crates
 mcp-common.workspace = true
