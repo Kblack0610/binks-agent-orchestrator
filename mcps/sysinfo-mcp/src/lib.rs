@@ -30,3 +30,6 @@ pub use server::SysInfoMcpServer;
 
 // Re-export parameter types for direct API usage
 pub use server::{CpuInfoParams, CpuUsageParams, DiskInfoParams, NetworkParams};
+
+// Re-export EmbeddableMcp trait for in-process usage
+pub use mcp_common::{EmbeddableMcp, EmbeddableError, EmbeddableResult};

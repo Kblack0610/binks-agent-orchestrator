@@ -1,13 +1,16 @@
 //! MCP Server implementation for system information
 
-use mcp_common::{json_success, McpError};
+use mcp_common::{
+    async_trait, json_success, EmbeddableError, EmbeddableMcp, EmbeddableResult, McpError,
+};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, ServerCapabilities, ServerInfo},
+    model::{CallToolResult, ServerCapabilities, ServerInfo, Tool},
     tool, tool_handler, tool_router,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use sysinfo::System;
 use tokio::sync::Mutex;
@@ -171,5 +174,126 @@ impl rmcp::ServerHandler for SysInfoMcpServer {
 impl Default for SysInfoMcpServer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ============================================================================
+// EmbeddableMcp Implementation
+// ============================================================================
+
+#[async_trait]
+impl EmbeddableMcp for SysInfoMcpServer {
+    fn server_name(&self) -> &str {
+        "sysinfo"
+    }
+
+    fn server_description(&self) -> Option<&str> {
+        Some(
+            "Cross-platform System Information MCP Server - provides tools for \
+             retrieving OS, CPU, memory, disk, network, and uptime information.",
+        )
+    }
+
+    fn list_tools(&self) -> Vec<Tool> {
+        self.tool_router.list_all()
+    }
+
+    async fn call_tool(&self, name: &str, params: Value) -> EmbeddableResult<CallToolResult> {
+        match name {
+            "get_os_info" => self.get_os_info().await.map_err(Into::into),
+
+            "get_cpu_info" => {
+                let params: CpuInfoParams = serde_json::from_value(params)?;
+                self.get_cpu_info(Parameters(params)).await.map_err(Into::into)
+            }
+
+            "get_cpu_usage" => {
+                let params: CpuUsageParams = serde_json::from_value(params)?;
+                self.get_cpu_usage(Parameters(params)).await.map_err(Into::into)
+            }
+
+            "get_memory_info" => self.get_memory_info().await.map_err(Into::into),
+
+            "get_disk_info" => {
+                let params: DiskInfoParams = serde_json::from_value(params)?;
+                self.get_disk_info(Parameters(params)).await.map_err(Into::into)
+            }
+
+            "get_network_interfaces" => {
+                let params: NetworkParams = serde_json::from_value(params)?;
+                self.get_network_interfaces(Parameters(params))
+                    .await
+                    .map_err(Into::into)
+            }
+
+            "get_uptime" => self.get_uptime().await.map_err(Into::into),
+
+            "get_system_summary" => self.get_system_summary().await.map_err(Into::into),
+
+            _ => Err(EmbeddableError::ToolNotFound(name.to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_embeddable_server_name() {
+        let server = SysInfoMcpServer::new();
+        assert_eq!(server.server_name(), "sysinfo");
+    }
+
+    #[test]
+    fn test_embeddable_list_tools() {
+        let server = SysInfoMcpServer::new();
+        let tools = server.list_tools();
+
+        // Should have all 8 tools
+        assert_eq!(tools.len(), 8);
+
+        // Check some expected tool names
+        let tool_names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
+        assert!(tool_names.contains(&"get_os_info"));
+        assert!(tool_names.contains(&"get_cpu_info"));
+        assert!(tool_names.contains(&"get_memory_info"));
+        assert!(tool_names.contains(&"get_system_summary"));
+    }
+
+    #[tokio::test]
+    async fn test_embeddable_call_os_info() {
+        let server = SysInfoMcpServer::new();
+        let result = server
+            .call_tool("get_os_info", serde_json::json!({}))
+            .await;
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        // Should be successful (is_error not set or false)
+        assert!(result.is_error.is_none() || !result.is_error.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_embeddable_call_cpu_info() {
+        let server = SysInfoMcpServer::new();
+        let result = server
+            .call_tool(
+                "get_cpu_info",
+                serde_json::json!({ "include_per_core": true }),
+            )
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_embeddable_unknown_tool() {
+        let server = SysInfoMcpServer::new();
+        let result = server
+            .call_tool("nonexistent_tool", serde_json::json!({}))
+            .await;
+
+        assert!(matches!(result, Err(EmbeddableError::ToolNotFound(_))));
     }
 }
