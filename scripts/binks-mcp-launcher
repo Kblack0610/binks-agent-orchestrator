@@ -1,0 +1,264 @@
+#!/bin/bash
+# binks-mcp-launcher - Lazy download launcher for Binks MCP servers
+#
+# Downloads MCP binaries from GitHub releases on first run, caches locally.
+#
+# Usage:
+#   binks-mcp-launcher <mcp-name>
+#   binks-mcp-launcher --list
+#   binks-mcp-launcher --update [mcp-name]
+#   binks-mcp-launcher --version
+#
+# Environment variables:
+#   BINKS_REPO     - GitHub repository (default: kblack0610/binks-agent-orchestrator)
+#   BINKS_VERSION  - Version tag (default: latest)
+#   BINKS_CACHE    - Cache directory (default: ~/.binks/bin)
+#
+set -euo pipefail
+
+LAUNCHER_VERSION="0.1.0"
+
+# Configuration
+REPO="${BINKS_REPO:-kblack0610/binks-agent-orchestrator}"
+VERSION="${BINKS_VERSION:-latest}"
+CACHE_DIR="${BINKS_CACHE:-${HOME}/.binks/bin}"
+VERSION_FILE="${CACHE_DIR}/.versions"
+
+# Detect platform
+detect_platform() {
+    local os arch suffix
+
+    os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    arch=$(uname -m)
+
+    case "$os" in
+        linux)  os="linux" ;;
+        darwin) os="darwin" ;;
+        *)
+            echo "Error: Unsupported OS: $os" >&2
+            exit 1
+            ;;
+    esac
+
+    case "$arch" in
+        x86_64|amd64) arch="x86_64" ;;
+        aarch64|arm64) arch="aarch64" ;;
+        *)
+            echo "Error: Unsupported architecture: $arch" >&2
+            exit 1
+            ;;
+    esac
+
+    echo "${os}-${arch}"
+}
+
+# Get latest release version
+get_latest_version() {
+    local api_url="https://api.github.com/repos/${REPO}/releases/latest"
+
+    if command -v curl &> /dev/null; then
+        curl -sL "$api_url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+    elif command -v wget &> /dev/null; then
+        wget -qO- "$api_url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+    else
+        echo "Error: curl or wget required" >&2
+        exit 1
+    fi
+}
+
+# Download binary
+download_binary() {
+    local mcp_name="$1"
+    local version="$2"
+    local suffix="$3"
+    local binary_path="$4"
+
+    local asset_name="${mcp_name}-${suffix}"
+    local url="https://github.com/${REPO}/releases/download/${version}/${asset_name}"
+
+    echo "Downloading ${mcp_name} ${version} for ${suffix}..." >&2
+
+    mkdir -p "$(dirname "$binary_path")"
+
+    if command -v curl &> /dev/null; then
+        if ! curl -fsSL "$url" -o "$binary_path"; then
+            echo "Error: Failed to download from $url" >&2
+            rm -f "$binary_path"
+            exit 1
+        fi
+    elif command -v wget &> /dev/null; then
+        if ! wget -q "$url" -O "$binary_path"; then
+            echo "Error: Failed to download from $url" >&2
+            rm -f "$binary_path"
+            exit 1
+        fi
+    fi
+
+    chmod +x "$binary_path"
+
+    # Record version
+    mkdir -p "$(dirname "$VERSION_FILE")"
+    grep -v "^${mcp_name}=" "$VERSION_FILE" 2>/dev/null > "${VERSION_FILE}.tmp" || true
+    echo "${mcp_name}=${version}" >> "${VERSION_FILE}.tmp"
+    mv "${VERSION_FILE}.tmp" "$VERSION_FILE"
+
+    echo "Downloaded ${mcp_name} ${version}" >&2
+}
+
+# Get installed version
+get_installed_version() {
+    local mcp_name="$1"
+    if [ -f "$VERSION_FILE" ]; then
+        grep "^${mcp_name}=" "$VERSION_FILE" 2>/dev/null | cut -d= -f2 || echo ""
+    else
+        echo ""
+    fi
+}
+
+# List installed MCPs
+list_installed() {
+    echo "Installed MCP servers in ${CACHE_DIR}:"
+    echo ""
+
+    if [ -f "$VERSION_FILE" ]; then
+        while IFS='=' read -r name version; do
+            local binary_path="${CACHE_DIR}/${name}"
+            if [ -x "$binary_path" ]; then
+                printf "  %-20s %s\n" "$name" "$version"
+            fi
+        done < "$VERSION_FILE"
+    else
+        echo "  (none)"
+    fi
+    echo ""
+    echo "Cache directory: ${CACHE_DIR}"
+}
+
+# Update MCP(s)
+update_mcp() {
+    local mcp_name="${1:-}"
+    local suffix
+    suffix=$(detect_platform)
+
+    local latest
+    latest=$(get_latest_version)
+
+    if [ -n "$mcp_name" ]; then
+        # Update specific MCP
+        echo "Updating ${mcp_name} to ${latest}..."
+        download_binary "$mcp_name" "$latest" "$suffix" "${CACHE_DIR}/${mcp_name}"
+    else
+        # Update all installed MCPs
+        if [ ! -f "$VERSION_FILE" ]; then
+            echo "No MCPs installed to update"
+            exit 0
+        fi
+
+        echo "Updating all MCPs to ${latest}..."
+        while IFS='=' read -r name version; do
+            if [ "$version" != "$latest" ]; then
+                download_binary "$name" "$latest" "$suffix" "${CACHE_DIR}/${name}"
+            else
+                echo "${name} is already at ${latest}"
+            fi
+        done < "$VERSION_FILE"
+    fi
+}
+
+# Main
+main() {
+    case "${1:-}" in
+        --help|-h)
+            cat << 'EOF'
+binks-mcp-launcher - Lazy download launcher for Binks MCP servers
+
+USAGE:
+    binks-mcp-launcher <mcp-name>           Run an MCP (downloads if needed)
+    binks-mcp-launcher --list               List installed MCPs
+    binks-mcp-launcher --update [mcp-name]  Update all or specific MCP
+    binks-mcp-launcher --version            Show launcher version
+
+ENVIRONMENT:
+    BINKS_REPO      GitHub repository (default: kblack0610/binks-agent-orchestrator)
+    BINKS_VERSION   Version tag (default: latest)
+    BINKS_CACHE     Cache directory (default: ~/.binks/bin)
+
+EXAMPLES:
+    # Run sysinfo-mcp (downloads on first run)
+    binks-mcp-launcher sysinfo-mcp
+
+    # Use specific version
+    BINKS_VERSION=v0.1.0 binks-mcp-launcher sysinfo-mcp
+
+    # Update all MCPs to latest
+    binks-mcp-launcher --update
+
+    # In .mcp.json:
+    {
+      "mcpServers": {
+        "sysinfo": {
+          "command": "binks-mcp-launcher",
+          "args": ["sysinfo-mcp"],
+          "env": { "BINKS_VERSION": "latest" }
+        }
+      }
+    }
+EOF
+            exit 0
+            ;;
+        --version|-V)
+            echo "binks-mcp-launcher ${LAUNCHER_VERSION}"
+            exit 0
+            ;;
+        --list|-l)
+            list_installed
+            exit 0
+            ;;
+        --update|-u)
+            update_mcp "${2:-}"
+            exit 0
+            ;;
+        "")
+            echo "Error: MCP name required" >&2
+            echo "Usage: binks-mcp-launcher <mcp-name>" >&2
+            echo "       binks-mcp-launcher --help" >&2
+            exit 1
+            ;;
+        -*)
+            echo "Error: Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+
+    # Run MCP
+    local mcp_name="$1"
+    shift
+
+    local suffix
+    suffix=$(detect_platform)
+
+    local binary_path="${CACHE_DIR}/${mcp_name}"
+    local installed_version
+    installed_version=$(get_installed_version "$mcp_name")
+
+    # Resolve version
+    local target_version="$VERSION"
+    if [ "$target_version" = "latest" ]; then
+        # If we have a cached binary and didn't request explicit update, use it
+        if [ -x "$binary_path" ] && [ -n "$installed_version" ]; then
+            target_version="$installed_version"
+        else
+            target_version=$(get_latest_version)
+        fi
+    fi
+
+    # Download if needed
+    if [ ! -x "$binary_path" ] || [ "$installed_version" != "$target_version" ]; then
+        download_binary "$mcp_name" "$target_version" "$suffix" "$binary_path"
+    fi
+
+    # Execute
+    exec "$binary_path" "$@"
+}
+
+main "$@"
