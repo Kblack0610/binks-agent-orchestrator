@@ -6,7 +6,7 @@ description = "Benchmark harness for Binks agent testing and regression detectio
 
 [dependencies]
 # Internal crates
-agent = { path = "../../agent" }
+binks_agent = { path = "../../agent", package = "agent" }
 
 # Async runtime
 tokio = { workspace = true }

@@ -19,7 +19,7 @@
       "tier": 3
     },
     "github-gh": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/github-gh/target/release/github-gh-mcp",
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/github-gh-mcp",
       "args": [],
       "env": {
         "RUST_LOG": "info"
@@ -27,7 +27,7 @@
       "tier": 2
     },
     "sysinfo": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/sysinfo-mcp/target/release/sysinfo-mcp",
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/sysinfo-mcp",
       "args": [],
       "env": {
         "RUST_LOG": "info"
@@ -35,7 +35,7 @@
       "tier": 1
     },
     "inbox": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/inbox-mcp/target/release/inbox-mcp",
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/inbox-mcp",
       "args": [],
       "env": {
         "INBOX_PATH": "${HOME}/.notes/inbox",
@@ -44,7 +44,7 @@
       "tier": 2
     },
     "notify": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/notify-mcp/target/release/notify-mcp",
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/notify-mcp",
       "args": [],
       "env": {
         "SLACK_WEBHOOK_URL": "${SLACK_WEBHOOK_URL}",
@@ -64,7 +64,7 @@
       "tier": 4
     },
     "filesystem": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/filesystem-mcp/target/release/filesystem-mcp",
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/filesystem-mcp",
       "args": [],
       "env": {
         "FS_CONFIG_PATH": "${HOME}/.binks/filesystem.toml",
@@ -73,7 +73,7 @@
       "tier": 1
     },
     "exec": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/exec-mcp/target/release/exec-mcp",
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/exec-mcp",
       "args": [],
       "env": {
         "EXEC_CONFIG_PATH": "${HOME}/.binks/exec.toml",
@@ -147,6 +147,30 @@
         "RUST_LOG": "info"
       },
       "tier": 3
+    },
+    "playwright": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--shm-size=2gb",
+        "--network=host",
+        "binks-playwright-sandbox:latest"
+      ],
+      "env": {},
+      "tier": 3,
+      "description": "Browser automation via Playwright in Docker sandbox"
+    },
+    "playwright-direct": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-server-playwright"
+      ],
+      "env": {},
+      "tier": 3,
+      "description": "Browser automation via Playwright (direct, no sandbox)"
     }
   }
 }
