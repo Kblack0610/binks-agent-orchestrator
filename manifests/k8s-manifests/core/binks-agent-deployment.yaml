@@ -45,7 +45,7 @@ spec:
         image: ghcr.io/kblack0610/binks-agent:latest
         imagePullPolicy: Always
         ports:
-        - containerPort: 3001
+        - containerPort: 7317
           name: http
         env:
         # Ollama configuration - external server
@@ -72,14 +72,14 @@ spec:
         livenessProbe:
           httpGet:
             path: /api/health
-            port: 3001
+            port: 7317
           initialDelaySeconds: 10
           periodSeconds: 30
           timeoutSeconds: 5
         readinessProbe:
           httpGet:
             path: /api/health
-            port: 3001
+            port: 7317
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 5
@@ -101,6 +101,6 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 3001
+    targetPort: 7317
     name: http
   type: ClusterIP
