@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use rusqlite::{params, types::FromSqlError, Connection, OptionalExtension};
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use crate::schema;

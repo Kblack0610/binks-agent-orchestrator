@@ -2,6 +2,20 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
+
+/// Error type for parsing TaskStatus from string
+#[derive(Debug, Clone)]
+pub struct ParseTaskStatusError(String);
+
+impl fmt::Display for ParseTaskStatusError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid task status: {}", self.0)
+    }
+}
+
+impl std::error::Error for ParseTaskStatusError {}
 
 /// Task status
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -24,15 +38,19 @@ impl TaskStatus {
             TaskStatus::Blocked => "blocked",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> anyhow::Result<Self> {
+impl FromStr for TaskStatus {
+    type Err = ParseTaskStatusError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "pending" => Ok(TaskStatus::Pending),
             "in_progress" => Ok(TaskStatus::InProgress),
             "completed" => Ok(TaskStatus::Completed),
             "failed" => Ok(TaskStatus::Failed),
             "blocked" => Ok(TaskStatus::Blocked),
-            _ => anyhow::bail!("Invalid task status: {}", s),
+            _ => Err(ParseTaskStatusError(s.to_string())),
         }
     }
 }

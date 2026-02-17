@@ -5,6 +5,7 @@
 
 use mcp_common::{internal_error, invalid_params, json_success, CallToolResult, McpError};
 use serde_json::json;
+use std::str::FromStr;
 
 use crate::params::*;
 use crate::repository::{NewTask, TaskFilter, TaskRepository};
