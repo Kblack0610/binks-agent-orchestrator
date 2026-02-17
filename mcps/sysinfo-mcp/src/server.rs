@@ -204,19 +204,25 @@ impl EmbeddableMcp for SysInfoMcpServer {
 
             "get_cpu_info" => {
                 let params: CpuInfoParams = serde_json::from_value(params)?;
-                self.get_cpu_info(Parameters(params)).await.map_err(Into::into)
+                self.get_cpu_info(Parameters(params))
+                    .await
+                    .map_err(Into::into)
             }
 
             "get_cpu_usage" => {
                 let params: CpuUsageParams = serde_json::from_value(params)?;
-                self.get_cpu_usage(Parameters(params)).await.map_err(Into::into)
+                self.get_cpu_usage(Parameters(params))
+                    .await
+                    .map_err(Into::into)
             }
 
             "get_memory_info" => self.get_memory_info().await.map_err(Into::into),
 
             "get_disk_info" => {
                 let params: DiskInfoParams = serde_json::from_value(params)?;
-                self.get_disk_info(Parameters(params)).await.map_err(Into::into)
+                self.get_disk_info(Parameters(params))
+                    .await
+                    .map_err(Into::into)
             }
 
             "get_network_interfaces" => {
@@ -264,9 +270,7 @@ mod tests {
     #[tokio::test]
     async fn test_embeddable_call_os_info() {
         let server = SysInfoMcpServer::new();
-        let result = server
-            .call_tool("get_os_info", serde_json::json!({}))
-            .await;
+        let result = server.call_tool("get_os_info", serde_json::json!({})).await;
 
         assert!(result.is_ok());
         let result = result.unwrap();

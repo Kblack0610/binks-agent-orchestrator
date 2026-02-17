@@ -32,4 +32,4 @@ pub use server::SysInfoMcpServer;
 pub use server::{CpuInfoParams, CpuUsageParams, DiskInfoParams, NetworkParams};
 
 // Re-export EmbeddableMcp trait for in-process usage
-pub use mcp_common::{EmbeddableMcp, EmbeddableError, EmbeddableResult};
+pub use mcp_common::{EmbeddableError, EmbeddableMcp, EmbeddableResult};

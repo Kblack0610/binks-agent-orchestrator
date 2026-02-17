@@ -6,10 +6,10 @@ use crate::{
     collector::{BenchmarkCollector, CollectedMetrics},
     BenchmarkCase, BenchmarkResult, BenchmarkSummary, Tier, TierSummary,
 };
+use anyhow::Result;
 use binks_agent::agent::{event_channel, Agent};
 use binks_agent::config::McpConfig;
 use binks_agent::mcp::McpClientPool;
-use anyhow::Result;
 use chrono::Utc;
 use std::path::PathBuf;
 use tokio::time::timeout;

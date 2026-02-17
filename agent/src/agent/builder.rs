@@ -24,8 +24,8 @@ use crate::config::AgentSectionConfig;
 use crate::mcp::McpClientPool;
 
 use super::{
-    Agent, EventSender, ModelCapabilities, DEFAULT_LLM_TIMEOUT_SECS,
-    DEFAULT_MAX_HISTORY_MESSAGES, DEFAULT_MAX_ITERATIONS, DEFAULT_TOOL_TIMEOUT_SECS,
+    Agent, EventSender, ModelCapabilities, DEFAULT_LLM_TIMEOUT_SECS, DEFAULT_MAX_HISTORY_MESSAGES,
+    DEFAULT_MAX_ITERATIONS, DEFAULT_TOOL_TIMEOUT_SECS,
 };
 
 #[cfg(feature = "embedded")]

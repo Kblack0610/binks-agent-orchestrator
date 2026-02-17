@@ -22,7 +22,7 @@ pub struct BinksAgent {
 ///
 /// The returned pointer must be freed with `binks_agent_free`.
 #[no_mangle]
-pub extern "C" fn binks_agent_new() -> *mut BinksAgent {
+pub unsafe extern "C" fn binks_agent_new() -> *mut BinksAgent {
     binks_agent_new_with_model(ptr::null())
 }
 
@@ -35,7 +35,7 @@ pub extern "C" fn binks_agent_new() -> *mut BinksAgent {
 ///
 /// The returned pointer must be freed with `binks_agent_free`.
 #[no_mangle]
-pub extern "C" fn binks_agent_new_with_model(model: *const c_char) -> *mut BinksAgent {
+pub unsafe extern "C" fn binks_agent_new_with_model(model: *const c_char) -> *mut BinksAgent {
     // Create tokio runtime for async operations
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -84,7 +84,10 @@ pub extern "C" fn binks_agent_new_with_model(model: *const c_char) -> *mut Binks
 /// - `message` must be a valid null-terminated C string
 /// - The returned string must be freed with `binks_string_free`
 #[no_mangle]
-pub extern "C" fn binks_agent_chat(agent: *mut BinksAgent, message: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn binks_agent_chat(
+    agent: *mut BinksAgent,
+    message: *const c_char,
+) -> *mut c_char {
     if agent.is_null() || message.is_null() {
         return ptr::null_mut();
     }
@@ -126,11 +129,9 @@ pub extern "C" fn binks_get_last_error() -> *const c_char {
 ///
 /// `agent` must be a valid pointer from `binks_agent_new` or NULL.
 #[no_mangle]
-pub extern "C" fn binks_agent_free(agent: *mut BinksAgent) {
+pub unsafe extern "C" fn binks_agent_free(agent: *mut BinksAgent) {
     if !agent.is_null() {
-        unsafe {
-            drop(Box::from_raw(agent));
-        }
+        drop(Box::from_raw(agent));
     }
 }
 
@@ -140,11 +141,9 @@ pub extern "C" fn binks_agent_free(agent: *mut BinksAgent) {
 ///
 /// `s` must be a valid pointer from a binks function or NULL.
 #[no_mangle]
-pub extern "C" fn binks_string_free(s: *mut c_char) {
+pub unsafe extern "C" fn binks_string_free(s: *mut c_char) {
     if !s.is_null() {
-        unsafe {
-            drop(CString::from_raw(s));
-        }
+        drop(CString::from_raw(s));
     }
 }
 
@@ -171,10 +170,12 @@ mod tests {
 
     #[test]
     fn test_null_safety() {
-        // These should not crash
-        binks_agent_free(ptr::null_mut());
-        binks_string_free(ptr::null_mut());
-        let result = binks_agent_chat(ptr::null_mut(), ptr::null());
-        assert!(result.is_null());
+        // These should not crash - unsafe calls are safe with null pointers
+        unsafe {
+            binks_agent_free(ptr::null_mut());
+            binks_string_free(ptr::null_mut());
+            let result = binks_agent_chat(ptr::null_mut(), ptr::null());
+            assert!(result.is_null());
+        }
     }
 }

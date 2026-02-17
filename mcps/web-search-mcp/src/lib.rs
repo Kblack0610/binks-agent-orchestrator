@@ -24,4 +24,7 @@ pub mod types;
 pub use server::WebSearchMcpServer;
 
 // Re-export parameter types for direct API usage
-pub use server::{FetchJsonParams, FetchMarkdownParams, FetchParams, ImageSearchParams, NewsSearchParams, ParseHtmlParams, SearchParams};
+pub use server::{
+    FetchJsonParams, FetchMarkdownParams, FetchParams, ImageSearchParams, NewsSearchParams,
+    ParseHtmlParams, SearchParams,
+};

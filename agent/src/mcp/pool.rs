@@ -187,7 +187,6 @@ impl McpClientPool {
         names
     }
 
-
     /// Check if daemon is available (with caching)
     async fn check_daemon(&mut self) -> bool {
         if self.daemon_available.is_none() {
@@ -305,7 +304,11 @@ impl McpClientPool {
 
             // Cache the result
             self.tools_cache.insert(name.to_string(), tools.clone());
-            tracing::info!("Server '{}': {} tools (embedded, cached)", name, tools.len());
+            tracing::info!(
+                "Server '{}': {} tools (embedded, cached)",
+                name,
+                tools.len()
+            );
             return Ok(tools);
         }
 
@@ -462,7 +465,11 @@ impl McpClientPool {
         // Check embedded MCPs first (feature-gated)
         #[cfg(feature = "embedded")]
         for (server_name, embedded) in &self.embedded_mcps {
-            if embedded.list_tools().iter().any(|t| t.name.as_ref() == tool_name) {
+            if embedded
+                .list_tools()
+                .iter()
+                .any(|t| t.name.as_ref() == tool_name)
+            {
                 return Some(server_name.clone());
             }
         }
