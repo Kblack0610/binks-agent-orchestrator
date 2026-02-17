@@ -15,10 +15,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /build
 
-# Copy only agent source (no workspace dependencies)
+# Copy agent source and workspace dependencies
 COPY agent/Cargo.toml agent/Cargo.lock* ./
 COPY agent/src ./src
 COPY agent/static ./static
+
+# Copy mcp-common dependency (required even as optional - Cargo validates path)
+COPY common/mcp-common /common/mcp-common
 
 # Build release binary
 RUN cargo build --release
