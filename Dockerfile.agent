@@ -15,16 +15,19 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /build
 
-# Copy agent source and workspace dependencies
-COPY agent/Cargo.toml agent/Cargo.lock* ./
-COPY agent/src ./src
-COPY agent/static ./static
+# Copy workspace root Cargo.toml (required for mcp-common workspace inheritance)
+COPY Cargo.toml ./
+
+# Copy agent source
+COPY agent/Cargo.toml agent/Cargo.lock* ./agent/
+COPY agent/src ./agent/src
+COPY agent/static ./agent/static
 
 # Copy mcp-common dependency (required even as optional - Cargo validates path)
-COPY common/mcp-common /common/mcp-common
+COPY common/mcp-common ./common/mcp-common
 
-# Build release binary
-RUN cargo build --release
+# Build release binary from workspace root
+RUN cargo build --release -p agent
 
 # ============================================
 # Stage 2: Runtime
@@ -44,7 +47,7 @@ RUN useradd -m -u 1000 binks
 # Create data directory for SQLite
 RUN mkdir -p /data && chown binks:binks /data
 
-# Copy the binary
+# Copy the binary (built from workspace root)
 COPY --from=builder /build/target/release/agent /usr/local/bin/agent
 
 # Switch to non-root user
