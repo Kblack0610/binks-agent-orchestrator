@@ -293,10 +293,12 @@ fn read_pr_checks() {
         .output()
         .expect("Failed to execute gh pr checks");
 
-    // Accept exit codes 0 (all pass) or 1 (some fail) as valid
+    // Accept exit codes: 0 (all pass), 1 (some fail), 8 (pending) as valid
+    let exit_code = output.status.code().unwrap_or(255);
     assert!(
-        output.status.code().unwrap_or(2) <= 1,
-        "gh pr checks returned unexpected exit code"
+        exit_code == 0 || exit_code == 1 || exit_code == 8,
+        "gh pr checks returned unexpected exit code: {}",
+        exit_code
     );
 
     println!(
