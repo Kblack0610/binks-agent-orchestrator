@@ -13,42 +13,147 @@ env:
 
 jobs:
   build:
-    name: Build and Release
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: linux-x86_64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: darwin-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            suffix: darwin-aarch64
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: Build release binaries
-        run: cargo build --release --workspace
+        run: cargo build --release --workspace --target ${{ matrix.target }}
 
-      - name: Package binaries
+      - name: Prepare individual MCP binaries
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          mkdir -p dist
+          mkdir -p artifacts
 
-          # Core binaries
-          cp target/release/agent dist/
-          cp target/release/orchestrator dist/
-          cp target/release/agent-panel dist/
+          # List of MCP servers to package individually
+          MCPS=(
+            "sysinfo-mcp"
+            "github-gh-mcp"
+            "inbox-mcp"
+            "notify-mcp"
+            "filesystem-mcp"
+            "memory-mcp"
+            "git-mcp"
+            "exec-mcp"
+            "web-search-mcp"
+            "self-healing-mcp"
+            "task-mcp"
+            "workflow-mcp"
+            "linear-cli-mcp"
+            "rico-mcp"
+          )
 
-          # MCP servers
-          cp target/release/sysinfo-mcp dist/
-          cp target/release/github-gh-mcp dist/
-          cp target/release/inbox-mcp dist/
-          cp target/release/notify-mcp dist/
-          cp target/release/filesystem-mcp dist/
-          cp target/release/memory-mcp dist/
-          cp target/release/git-mcp dist/
+          # Copy each MCP with platform suffix
+          for mcp in "${MCPS[@]}"; do
+            if [ -f "target/${{ matrix.target }}/release/${mcp}" ]; then
+              cp "target/${{ matrix.target }}/release/${mcp}" "artifacts/${mcp}-${{ matrix.suffix }}"
+            fi
+          done
 
-          # Create tarball
-          tar -czvf binks-agent-orchestrator-${VERSION}-linux-x86_64.tar.gz -C dist .
+          # Also copy core binaries
+          for bin in agent orchestrator agent-panel; do
+            if [ -f "target/${{ matrix.target }}/release/${bin}" ]; then
+              cp "target/${{ matrix.target }}/release/${bin}" "artifacts/${bin}-${{ matrix.suffix }}"
+            fi
+          done
+
+      - name: Upload individual binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.suffix }}
+          path: artifacts/*
+          retention-days: 1
+
+  package:
+    name: Package Tarballs
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - suffix: linux-x86_64
+          - suffix: darwin-x86_64
+          - suffix: darwin-aarch64
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-${{ matrix.suffix }}
+          path: dist
+
+      - name: Create tarball
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          # Strip platform suffix from filenames for tarball
+          cd dist
+          for file in *-${{ matrix.suffix }}; do
+            [ -f "$file" ] && mv "$file" "${file%-${{ matrix.suffix }}}"
+          done
+          cd ..
+          tar -czvf binks-agent-orchestrator-${VERSION}-${{ matrix.suffix }}.tar.gz -C dist .
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball-${{ matrix.suffix }}
+          path: "*.tar.gz"
+          retention-days: 1
+
+  release:
+    name: Create Release
+    needs: [build, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binaries-*
+          path: binaries
+          merge-multiple: true
+
+      - name: Download all tarballs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tarball-*
+          path: tarballs
+          merge-multiple: true
+
+      - name: List release files
+        run: |
+          echo "Individual binaries:"
+          ls -la binaries/
+          echo ""
+          echo "Tarballs:"
+          ls -la tarballs/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: binks-agent-orchestrator-*.tar.gz
+          files: |
+            binaries/*
+            tarballs/*
           generate_release_notes: true

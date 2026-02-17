@@ -134,7 +134,7 @@ pub enum Commands {
     #[cfg(feature = "web")]
     Web {
         /// Port to listen on
-        #[arg(short, long, default_value = "3001")]
+        #[arg(short, long, default_value = "7317")]
         port: u16,
         /// System prompt for the agent
         #[arg(long, short)]

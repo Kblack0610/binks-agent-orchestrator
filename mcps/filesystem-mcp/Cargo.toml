@@ -37,6 +37,10 @@ glob = "0.3"
 # Logging
 tracing.workspace = true
 
+[lib]
+name = "filesystem_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "filesystem-mcp"
 path = "src/main.rs"

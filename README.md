@@ -38,7 +38,36 @@ Binks is an orchestration platform that connects an AI agent to various tools th
 - Ollama with a model installed (e.g., `ollama pull llama3.1:8b`)
 - `gh` CLI (for GitHub MCP)
 
-### Build
+### Option 1: Pre-built Binaries (Recommended)
+
+Use the launcher to automatically download MCP binaries from GitHub releases:
+
+```bash
+# Install the launcher
+curl -sSL https://raw.githubusercontent.com/kblack0610/binks-agent-orchestrator/master/scripts/install.sh | bash
+
+# Add to your PATH
+export PATH="$HOME/.binks/bin:$PATH"
+
+# MCPs download automatically on first use
+binks-mcp-launcher sysinfo-mcp
+```
+
+Configure `.mcp.json` to use the launcher:
+
+```json
+{
+  "mcpServers": {
+    "sysinfo": {
+      "command": "binks-mcp-launcher",
+      "args": ["sysinfo-mcp"],
+      "env": { "BINKS_VERSION": "latest" }
+    }
+  }
+}
+```
+
+### Option 2: Build from Source
 
 ```bash
 # Build the agent (full features)
@@ -158,7 +187,7 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for running the full stack with b
 Quick start:
 ```bash
 export OLLAMA_URL=http://192.168.1.4:11434
-cargo run --release --bin agent -- web  # Backend on :3001
+cargo run --release --bin agent -- web  # Backend on :7317
 # In another terminal: cd ~/dev/bnb/platform && pnpm dev --filter=binks-chat
 ```
 

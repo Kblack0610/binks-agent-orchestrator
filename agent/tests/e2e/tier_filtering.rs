@@ -3,9 +3,9 @@
 //! Tests the integration between config loading, tier parsing, and server filtering
 //! based on model size.
 
-use agent::config::McpConfig;
-use agent::mcp::model_size::{parse_model_size, ModelSize};
-use agent::mcp::McpClientPool;
+use binks_agent::config::McpConfig;
+use binks_agent::mcp::model_size::{parse_model_size, ModelSize};
+use binks_agent::mcp::McpClientPool;
 use std::path::PathBuf;
 
 /// Get the workspace root directory (contains target/ and Cargo.toml with [workspace])

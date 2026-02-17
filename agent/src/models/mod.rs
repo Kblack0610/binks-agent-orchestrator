@@ -201,7 +201,7 @@ const BUILTIN_FAMILIES: &[ModelFamily] = &[
 /// # Examples
 ///
 /// ```
-/// use agent::models::detect_capabilities;
+/// use binks_agent::models::detect_capabilities;
 ///
 /// let caps = detect_capabilities("qwen3-coder:30b");
 /// assert!(caps.tool_calling);

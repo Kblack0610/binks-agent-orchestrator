@@ -1,19 +1,7 @@
-//! Task MCP - Task management with CRUD, dependencies, and execution tracking
-//!
-//! Shares ~/.binks/conversations.db with the agent for task execution state.
-//! Integrates with memory-mcp for task knowledge and context.
-
-mod handlers;
-mod params;
-mod repository;
-mod schema;
-mod server;
-#[cfg(test)]
-mod tests;
-mod types;
+//! Task MCP Server binary entry point
 
 use rmcp::{transport::io::stdio, ServiceExt};
-use server::TaskMcpServer;
+use task_mcp::TaskMcpServer;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

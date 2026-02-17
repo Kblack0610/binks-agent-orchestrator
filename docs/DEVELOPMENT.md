@@ -4,7 +4,7 @@
 
 | Component | Location | Port | Purpose |
 |-----------|----------|------|---------|
-| binks-agent-orchestrator | `~/dev/home/binks-agent-orchestrator` | 3001 | Rust backend (API + WebSocket) |
+| binks-agent-orchestrator | `~/dev/home/binks-agent-orchestrator` | 7317 | Rust backend (API + WebSocket) |
 | binks-chat | `~/dev/bnb/platform/apps/binks-chat` | 5173 | React frontend (Vite) |
 
 The frontend proxies `/api/*` and `/ws/*` to the backend via Vite config.
@@ -38,8 +38,8 @@ pnpm dev --filter=@blacknbrownstudios/binks-chat
 
 ### Access
 - **UI:** http://localhost:5173
-- **API:** http://localhost:3001/api
-- **Health:** http://localhost:3001/api/health
+- **API:** http://localhost:7317/api
+- **Health:** http://localhost:7317/api/health
 
 ## Testing Changes
 
@@ -72,6 +72,6 @@ cargo run --bin agent -- call get_system_summary
 
 | Issue | Check |
 |-------|-------|
-| WebSocket disconnects | Is backend running? `curl localhost:3001/api/health` |
+| WebSocket disconnects | Is backend running? `curl localhost:7317/api/health` |
 | Ollama not responding | `curl $OLLAMA_URL/api/tags` |
 | MCP tools missing | Check `.mcp.json`, run `cargo run --bin agent -- tools` |

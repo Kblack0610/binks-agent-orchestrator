@@ -3,7 +3,7 @@
 //! Consumes AgentEvent stream and collects metrics for benchmark analysis.
 
 use crate::ToolCallMetric;
-use agent::agent::AgentEvent;
+use binks_agent::agent::AgentEvent;
 use chrono::Utc;
 use std::time::Instant;
 use tokio::sync::mpsc;

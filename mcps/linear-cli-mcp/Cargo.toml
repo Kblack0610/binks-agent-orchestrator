@@ -6,6 +6,10 @@ description = "Lightweight MCP server wrapping the linear CLI for Linear issue t
 license = "MIT"
 readme = "README.md"
 
+[lib]
+name = "linear_cli_mcp"
+path = "src/lib.rs"
+
 [dependencies]
 mcp-common.workspace = true
 rmcp.workspace = true

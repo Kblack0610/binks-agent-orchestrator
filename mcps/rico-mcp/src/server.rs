@@ -654,11 +654,7 @@ fn derive_layout_description(pattern_name: &str, frequencies: &[ComponentFrequen
             .take(3)
             .map(|c| c.name.as_str())
             .collect();
-        format!(
-            "{}. Common components: {}",
-            base,
-            top_components.join(", ")
-        )
+        format!("{}. Common components: {}", base, top_components.join(", "))
     } else {
         base.to_string()
     }

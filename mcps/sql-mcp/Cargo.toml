@@ -5,6 +5,10 @@ edition = "2021"
 description = "MCP server for SQL database queries"
 license = "MIT"
 
+[lib]
+name = "sql_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "sql-mcp"
 path = "src/main.rs"

@@ -39,6 +39,10 @@ regex = "1"
 # Utilities
 url = "2"
 
+[lib]
+name = "web_search_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "web-search-mcp"
 path = "src/main.rs"

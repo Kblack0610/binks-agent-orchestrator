@@ -29,6 +29,10 @@ anyhow.workspace = true
 # Logging
 tracing.workspace = true
 
+[lib]
+name = "sysinfo_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "sysinfo-mcp"
 path = "src/main.rs"
