@@ -22,6 +22,7 @@ members = [
     "mcps/workflow-mcp",
     "mcps/linear-cli-mcp",
     "mcps/rico-mcp",
+    "mcps/adb-mcp",
     # FFI bindings
     "mcps/binks-ffi",
 ]
