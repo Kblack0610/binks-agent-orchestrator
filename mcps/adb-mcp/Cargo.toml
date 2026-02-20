@@ -1,0 +1,28 @@
+[package]
+name = "adb-mcp"
+version.workspace = true
+edition.workspace = true
+description = "MCP server for Android Debug Bridge (ADB) operations"
+
+[lib]
+name = "adb_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "adb-mcp"
+path = "src/main.rs"
+
+[dependencies]
+mcp-common.workspace = true
+rmcp.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+# ADB-specific
+base64 = "0.22"
+quick-xml = "0.31"
