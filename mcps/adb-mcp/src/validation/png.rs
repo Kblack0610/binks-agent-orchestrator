@@ -36,7 +36,13 @@ pub fn validate_png(data: &[u8]) -> Result<PngInfo, PngError> {
             .iter()
             .take(100)
             .take_while(|&&b| b != 0x89)
-            .map(|&b| if b.is_ascii_graphic() || b == b' ' { b as char } else { '?' })
+            .map(|&b| {
+                if b.is_ascii_graphic() || b == b' ' {
+                    b as char
+                } else {
+                    '?'
+                }
+            })
             .collect();
         return Err(PngError::TextPrefix(text_preview));
     }
@@ -53,11 +59,7 @@ pub fn validate_png(data: &[u8]) -> Result<PngInfo, PngError> {
         return Err(PngError::TooSmall(data.len()));
     }
 
-    let has_iend = data
-        .windows(4)
-        .rev()
-        .take(20)
-        .any(|w| w == b"IEND");
+    let has_iend = data.windows(4).rev().take(20).any(|w| w == b"IEND");
 
     if !has_iend {
         return Err(PngError::MissingIEND);
@@ -78,7 +80,9 @@ fn parse_ihdr(data: &[u8]) -> Result<(u32, u32), PngError> {
     }
 
     if &data[12..16] != b"IHDR" {
-        return Err(PngError::InvalidIHDR("IHDR chunk not found at expected position".into()));
+        return Err(PngError::InvalidIHDR(
+            "IHDR chunk not found at expected position".into(),
+        ));
     }
 
     let width = u32::from_be_bytes([data[16], data[17], data[18], data[19]]);

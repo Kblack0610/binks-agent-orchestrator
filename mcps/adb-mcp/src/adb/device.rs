@@ -14,11 +14,8 @@ pub struct Device {
 
 /// List all connected ADB devices
 pub async fn list_devices() -> Result<Vec<Device>> {
-    let output = run_adb_with_timeout(
-        Command::new("adb").args(["devices", "-l"]),
-        ADB_TIMEOUT,
-    )
-    .await?;
+    let output =
+        run_adb_with_timeout(Command::new("adb").args(["devices", "-l"]), ADB_TIMEOUT).await?;
 
     if !output.status.success() {
         anyhow::bail!(

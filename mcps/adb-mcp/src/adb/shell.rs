@@ -5,9 +5,11 @@ use super::{run_adb_with_timeout, ADB_TIMEOUT};
 
 /// Execute a shell command on the device
 pub async fn shell(device: &str, command: &str) -> Result<ShellOutput> {
-    let output =
-        run_adb_with_timeout(Command::new("adb").args(["-s", device, "shell", command]), ADB_TIMEOUT)
-            .await?;
+    let output = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", command]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     Ok(ShellOutput {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
