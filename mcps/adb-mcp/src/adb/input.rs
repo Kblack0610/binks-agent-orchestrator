@@ -1,10 +1,12 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use tokio::process::Command;
+
+use super::{run_adb_with_timeout, ADB_TIMEOUT};
 
 /// Tap at coordinates
 pub async fn tap(device: &str, x: i32, y: i32) -> Result<()> {
-    Command::new("adb")
-        .args([
+    run_adb_with_timeout(
+        Command::new("adb").args([
             "-s",
             device,
             "shell",
@@ -12,10 +14,10 @@ pub async fn tap(device: &str, x: i32, y: i32) -> Result<()> {
             "tap",
             &x.to_string(),
             &y.to_string(),
-        ])
-        .output()
-        .await
-        .context("Failed to tap")?;
+        ]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     Ok(())
 }
@@ -45,11 +47,7 @@ pub async fn swipe(
         args.push(duration.to_string());
     }
 
-    Command::new("adb")
-        .args(&args)
-        .output()
-        .await
-        .context("Failed to swipe")?;
+    run_adb_with_timeout(Command::new("adb").args(&args), ADB_TIMEOUT).await?;
 
     Ok(())
 }
@@ -64,11 +62,11 @@ pub async fn input_text(device: &str, text: &str) -> Result<()> {
         .replace('`', "\\`")
         .replace(' ', "%s"); // ADB input text uses %s for space
 
-    Command::new("adb")
-        .args(["-s", device, "shell", "input", "text", &escaped])
-        .output()
-        .await
-        .context("Failed to input text")?;
+    run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", "input", "text", &escaped]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     Ok(())
 }
@@ -82,11 +80,11 @@ pub async fn keyevent(device: &str, key: &str) -> Result<()> {
         format!("KEYCODE_{}", key.to_uppercase())
     };
 
-    Command::new("adb")
-        .args(["-s", device, "shell", "input", "keyevent", &keycode])
-        .output()
-        .await
-        .context("Failed to send keyevent")?;
+    run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", "input", "keyevent", &keycode]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     Ok(())
 }

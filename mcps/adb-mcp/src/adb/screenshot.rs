@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use tokio::process::Command;
 use tracing::{debug, info, warn};
 
+use super::{run_adb_with_timeout, ADB_CLEANUP_TIMEOUT, ADB_TIMEOUT};
 use crate::validation::{strip_text_prefix, validate_png, PngError, PngInfo};
 
 /// Screenshot capture result
@@ -38,11 +39,11 @@ pub async fn capture_screenshot(device: &str) -> Result<ScreenshotResult> {
 async fn capture_direct(device: &str) -> Result<ScreenshotResult> {
     debug!("Attempting direct capture via exec-out");
 
-    let output = Command::new("adb")
-        .args(["-s", device, "exec-out", "screencap", "-p"])
-        .output()
-        .await
-        .context("Failed to run screencap")?;
+    let output = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "exec-out", "screencap", "-p"]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     if !output.status.success() {
         anyhow::bail!(
@@ -86,11 +87,11 @@ async fn capture_via_storage(device: &str) -> Result<ScreenshotResult> {
     let remote_path = "/sdcard/adb_mcp_screenshot.png";
 
     // Capture to file on device
-    let output = Command::new("adb")
-        .args(["-s", device, "shell", "screencap", "-p", remote_path])
-        .output()
-        .await
-        .context("Failed to capture to storage")?;
+    let output = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", "screencap", "-p", remote_path]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     if !output.status.success() {
         anyhow::bail!(
@@ -100,18 +101,19 @@ async fn capture_via_storage(device: &str) -> Result<ScreenshotResult> {
     }
 
     // Pull the file using cat (binary-safe via exec-out)
-    let data = Command::new("adb")
-        .args(["-s", device, "exec-out", "cat", remote_path])
-        .output()
-        .await
-        .context("Failed to pull screenshot")?
-        .stdout;
+    let data = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "exec-out", "cat", remote_path]),
+        ADB_TIMEOUT,
+    )
+    .await?
+    .stdout;
 
-    // Cleanup
-    let _ = Command::new("adb")
-        .args(["-s", device, "shell", "rm", "-f", remote_path])
-        .output()
-        .await;
+    // Cleanup (short timeout, ignore errors)
+    let _ = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", "rm", "-f", remote_path]),
+        ADB_CLEANUP_TIMEOUT,
+    )
+    .await;
 
     // Validate
     let info = validate_png(&data).context("Screenshot from storage is invalid")?;
@@ -128,11 +130,12 @@ async fn capture_via_storage(device: &str) -> Result<ScreenshotResult> {
 pub async fn wake_device(device: &str) -> Result<()> {
     debug!("Waking device screen");
 
-    Command::new("adb")
-        .args(["-s", device, "shell", "input", "keyevent", "KEYCODE_WAKEUP"])
-        .output()
-        .await
-        .context("Failed to wake device")?;
+    run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", "input", "keyevent", "KEYCODE_WAKEUP"]),
+        ADB_CLEANUP_TIMEOUT,
+    )
+    .await
+    .context("Failed to wake device")?;
 
     tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 

@@ -7,6 +7,21 @@ use serde::{Deserialize, Serialize};
 pub struct DevicesParams {}
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct CropRegion {
+    #[schemars(description = "X offset of the crop region (pixels from left)")]
+    pub x: u32,
+
+    #[schemars(description = "Y offset of the crop region (pixels from top)")]
+    pub y: u32,
+
+    #[schemars(description = "Width of the crop region in pixels")]
+    pub width: u32,
+
+    #[schemars(description = "Height of the crop region in pixels")]
+    pub height: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ScreenshotParams {
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
     #[serde(default)]
@@ -15,6 +30,24 @@ pub struct ScreenshotParams {
     #[schemars(description = "File path to save screenshot (optional, returns base64 if omitted)")]
     #[serde(default)]
     pub output_path: Option<String>,
+
+    #[schemars(description = "Output format: \"png\" or \"jpeg\" (default: \"jpeg\")")]
+    #[serde(default)]
+    pub format: Option<String>,
+
+    #[schemars(description = "JPEG quality 1-100 (default: 80, ignored for PNG)")]
+    #[serde(default)]
+    pub quality: Option<u8>,
+
+    #[schemars(
+        description = "Max output width in pixels, preserving aspect ratio (default: 1024, 0 = no resize)"
+    )]
+    #[serde(default)]
+    pub max_width: Option<u32>,
+
+    #[schemars(description = "Crop region to extract before resizing")]
+    #[serde(default)]
+    pub region: Option<CropRegion>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]

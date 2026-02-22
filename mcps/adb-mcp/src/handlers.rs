@@ -2,10 +2,13 @@
 //!
 //! Each handler takes parameters and returns MCP results using mcp-common helpers.
 
-use mcp_common::{internal_error, json_success, text_success, CallToolResult, Content, McpError};
+use mcp_common::{
+    internal_error, invalid_params, json_success, text_success, CallToolResult, Content, McpError,
+};
 
 use crate::adb;
 use crate::params::*;
+use crate::processing::{CropRect, ProcessOptions};
 
 /// Resolve a device serial, returning an MCP error on failure
 async fn resolve_device(device: Option<&str>) -> Result<String, McpError> {
@@ -22,6 +25,14 @@ pub async fn devices(_params: DevicesParams) -> Result<CallToolResult, McpError>
 pub async fn screenshot(params: ScreenshotParams) -> Result<CallToolResult, McpError> {
     let device = resolve_device(params.device.as_deref()).await?;
 
+    // Validate format early
+    let format = params.format.as_deref().unwrap_or("jpeg");
+    if !matches!(format, "jpeg" | "jpg" | "png") {
+        return Err(invalid_params(format!(
+            "Unsupported format \"{format}\", use \"jpeg\" or \"png\""
+        )));
+    }
+
     // Wake device first
     if let Err(e) = adb::wake_device(&device).await {
         tracing::warn!("Failed to wake device: {}", e);
@@ -31,18 +42,37 @@ pub async fn screenshot(params: ScreenshotParams) -> Result<CallToolResult, McpE
         .await
         .map_err(|e| internal_error(format!("Screenshot capture failed: {e}")))?;
 
+    // Build processing options with defaults
+    let opts = ProcessOptions {
+        format: format.to_string(),
+        quality: params.quality.unwrap_or(80),
+        max_width: params.max_width.unwrap_or(1024),
+        crop: params.region.map(|r| CropRect {
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+        }),
+    };
+
+    let processed = crate::processing::process_screenshot(&result.data, &opts)
+        .map_err(|e| internal_error(format!("Image processing failed: {e}")))?;
+
     if let Some(path) = params.output_path {
-        tokio::fs::write(&path, &result.data)
+        tokio::fs::write(&path, &processed.data)
             .await
             .map_err(|e| internal_error(format!("Failed to save screenshot: {e}")))?;
         Ok(text_success(format!(
-            "Screenshot saved to {} ({}x{}, {} bytes)",
-            path, result.info.width, result.info.height, result.info.size
+            "Screenshot saved to {} ({}x{}, {} bytes, {})",
+            path, processed.width, processed.height, processed.data.len(), processed.mime_type
         )))
     } else {
         use base64::Engine;
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&result.data);
-        Ok(CallToolResult::success(vec![Content::image(&b64, "image/png")]))
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&processed.data);
+        Ok(CallToolResult::success(vec![Content::image(
+            &b64,
+            processed.mime_type,
+        )]))
     }
 }
 
