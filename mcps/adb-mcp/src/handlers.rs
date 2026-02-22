@@ -47,6 +47,7 @@ pub async fn screenshot(params: ScreenshotParams) -> Result<CallToolResult, McpE
         format: format.to_string(),
         quality: params.quality.unwrap_or(80),
         max_width: params.max_width.unwrap_or(1024),
+        max_height: params.max_height.unwrap_or(1920),
         crop: params.region.map(|r| CropRect {
             x: r.x,
             y: r.y,

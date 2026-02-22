@@ -362,6 +362,12 @@ pub struct ScreenshotParams {
     #[serde(default, deserialize_with = "deserialize_lenient_u32_opt")]
     pub max_width: Option<u32>,
 
+    #[schemars(
+        description = "Max output height in pixels, preserving aspect ratio (default: 1920, 0 = no resize)"
+    )]
+    #[serde(default, deserialize_with = "deserialize_lenient_u32_opt")]
+    pub max_height: Option<u32>,
+
     #[schemars(description = "Crop region to extract before resizing")]
     #[serde(default)]
     pub region: Option<CropRegion>,

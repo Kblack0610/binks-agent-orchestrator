@@ -18,6 +18,9 @@ pub struct ProcessOptions {
     /// Maximum output width. Image is downscaled (preserving aspect ratio) if
     /// wider than this value. `0` disables resizing.
     pub max_width: u32,
+    /// Maximum output height. Image is downscaled (preserving aspect ratio) if
+    /// taller than this value. `0` disables height constraint.
+    pub max_height: u32,
     /// Optional crop region applied before resizing.
     pub crop: Option<CropRect>,
 }
@@ -49,6 +52,7 @@ impl Default for ProcessOptions {
             format: "jpeg".into(),
             quality: 80,
             max_width: 1024,
+            max_height: 1920,
             crop: None,
         }
     }
@@ -70,12 +74,26 @@ pub fn process_screenshot(
         img
     };
 
-    // Resize (if wider than max_width and max_width != 0)
-    let img = if opts.max_width > 0 && img.width() > opts.max_width {
-        let new_height = (img.height() as f64 * opts.max_width as f64 / img.width() as f64) as u32;
-        img.resize_exact(opts.max_width, new_height, FilterType::Lanczos3)
-    } else {
-        img
+    // Resize if either dimension exceeds its limit (preserving aspect ratio)
+    let img = {
+        let scale_w = if opts.max_width > 0 && img.width() > opts.max_width {
+            opts.max_width as f64 / img.width() as f64
+        } else {
+            1.0
+        };
+        let scale_h = if opts.max_height > 0 && img.height() > opts.max_height {
+            opts.max_height as f64 / img.height() as f64
+        } else {
+            1.0
+        };
+        let scale = scale_w.min(scale_h);
+        if scale < 1.0 {
+            let new_width = (img.width() as f64 * scale) as u32;
+            let new_height = (img.height() as f64 * scale) as u32;
+            img.resize_exact(new_width, new_height, FilterType::Lanczos3)
+        } else {
+            img
+        }
     };
 
     let (width, height) = (img.width(), img.height());
@@ -160,6 +178,7 @@ mod tests {
             format: "png".into(),
             quality: 80,
             max_width: 0, // disable resize
+            max_height: 0,
             crop: None,
         };
         let result = process_screenshot(&png, &opts).unwrap();
@@ -175,6 +194,7 @@ mod tests {
             format: "jpeg".into(),
             quality: 80,
             max_width: 1000,
+            max_height: 0,
             crop: None,
         };
         let result = process_screenshot(&png, &opts).unwrap();
@@ -190,6 +210,7 @@ mod tests {
             format: "jpeg".into(),
             quality: 80,
             max_width: 1024,
+            max_height: 0,
             crop: None,
         };
         let result = process_screenshot(&png, &opts).unwrap();
@@ -204,6 +225,7 @@ mod tests {
             format: "jpeg".into(),
             quality: 80,
             max_width: 500,
+            max_height: 0,
             crop: Some(CropRect {
                 x: 0,
                 y: 0,
@@ -223,6 +245,7 @@ mod tests {
             format: "png".into(),
             quality: 80,
             max_width: 0,
+            max_height: 0,
             crop: Some(CropRect {
                 x: 50,
                 y: 50,
@@ -242,6 +265,7 @@ mod tests {
             format: "png".into(),
             quality: 80,
             max_width: 0,
+            max_height: 0,
             crop: Some(CropRect {
                 x: 0,
                 y: 0,
@@ -259,6 +283,7 @@ mod tests {
             format: "jpeg".into(),
             quality: 80,
             max_width: 0,
+            max_height: 0,
             crop: None,
         };
         let result = process_screenshot(&png, &opts).unwrap();
@@ -273,9 +298,58 @@ mod tests {
             format: "webp".into(),
             quality: 80,
             max_width: 0,
+            max_height: 0,
             crop: None,
         };
         assert!(process_screenshot(&png, &opts).is_err());
+    }
+
+    #[test]
+    fn height_constrained_galaxy_s22() {
+        // 1080×2340 phone: width fits in 1024 after width-scale, but height still > 1920
+        let png = make_test_png(1080, 2340);
+        let opts = ProcessOptions {
+            format: "jpeg".into(),
+            quality: 80,
+            max_width: 1024,
+            max_height: 1920,
+            crop: None,
+        };
+        let result = process_screenshot(&png, &opts).unwrap();
+        // Height is the binding constraint: scale = 1920/2340 ≈ 0.8205
+        assert!(result.height <= 1920, "height {} > 1920", result.height);
+        assert!(result.width <= 1024, "width {} > 1024", result.width);
+    }
+
+    #[test]
+    fn height_constrained_fold() {
+        // Galaxy Z Fold: 904×2316 — width < 1024 so no width resize, but height > 1920
+        let png = make_test_png(904, 2316);
+        let opts = ProcessOptions {
+            format: "jpeg".into(),
+            quality: 80,
+            max_width: 1024,
+            max_height: 1920,
+            crop: None,
+        };
+        let result = process_screenshot(&png, &opts).unwrap();
+        assert!(result.height <= 1920, "height {} > 1920", result.height);
+        assert!(result.width <= 904, "width {} > 904", result.width);
+    }
+
+    #[test]
+    fn both_limits_zero_no_resize() {
+        let png = make_test_png(3000, 6000);
+        let opts = ProcessOptions {
+            format: "jpeg".into(),
+            quality: 80,
+            max_width: 0,
+            max_height: 0,
+            crop: None,
+        };
+        let result = process_screenshot(&png, &opts).unwrap();
+        assert_eq!(result.width, 3000);
+        assert_eq!(result.height, 6000);
     }
 
     #[test]
