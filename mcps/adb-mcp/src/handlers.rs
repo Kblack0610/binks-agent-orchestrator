@@ -12,7 +12,9 @@ use crate::processing::{CropRect, ProcessOptions};
 
 /// Resolve a device serial, returning an MCP error on failure
 async fn resolve_device(device: Option<&str>) -> Result<String, McpError> {
-    adb::get_device(device).await.map_err(|e| internal_error(format!("Device error: {e}")))
+    adb::get_device(device)
+        .await
+        .map_err(|e| internal_error(format!("Device error: {e}")))
 }
 
 pub async fn devices(_params: DevicesParams) -> Result<CallToolResult, McpError> {
@@ -65,7 +67,11 @@ pub async fn screenshot(params: ScreenshotParams) -> Result<CallToolResult, McpE
             .map_err(|e| internal_error(format!("Failed to save screenshot: {e}")))?;
         Ok(text_success(format!(
             "Screenshot saved to {} ({}x{}, {} bytes, {})",
-            path, processed.width, processed.height, processed.data.len(), processed.mime_type
+            path,
+            processed.width,
+            processed.height,
+            processed.data.len(),
+            processed.mime_type
         )))
     } else {
         use base64::Engine;
@@ -82,7 +88,10 @@ pub async fn tap(params: TapParams) -> Result<CallToolResult, McpError> {
     adb::tap(&device, params.x, params.y)
         .await
         .map_err(|e| internal_error(format!("Tap failed: {e}")))?;
-    Ok(text_success(format!("Tapped at ({}, {})", params.x, params.y)))
+    Ok(text_success(format!(
+        "Tapped at ({}, {})",
+        params.x, params.y
+    )))
 }
 
 pub async fn swipe(params: SwipeParams) -> Result<CallToolResult, McpError> {
@@ -200,7 +209,10 @@ pub async fn wait_for_activity(params: WaitForActivityParams) -> Result<CallTool
     let timeout = params.timeout_ms.unwrap_or(10000);
 
     match adb::wait_for_activity(&device, &params.activity, timeout).await {
-        Ok(true) => Ok(text_success(format!("Activity '{}' appeared", params.activity))),
+        Ok(true) => Ok(text_success(format!(
+            "Activity '{}' appeared",
+            params.activity
+        ))),
         Ok(false) => Err(internal_error(format!(
             "Timeout waiting for activity '{}'",
             params.activity
