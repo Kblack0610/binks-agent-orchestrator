@@ -32,7 +32,9 @@ impl AdbMcpServer {
         handlers::devices(params).await
     }
 
-    #[tool(description = "Capture a screenshot from an Android device. By default returns JPEG at quality 80, resized to max 1024px wide (25-50x smaller than raw PNG). Supports optional cropping and PNG output. Returns base64-encoded image or saves to file.")]
+    #[tool(
+        description = "Capture a screenshot from an Android device. By default returns JPEG at quality 80, resized to fit within 1024x1920 pixels (25-50x smaller than raw PNG). Supports optional cropping and PNG output. Returns base64-encoded image or saves to file."
+    )]
     async fn adb_screenshot(
         &self,
         Parameters(params): Parameters<ScreenshotParams>,
@@ -96,7 +98,9 @@ impl AdbMcpServer {
         handlers::find_element(params).await
     }
 
-    #[tool(description = "Find a UI element and tap on it. Combines element finding with tap action.")]
+    #[tool(
+        description = "Find a UI element and tap on it. Combines element finding with tap action."
+    )]
     async fn adb_tap_element(
         &self,
         Parameters(params): Parameters<TapElementParams>,
@@ -112,7 +116,9 @@ impl AdbMcpServer {
         handlers::get_current_activity(params).await
     }
 
-    #[tool(description = "Wait for a specific activity to appear on screen (useful for navigation timing)")]
+    #[tool(
+        description = "Wait for a specific activity to appear on screen (useful for navigation timing)"
+    )]
     async fn adb_wait_for_activity(
         &self,
         Parameters(params): Parameters<WaitForActivityParams>,

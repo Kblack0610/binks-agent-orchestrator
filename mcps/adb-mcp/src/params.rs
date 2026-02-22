@@ -31,14 +31,16 @@ where
         where
             E: de::Error,
         {
-            i32::try_from(value).map_err(|_| de::Error::custom(format!("i64 {value} out of i32 range")))
+            i32::try_from(value)
+                .map_err(|_| de::Error::custom(format!("i64 {value} out of i32 range")))
         }
 
         fn visit_u64<E>(self, value: u64) -> Result<i32, E>
         where
             E: de::Error,
         {
-            i32::try_from(value).map_err(|_| de::Error::custom(format!("u64 {value} out of i32 range")))
+            i32::try_from(value)
+                .map_err(|_| de::Error::custom(format!("u64 {value} out of i32 range")))
         }
 
         fn visit_f64<E>(self, value: f64) -> Result<i32, E>
@@ -48,7 +50,9 @@ where
             if value.fract() == 0.0 && value >= i32::MIN as f64 && value <= i32::MAX as f64 {
                 Ok(value as i32)
             } else {
-                Err(de::Error::custom(format!("f64 {value} cannot be represented as i32")))
+                Err(de::Error::custom(format!(
+                    "f64 {value} cannot be represented as i32"
+                )))
             }
         }
 
@@ -56,9 +60,9 @@ where
         where
             E: de::Error,
         {
-            value.parse::<i32>().map_err(|_| {
-                de::Error::custom(format!("invalid string for i32: '{value}'"))
-            })
+            value
+                .parse::<i32>()
+                .map_err(|_| de::Error::custom(format!("invalid string for i32: '{value}'")))
         }
     }
 
@@ -85,14 +89,16 @@ where
         where
             E: de::Error,
         {
-            u32::try_from(value).map_err(|_| de::Error::custom(format!("i64 {value} out of u32 range")))
+            u32::try_from(value)
+                .map_err(|_| de::Error::custom(format!("i64 {value} out of u32 range")))
         }
 
         fn visit_u64<E>(self, value: u64) -> Result<u32, E>
         where
             E: de::Error,
         {
-            u32::try_from(value).map_err(|_| de::Error::custom(format!("u64 {value} out of u32 range")))
+            u32::try_from(value)
+                .map_err(|_| de::Error::custom(format!("u64 {value} out of u32 range")))
         }
 
         fn visit_f64<E>(self, value: f64) -> Result<u32, E>
@@ -102,7 +108,9 @@ where
             if value.fract() == 0.0 && value >= 0.0 && value <= u32::MAX as f64 {
                 Ok(value as u32)
             } else {
-                Err(de::Error::custom(format!("f64 {value} cannot be represented as u32")))
+                Err(de::Error::custom(format!(
+                    "f64 {value} cannot be represented as u32"
+                )))
             }
         }
 
@@ -110,9 +118,9 @@ where
         where
             E: de::Error,
         {
-            value.parse::<u32>().map_err(|_| {
-                de::Error::custom(format!("invalid string for u32: '{value}'"))
-            })
+            value
+                .parse::<u32>()
+                .map_err(|_| de::Error::custom(format!("invalid string for u32: '{value}'")))
         }
     }
 
@@ -168,7 +176,9 @@ where
             if value.fract() == 0.0 && value >= 0.0 && value <= u32::MAX as f64 {
                 Ok(Some(value as u32))
             } else {
-                Err(de::Error::custom(format!("f64 {value} cannot be represented as u32")))
+                Err(de::Error::custom(format!(
+                    "f64 {value} cannot be represented as u32"
+                )))
             }
         }
 
@@ -176,9 +186,10 @@ where
         where
             E: de::Error,
         {
-            value.parse::<u32>().map(Some).map_err(|_| {
-                de::Error::custom(format!("invalid string for u32: '{value}'"))
-            })
+            value
+                .parse::<u32>()
+                .map(Some)
+                .map_err(|_| de::Error::custom(format!("invalid string for u32: '{value}'")))
         }
     }
 
@@ -229,7 +240,9 @@ where
             if value.fract() == 0.0 && value >= 0.0 && value <= u64::MAX as f64 {
                 Ok(Some(value as u64))
             } else {
-                Err(de::Error::custom(format!("f64 {value} cannot be represented as u64")))
+                Err(de::Error::custom(format!(
+                    "f64 {value} cannot be represented as u64"
+                )))
             }
         }
 
@@ -237,9 +250,10 @@ where
         where
             E: de::Error,
         {
-            value.parse::<u64>().map(Some).map_err(|_| {
-                de::Error::custom(format!("invalid string for u64: '{value}'"))
-            })
+            value
+                .parse::<u64>()
+                .map(Some)
+                .map_err(|_| de::Error::custom(format!("invalid string for u64: '{value}'")))
         }
     }
 
@@ -295,7 +309,9 @@ where
             if value.fract() == 0.0 && (0.0..=255.0).contains(&value) {
                 Ok(Some(value as u8))
             } else {
-                Err(de::Error::custom(format!("f64 {value} cannot be represented as u8")))
+                Err(de::Error::custom(format!(
+                    "f64 {value} cannot be represented as u8"
+                )))
             }
         }
 
@@ -303,9 +319,10 @@ where
         where
             E: de::Error,
         {
-            value.parse::<u8>().map(Some).map_err(|_| {
-                de::Error::custom(format!("invalid string for u8: '{value}'"))
-            })
+            value
+                .parse::<u8>()
+                .map(Some)
+                .map_err(|_| de::Error::custom(format!("invalid string for u8: '{value}'")))
         }
     }
 
@@ -361,6 +378,12 @@ pub struct ScreenshotParams {
     )]
     #[serde(default, deserialize_with = "deserialize_lenient_u32_opt")]
     pub max_width: Option<u32>,
+
+    #[schemars(
+        description = "Max output height in pixels, preserving aspect ratio (default: 1920, 0 = no resize)"
+    )]
+    #[serde(default, deserialize_with = "deserialize_lenient_u32_opt")]
+    pub max_height: Option<u32>,
 
     #[schemars(description = "Crop region to extract before resizing")]
     #[serde(default)]
@@ -539,7 +562,8 @@ mod tests {
 
     #[test]
     fn swipe_params_with_duration_string() {
-        let json = r#"{"start_x": 100, "start_y": 200, "end_x": 300, "end_y": 400, "duration_ms": "500"}"#;
+        let json =
+            r#"{"start_x": 100, "start_y": 200, "end_x": 300, "end_y": 400, "duration_ms": "500"}"#;
         let params: SwipeParams = serde_json::from_str(json).unwrap();
         assert_eq!(params.duration_ms, Some(500));
     }

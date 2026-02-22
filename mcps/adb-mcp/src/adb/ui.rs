@@ -181,9 +181,7 @@ pub fn find_elements<'a>(
             });
 
             let id_match = resource_id.map_or(true, |id| {
-                e.resource_id
-                    .as_ref()
-                    .is_some_and(|rid| rid.contains(id))
+                e.resource_id.as_ref().is_some_and(|rid| rid.contains(id))
             });
 
             let class_match = class.map_or(true, |c| e.class.contains(c));
