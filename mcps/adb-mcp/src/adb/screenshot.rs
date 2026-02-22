@@ -126,10 +126,27 @@ async fn capture_via_storage(device: &str) -> Result<ScreenshotResult> {
     Ok(ScreenshotResult { data, info })
 }
 
-/// Wake the device screen before capturing
+/// Wake the device screen before capturing.
+///
+/// Checks screen state first and skips the wake keyevent (+ sleep) when the
+/// display is already on.
 pub async fn wake_device(device: &str) -> Result<()> {
-    debug!("Waking device screen");
+    // Check if screen is already on
+    let output = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", "dumpsys", "power"]),
+        ADB_CLEANUP_TIMEOUT,
+    )
+    .await?;
 
+    let power_state = String::from_utf8_lossy(&output.stdout);
+    let screen_on = power_state.contains("Display Power: state=ON");
+
+    if screen_on {
+        debug!("Screen already on, skipping wake");
+        return Ok(());
+    }
+
+    debug!("Screen off, waking device");
     run_adb_with_timeout(
         Command::new("adb").args(["-s", device, "shell", "input", "keyevent", "KEYCODE_WAKEUP"]),
         ADB_CLEANUP_TIMEOUT,
@@ -137,7 +154,6 @@ pub async fn wake_device(device: &str) -> Result<()> {
     .await
     .context("Failed to wake device")?;
 
-    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
-
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     Ok(())
 }
