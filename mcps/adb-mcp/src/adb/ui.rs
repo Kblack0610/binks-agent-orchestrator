@@ -1,9 +1,11 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tracing::debug;
+
+use super::{run_adb_with_timeout, ADB_CLEANUP_TIMEOUT, ADB_TIMEOUT};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiElement {
@@ -34,11 +36,11 @@ impl Bounds {
 pub async fn dump_ui(device: &str) -> Result<Vec<UiElement>> {
     let remote_path = "/sdcard/adb_mcp_ui.xml";
 
-    let output = Command::new("adb")
-        .args(["-s", device, "shell", "uiautomator", "dump", remote_path])
-        .output()
-        .await
-        .context("Failed to dump UI")?;
+    let output = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", "uiautomator", "dump", remote_path]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     if !output.status.success() {
         anyhow::bail!(
@@ -47,17 +49,18 @@ pub async fn dump_ui(device: &str) -> Result<Vec<UiElement>> {
         );
     }
 
-    let xml_data = Command::new("adb")
-        .args(["-s", device, "exec-out", "cat", remote_path])
-        .output()
-        .await
-        .context("Failed to pull UI dump")?
-        .stdout;
+    let xml_data = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "exec-out", "cat", remote_path]),
+        ADB_TIMEOUT,
+    )
+    .await?
+    .stdout;
 
-    let _ = Command::new("adb")
-        .args(["-s", device, "shell", "rm", "-f", remote_path])
-        .output()
-        .await;
+    let _ = run_adb_with_timeout(
+        Command::new("adb").args(["-s", device, "shell", "rm", "-f", remote_path]),
+        ADB_CLEANUP_TIMEOUT,
+    )
+    .await;
 
     let xml_str = String::from_utf8_lossy(&xml_data);
     parse_ui_hierarchy(&xml_str)
@@ -192,8 +195,8 @@ pub fn find_elements<'a>(
 
 /// Get the current foreground activity
 pub async fn get_current_activity(device: &str) -> Result<String> {
-    let output = Command::new("adb")
-        .args([
+    let output = run_adb_with_timeout(
+        Command::new("adb").args([
             "-s",
             device,
             "shell",
@@ -204,17 +207,18 @@ pub async fn get_current_activity(device: &str) -> Result<String> {
             "grep",
             "-E",
             "mResumedActivity|mCurrentFocus",
-        ])
-        .output()
-        .await
-        .context("Failed to get current activity")?;
+        ]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     if stdout.is_empty() {
-        let output = Command::new("adb")
-            .args(["-s", device, "shell", "dumpsys", "activity", "activities"])
-            .output()
-            .await?;
+        let output = run_adb_with_timeout(
+            Command::new("adb").args(["-s", device, "shell", "dumpsys", "activity", "activities"]),
+            ADB_TIMEOUT,
+        )
+        .await?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         for line in stdout.lines() {

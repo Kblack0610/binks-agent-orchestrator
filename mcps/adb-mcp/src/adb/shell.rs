@@ -1,13 +1,13 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use tokio::process::Command;
+
+use super::{run_adb_with_timeout, ADB_TIMEOUT};
 
 /// Execute a shell command on the device
 pub async fn shell(device: &str, command: &str) -> Result<ShellOutput> {
-    let output = Command::new("adb")
-        .args(["-s", device, "shell", command])
-        .output()
-        .await
-        .context("Failed to run adb shell")?;
+    let output =
+        run_adb_with_timeout(Command::new("adb").args(["-s", device, "shell", command]), ADB_TIMEOUT)
+            .await?;
 
     Ok(ShellOutput {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -20,12 +20,13 @@ pub async fn shell(device: &str, command: &str) -> Result<ShellOutput> {
 pub async fn exec_out(device: &str, command: &str) -> Result<Vec<u8>> {
     let args: Vec<&str> = command.split_whitespace().collect();
 
-    let output = Command::new("adb")
-        .args(["-s", device, "exec-out"])
-        .args(&args)
-        .output()
-        .await
-        .context("Failed to run adb exec-out")?;
+    let output = run_adb_with_timeout(
+        Command::new("adb")
+            .args(["-s", device, "exec-out"])
+            .args(&args),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     if !output.status.success() {
         anyhow::bail!(

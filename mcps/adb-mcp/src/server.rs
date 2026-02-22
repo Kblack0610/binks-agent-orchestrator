@@ -32,7 +32,7 @@ impl AdbMcpServer {
         handlers::devices(params).await
     }
 
-    #[tool(description = "Capture a validated screenshot from an Android device. Returns base64-encoded PNG or saves to file.")]
+    #[tool(description = "Capture a screenshot from an Android device. By default returns JPEG at quality 80, resized to max 1024px wide (25-50x smaller than raw PNG). Supports optional cropping and PNG output. Returns base64-encoded image or saves to file.")]
     async fn adb_screenshot(
         &self,
         Parameters(params): Parameters<ScreenshotParams>,

@@ -1,6 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
+
+use super::{run_adb_with_timeout, ADB_TIMEOUT};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Device {
@@ -12,11 +14,11 @@ pub struct Device {
 
 /// List all connected ADB devices
 pub async fn list_devices() -> Result<Vec<Device>> {
-    let output = Command::new("adb")
-        .args(["devices", "-l"])
-        .output()
-        .await
-        .context("Failed to run adb devices")?;
+    let output = run_adb_with_timeout(
+        Command::new("adb").args(["devices", "-l"]),
+        ADB_TIMEOUT,
+    )
+    .await?;
 
     if !output.status.success() {
         anyhow::bail!(
