@@ -42,7 +42,7 @@ impl AdbMcpServer {
         handlers::screenshot(params).await
     }
 
-    #[tool(description = "Tap at specific x,y coordinates on the device screen")]
+    #[tool(description = "Tap at specific x,y coordinates on the device screen. Coordinates are in pixels from the top-left corner of the screen.")]
     async fn adb_tap(
         &self,
         Parameters(params): Parameters<TapParams>,
@@ -50,7 +50,7 @@ impl AdbMcpServer {
         handlers::tap(params).await
     }
 
-    #[tool(description = "Perform a swipe gesture from start to end coordinates")]
+    #[tool(description = "Perform a swipe gesture from start to end coordinates. Duration in ms controls speed (default ~300ms). Use 100-200 for fast flicks, 500+ for slow scrolls.")]
     async fn adb_swipe(
         &self,
         Parameters(params): Parameters<SwipeParams>,
@@ -90,7 +90,7 @@ impl AdbMcpServer {
         handlers::ui_dump(params).await
     }
 
-    #[tool(description = "Find UI elements by text, resource ID, or class name")]
+    #[tool(description = "Find UI elements by text, resource ID, or class name. Returns empty array if no match. Uses partial text matching. Check resource_id for reliable element targeting.")]
     async fn adb_find_element(
         &self,
         Parameters(params): Parameters<FindElementParams>,

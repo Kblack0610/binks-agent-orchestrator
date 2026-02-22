@@ -90,7 +90,7 @@ pub fn process_screenshot(
         if scale < 1.0 {
             let new_width = (img.width() as f64 * scale) as u32;
             let new_height = (img.height() as f64 * scale) as u32;
-            img.resize_exact(new_width, new_height, FilterType::Lanczos3)
+            img.resize_exact(new_width, new_height, FilterType::Triangle)
         } else {
             img
         }

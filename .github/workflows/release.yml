@@ -50,6 +50,7 @@ jobs:
 
           # List of MCP servers to package individually
           MCPS=(
+            "adb-mcp"
             "sysinfo-mcp"
             "github-gh-mcp"
             "inbox-mcp"

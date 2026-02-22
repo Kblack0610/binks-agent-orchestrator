@@ -84,6 +84,13 @@ pub async fn screenshot(params: ScreenshotParams) -> Result<CallToolResult, McpE
 }
 
 pub async fn tap(params: TapParams) -> Result<CallToolResult, McpError> {
+    if params.x < 0 || params.y < 0 {
+        return Err(invalid_params("Coordinates must be non-negative"));
+    }
+    if params.x > 10000 || params.y > 10000 {
+        tracing::warn!("Unusually large tap coordinates: ({}, {})", params.x, params.y);
+    }
+
     let device = resolve_device(params.device.as_deref()).await?;
     adb::tap(&device, params.x, params.y)
         .await
@@ -95,6 +102,16 @@ pub async fn tap(params: TapParams) -> Result<CallToolResult, McpError> {
 }
 
 pub async fn swipe(params: SwipeParams) -> Result<CallToolResult, McpError> {
+    if params.start_x < 0 || params.start_y < 0 || params.end_x < 0 || params.end_y < 0 {
+        return Err(invalid_params("Coordinates must be non-negative"));
+    }
+    if params.start_x > 10000 || params.start_y > 10000 || params.end_x > 10000 || params.end_y > 10000 {
+        tracing::warn!(
+            "Unusually large swipe coordinates: ({}, {}) -> ({}, {})",
+            params.start_x, params.start_y, params.end_x, params.end_y
+        );
+    }
+
     let device = resolve_device(params.device.as_deref()).await?;
     adb::swipe(
         &device,
