@@ -5,6 +5,10 @@ edition.workspace = true
 description = "Common utilities for MCP servers - initialization, error handling, and result formatting"
 license = "MIT"
 
+[features]
+default = []
+image-processing = ["dep:image", "dep:base64"]
+
 [dependencies]
 # MCP SDK
 rmcp.workspace = true
@@ -29,6 +33,10 @@ anyhow.workspace = true
 # Logging
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+# Image processing (optional, behind feature flag)
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"], optional = true }
+base64 = { version = "0.22", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

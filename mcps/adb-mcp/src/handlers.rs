@@ -74,8 +74,7 @@ pub async fn screenshot(params: ScreenshotParams) -> Result<CallToolResult, McpE
             processed.mime_type
         )))
     } else {
-        use base64::Engine;
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&processed.data);
+        let b64 = crate::processing::to_base64(&processed.data);
         Ok(CallToolResult::success(vec![Content::image(
             &b64,
             processed.mime_type,
