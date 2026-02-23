@@ -358,7 +358,7 @@ pub struct CropRegion {
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ScreenshotParams {
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 
     #[schemars(description = "File path to save screenshot (optional, returns base64 if omitted)")]
@@ -401,7 +401,7 @@ pub struct TapParams {
     pub y: i32,
 
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
@@ -428,7 +428,7 @@ pub struct SwipeParams {
     pub duration_ms: Option<u32>,
 
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
@@ -438,7 +438,7 @@ pub struct InputTextParams {
     pub text: String,
 
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
@@ -448,7 +448,7 @@ pub struct KeyeventParams {
     pub key: String,
 
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
@@ -458,14 +458,14 @@ pub struct ShellParams {
     pub command: String,
 
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct UiDumpParams {
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
@@ -484,7 +484,7 @@ pub struct FindElementParams {
     pub class: Option<String>,
 
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
@@ -503,14 +503,14 @@ pub struct TapElementParams {
     pub class: Option<String>,
 
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct GetActivityParams {
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
@@ -524,7 +524,7 @@ pub struct WaitForActivityParams {
     pub timeout_ms: Option<u64>,
 
     #[schemars(description = "Device serial number (optional, auto-selects if only one device)")]
-    #[serde(default)]
+    #[serde(default, alias = "deviceId", alias = "device_id")]
     pub device: Option<String>,
 }
 
@@ -623,5 +623,19 @@ mod tests {
         let params: TapParams = serde_json::from_str(json).unwrap();
         assert_eq!(params.x, -50);
         assert_eq!(params.y, 100);
+    }
+
+    #[test]
+    fn device_alias_device_id() {
+        let json = r#"{"x": 100, "y": 200, "deviceId": "ABC123"}"#;
+        let params: TapParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.device, Some("ABC123".into()));
+    }
+
+    #[test]
+    fn device_alias_snake_case() {
+        let json = r#"{"x": 100, "y": 200, "device_id": "ABC123"}"#;
+        let params: TapParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.device, Some("ABC123".into()));
     }
 }
