@@ -41,6 +41,12 @@ pub mod error;
 pub mod init;
 pub mod result;
 
+#[cfg(feature = "image-processing")]
+pub mod imaging;
+
+#[cfg(feature = "image-processing")]
+pub mod encoding;
+
 // Re-export commonly used items at crate root
 pub use embeddable::{EmbeddableError, EmbeddableMcp, EmbeddableResult};
 pub use error::{internal_error, invalid_params, IntoMcpError, McpResult, ResultExt};

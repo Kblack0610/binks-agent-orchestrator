@@ -17,6 +17,9 @@ pub struct SearchByVectorParams {
     /// Filter by component types (e.g., ["Button", "TextField"])
     #[serde(default)]
     pub component_filter: Option<Vec<String>>,
+    /// Include screenshot image (base64 JPEG) in each result
+    #[serde(default)]
+    pub include_image: bool,
 }
 
 /// Parameters for getting screen details
@@ -27,6 +30,9 @@ pub struct GetScreenDetailsParams {
     /// Whether to include screenshot path if available
     #[serde(default)]
     pub include_screenshot: bool,
+    /// Include screenshot image (base64 JPEG) in response
+    #[serde(default)]
+    pub include_image: bool,
 }
 
 /// Parameters for listing component types

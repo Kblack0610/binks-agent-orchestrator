@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # Internal crates
-mcp-common.workspace = true
+mcp-common = { workspace = true, features = ["image-processing"] }
 
 # MCP SDK
 rmcp.workspace = true
