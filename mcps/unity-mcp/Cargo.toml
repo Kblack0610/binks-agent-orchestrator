@@ -1,0 +1,45 @@
+[package]
+name = "unity-mcp"
+version.workspace = true
+edition.workspace = true
+description = "Unity Editor log monitoring and project analysis MCP server"
+license = "MIT"
+
+[dependencies]
+# Internal crates
+mcp-common.workspace = true
+
+# MCP SDK
+rmcp.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+chrono.workspace = true
+
+# Error handling
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Log pattern matching
+regex = "1"
+
+# Platform-specific paths
+dirs = "6"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lib]
+name = "unity_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "unity-mcp"
+path = "src/main.rs"
