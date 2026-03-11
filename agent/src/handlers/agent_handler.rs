@@ -25,7 +25,7 @@ pub async fn run_agent(
 
     // Detect model capabilities
     let capabilities = detect_capabilities(
-        &ctx.ollama_url,
+        &ctx.gateway_url,
         &ctx.model,
         Some(&ctx.file_config.models.overrides),
     )
@@ -42,7 +42,7 @@ pub async fn run_agent(
     }
 
     let mut agent =
-        Agent::from_agent_config(&ctx.ollama_url, &ctx.model, pool, &ctx.file_config.agent)
+        Agent::from_agent_config(&ctx.gateway_url, &ctx.model, pool, &ctx.file_config.agent)
             .with_capabilities(capabilities)
             .with_verbose(ctx.is_verbose());
 

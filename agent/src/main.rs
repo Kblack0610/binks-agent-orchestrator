@@ -1,4 +1,4 @@
-//! Minimal Rust agent with Ollama and MCP support
+//! Minimal Rust agent with LiteLLM gateway and MCP support
 //!
 //! This is the main entry point - a slim dispatcher that routes commands
 //! to their respective handlers in the `handlers` module.
@@ -52,7 +52,9 @@ async fn main() -> Result<()> {
     init_tracing(cli.verbose);
 
     let file_config = AgentFileConfig::load()?;
-    let ctx = CommandContext::new(cli.ollama_url, cli.model, cli.verbose, file_config);
+    let gateway_url = cli.gateway_url.or_else(|| std::env::var("OLLAMA_URL").ok());
+    let model = cli.model.or_else(|| std::env::var("OLLAMA_MODEL").ok());
+    let ctx = CommandContext::new(gateway_url, model, cli.verbose, file_config);
 
     dispatch(cli.command, ctx).await
 }

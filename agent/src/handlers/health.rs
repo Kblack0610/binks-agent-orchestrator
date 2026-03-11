@@ -97,7 +97,7 @@ fn check_agent_config(ctx: &CommandContext, checks_passed: &mut u32) -> bool {
         }
     } else {
         println!("{} Not found (using defaults)", status(true));
-        println!("  - LLM URL: {}", ctx.ollama_url);
+        println!("  - Gateway URL: {}", ctx.gateway_url);
         println!("  - Model: {}", ctx.model);
         *checks_passed += 1;
         true
@@ -179,7 +179,7 @@ async fn check_mcp_connections(checks_passed: &mut u32) -> bool {
 
 async fn check_llm_connectivity(ctx: &CommandContext, checks_passed: &mut u32) -> bool {
     print!("LLM Connectivity: ");
-    let llm = OllamaClient::new(&ctx.ollama_url, &ctx.model);
+    let llm = OllamaClient::new(&ctx.gateway_url, &ctx.model);
     match llm.chat("Say 'OK' and nothing else.").await {
         Ok(response) => {
             let trimmed = response.trim();

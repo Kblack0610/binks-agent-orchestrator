@@ -162,8 +162,10 @@ impl From<ModelOverrideConfig> for ModelCapabilityOverride {
 /// LLM configuration section
 #[derive(Debug, Deserialize)]
 pub struct LlmConfig {
-    #[serde(default = "default_ollama_url")]
+    #[serde(default = "default_gateway_url", alias = "gateway_url")]
     pub url: String,
+    #[serde(default = "default_gateway_type")]
+    pub gateway_type: String,
     /// Model name - must be specified in .agent.toml, no default
     #[serde(default)]
     pub model: String,
@@ -241,8 +243,12 @@ pub struct MonitorSectionConfig {
 }
 
 // Default value functions
-fn default_ollama_url() -> String {
-    "http://localhost:11434".to_string()
+fn default_gateway_url() -> String {
+    "http://localhost:4000".to_string()
+}
+
+fn default_gateway_type() -> String {
+    "litellm".to_string()
 }
 
 // No default_model() - model must be specified in .agent.toml
@@ -255,7 +261,8 @@ fn default_interval() -> u64 {
 impl Default for LlmConfig {
     fn default() -> Self {
         Self {
-            url: default_ollama_url(),
+            url: default_gateway_url(),
+            gateway_type: default_gateway_type(),
             model: String::new(), // No default - must be specified in .agent.toml
         }
     }
@@ -421,9 +428,9 @@ impl AgentFileConfig {
         Ok(config)
     }
 
-    /// Get the default Ollama URL (for use elsewhere)
-    pub fn default_ollama_url() -> String {
-        default_ollama_url()
+    /// Get the default LiteLLM gateway URL (for use elsewhere).
+    pub fn default_gateway_url() -> String {
+        default_gateway_url()
     }
 }
 
@@ -541,7 +548,8 @@ mod tests {
     fn test_agent_config_defaults() {
         let config = AgentFileConfig::default();
 
-        assert_eq!(config.llm.url, "http://localhost:11434");
+        assert_eq!(config.llm.url, "http://localhost:4000");
+        assert_eq!(config.llm.gateway_type, "litellm");
         // No default model - must be specified in .agent.toml
         assert!(config.llm.model.is_empty());
         assert_eq!(config.monitor.interval, 300);
@@ -554,16 +562,18 @@ mod tests {
     fn test_agent_config_parse_minimal() {
         let toml = r#"
 [llm]
-url = "http://192.168.1.4:11434"
-model = "llama3.1:8b"
+url = "http://localhost:4000"
+gateway_type = "litellm"
+model = "openai/gpt-4o-mini"
 "#;
 
         let mut file = NamedTempFile::with_suffix(".toml").unwrap();
         file.write_all(toml.as_bytes()).unwrap();
 
         let config = AgentFileConfig::load_from_path(file.path()).unwrap();
-        assert_eq!(config.llm.url, "http://192.168.1.4:11434");
-        assert_eq!(config.llm.model, "llama3.1:8b");
+        assert_eq!(config.llm.url, "http://localhost:4000");
+        assert_eq!(config.llm.gateway_type, "litellm");
+        assert_eq!(config.llm.model, "openai/gpt-4o-mini");
         // Defaults should still apply for unspecified sections
         assert_eq!(config.monitor.interval, 300);
     }
@@ -572,8 +582,9 @@ model = "llama3.1:8b"
     fn test_agent_config_parse_full() {
         let toml = r#"
 [llm]
-url = "http://gpu-server:11434"
-model = "codestral:22b"
+url = "http://litellm.internal:4000"
+gateway_type = "litellm"
+model = "code-fast"
 
 [agent]
 system_prompt = "You are a helpful coding assistant."
@@ -606,8 +617,9 @@ max_tier = 4
         let config = AgentFileConfig::load_from_path(file.path()).unwrap();
 
         // LLM section
-        assert_eq!(config.llm.url, "http://gpu-server:11434");
-        assert_eq!(config.llm.model, "codestral:22b");
+        assert_eq!(config.llm.url, "http://litellm.internal:4000");
+        assert_eq!(config.llm.gateway_type, "litellm");
+        assert_eq!(config.llm.model, "code-fast");
 
         // Agent section
         assert_eq!(
@@ -651,7 +663,7 @@ max_tier = 4
 
         // Empty file should use all defaults
         let config = AgentFileConfig::load_from_path(file.path()).unwrap();
-        assert_eq!(config.llm.url, "http://localhost:11434");
+        assert_eq!(config.llm.url, "http://localhost:4000");
     }
 
     #[test]
@@ -667,7 +679,7 @@ model = "custom-model"
 
         let config = AgentFileConfig::load_from_path(file.path()).unwrap();
         assert_eq!(config.llm.model, "custom-model");
-        assert_eq!(config.llm.url, "http://localhost:11434"); // default
+        assert_eq!(config.llm.url, "http://localhost:4000"); // default
     }
 
     // ============== Size Threshold Tests ==============
@@ -718,10 +730,10 @@ model = "custom-model"
     // ============== Static Method Tests ==============
 
     #[test]
-    fn test_default_ollama_url_value() {
+    fn test_default_gateway_url_value() {
         assert_eq!(
-            AgentFileConfig::default_ollama_url(),
-            "http://localhost:11434"
+            AgentFileConfig::default_gateway_url(),
+            "http://localhost:4000"
         );
     }
 

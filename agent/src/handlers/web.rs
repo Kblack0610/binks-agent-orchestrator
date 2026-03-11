@@ -17,7 +17,8 @@ pub async fn run_web(
 ) -> Result<()> {
     let config = WebConfig {
         port,
-        ollama_url: ctx.ollama_url.clone(),
+        gateway_url: ctx.gateway_url.clone(),
+        gateway_type: ctx.file_config.llm.gateway_type.clone(),
         model: ctx.model.clone(),
         system_prompt: system.or_else(|| ctx.file_config.agent.system_prompt.clone()),
         dev_mode: dev,

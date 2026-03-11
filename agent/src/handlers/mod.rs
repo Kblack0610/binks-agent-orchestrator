@@ -86,7 +86,7 @@ pub use workflow::run_workflow_command;
 /// Resources like MCP pool are only initialized when first accessed,
 /// avoiding startup overhead for commands that don't need them.
 pub struct CommandContext {
-    pub ollama_url: String,
+    pub gateway_url: String,
     pub model: String,
     pub verbose: u8,
     pub file_config: AgentFileConfig,
@@ -99,17 +99,17 @@ pub struct CommandContext {
 impl CommandContext {
     /// Create a new CommandContext from CLI args and file config
     pub fn new(
-        ollama_url: Option<String>,
+        gateway_url: Option<String>,
         model: Option<String>,
         verbose: u8,
         file_config: AgentFileConfig,
     ) -> Self {
         // Resolve with priority: CLI/env > config file > defaults
-        let ollama_url = ollama_url.unwrap_or_else(|| file_config.llm.url.clone());
+        let gateway_url = gateway_url.unwrap_or_else(|| file_config.llm.url.clone());
         let model = model.unwrap_or_else(|| file_config.llm.model.clone());
 
         Self {
-            ollama_url,
+            gateway_url,
             model,
             verbose,
             file_config,
@@ -118,9 +118,9 @@ impl CommandContext {
         }
     }
 
-    /// Create an OllamaClient configured with the context's settings
+    /// Create a gateway client configured with the context's settings.
     pub fn llm(&self) -> OllamaClient {
-        OllamaClient::new(&self.ollama_url, &self.model)
+        OllamaClient::new(&self.gateway_url, &self.model)
     }
 
     /// Check if verbose mode is enabled (any -v flag)

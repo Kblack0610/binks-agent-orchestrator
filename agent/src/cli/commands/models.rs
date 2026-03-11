@@ -1,6 +1,7 @@
 //! Models command - list and switch models
 
 use super::{CommandContext, CommandResult, SlashCommand};
+use crate::llm;
 use crate::output::OutputEvent;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -29,15 +30,18 @@ impl SlashCommand for ModelsCommand {
             // List models
             let current = ctx.agent.model();
 
-            // Try to fetch available models from Ollama
-            match list_ollama_models(ctx.agent.ollama_url()).await {
+            // Try to fetch available models from the configured gateway.
+            match llm::list_models(ctx.agent.gateway_url(), Some(current)).await {
                 Ok(models) => {
                     let mut output = String::new();
                     output.push_str("Available models:\n\n");
 
                     for model in models {
-                        let marker = if model == current { " *" } else { "" };
-                        output.push_str(&format!("  {}{}\n", model, marker));
+                        let marker = if model.id == current { " *" } else { "" };
+                        output.push_str(&format!(
+                            "  {} [{}]{}\n",
+                            model.display_name, model.provider, marker
+                        ));
                     }
 
                     output.push_str(&format!("\nCurrent: {}\n", current));
@@ -67,33 +71,6 @@ impl SlashCommand for ModelsCommand {
             )))
         }
     }
-}
-
-/// Fetch list of models from Ollama
-async fn list_ollama_models(ollama_url: &str) -> Result<Vec<String>> {
-    let url = format!("{}/api/tags", ollama_url);
-
-    let client = reqwest::Client::new();
-    let response = client.get(&url).send().await?;
-
-    if !response.status().is_success() {
-        anyhow::bail!("Ollama API error: {}", response.status());
-    }
-
-    #[derive(serde::Deserialize)]
-    struct TagsResponse {
-        models: Vec<ModelInfo>,
-    }
-
-    #[derive(serde::Deserialize)]
-    struct ModelInfo {
-        name: String,
-    }
-
-    let tags: TagsResponse = response.json().await?;
-    let models: Vec<String> = tags.models.into_iter().map(|m| m.name).collect();
-
-    Ok(models)
 }
 
 #[cfg(test)]

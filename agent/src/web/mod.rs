@@ -44,7 +44,8 @@ struct StaticAssets;
 /// Configuration for the web server
 pub struct WebConfig {
     pub port: u16,
-    pub ollama_url: String,
+    pub gateway_url: String,
+    pub gateway_type: String,
     pub model: String,
     pub system_prompt: Option<String>,
     pub dev_mode: bool,
@@ -67,7 +68,8 @@ pub async fn serve(config: WebConfig) -> Result<()> {
     // Create app state
     let state = AppState::new(
         db,
-        config.ollama_url.clone(),
+        config.gateway_url.clone(),
+        config.gateway_type.clone(),
         config.model.clone(),
         config.system_prompt.clone(),
     )?;

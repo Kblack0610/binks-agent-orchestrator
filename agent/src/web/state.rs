@@ -15,8 +15,10 @@ pub struct AppState {
     pub db: Database,
     /// MCP client pool for tool access
     pub mcp_pool: Option<Arc<tokio::sync::Mutex<McpClientPool>>>,
-    /// Ollama URL
-    pub ollama_url: String,
+    /// LiteLLM gateway URL
+    pub gateway_url: String,
+    /// Gateway type (currently `litellm`)
+    pub gateway_type: String,
     /// Model name
     pub model: String,
     /// Default system prompt
@@ -27,7 +29,8 @@ impl AppState {
     /// Create new app state
     pub fn new(
         db: Database,
-        ollama_url: String,
+        gateway_url: String,
+        gateway_type: String,
         model: String,
         system_prompt: Option<String>,
     ) -> Result<Self> {
@@ -50,7 +53,8 @@ impl AppState {
         Ok(Self {
             db,
             mcp_pool,
-            ollama_url,
+            gateway_url,
+            gateway_type,
             model,
             system_prompt,
         })
@@ -60,7 +64,7 @@ impl AppState {
     #[cfg(feature = "orchestrator")]
     pub fn engine_config(&self, non_interactive: bool) -> EngineConfig {
         EngineConfig {
-            ollama_url: self.ollama_url.clone(),
+            ollama_url: self.gateway_url.clone(),
             default_model: self.model.clone(),
             non_interactive,
             verbose: false,

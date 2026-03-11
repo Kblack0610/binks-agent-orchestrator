@@ -18,15 +18,11 @@ pub async fn chat(ctx: &CommandContext, message: &str) -> Result<()> {
 
 /// Handle the `models` command - list available models
 pub async fn models(ctx: &CommandContext) -> Result<()> {
-    let models = llm::list_models(&ctx.ollama_url).await?;
+    let models = llm::list_models(&ctx.gateway_url, Some(&ctx.model)).await?;
     println!("Available models:");
     for m in models {
-        let current_marker = if m.name == ctx.model {
-            " (current)"
-        } else {
-            ""
-        };
-        println!("  {}{}", m.name, current_marker);
+        let current_marker = if m.id == ctx.model { " (current)" } else { "" };
+        println!("  {} [{}]{}", m.display_name, m.provider, current_marker);
     }
     Ok(())
 }

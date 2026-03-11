@@ -10,7 +10,7 @@ use crate::server::{self, ServerConfig};
 /// Handle the `serve` command - run as MCP server
 pub async fn run_serve(ctx: &CommandContext, system: Option<String>) -> Result<()> {
     let config = ServerConfig {
-        ollama_url: ctx.ollama_url.clone(),
+        gateway_url: ctx.gateway_url.clone(),
         model: ctx.model.clone(),
         system_prompt: ctx.resolve_system_prompt(system),
         enable_runs: true,

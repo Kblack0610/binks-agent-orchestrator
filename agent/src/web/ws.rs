@@ -267,7 +267,7 @@ async fn create_agent(state: &AppState) -> anyhow::Result<Agent> {
     let pool = crate::mcp::McpClientPool::load()?
         .ok_or_else(|| anyhow::anyhow!("No .mcp.json found - agent needs MCP tools"))?;
 
-    let mut agent = Agent::new(&state.ollama_url, &state.model, pool);
+    let mut agent = Agent::new(&state.gateway_url, &state.model, pool);
 
     if let Some(ref prompt) = state.system_prompt {
         agent = agent.with_system_prompt(prompt);

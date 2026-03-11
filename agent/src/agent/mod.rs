@@ -28,7 +28,7 @@ pub use capabilities::{
 pub mod events;
 pub use events::{event_channel, AgentEvent, AgentEventSender, EventReceiver, EventSender};
 
-// Direct HTTP API types for Ollama
+// Direct HTTP API types for the LiteLLM gateway
 mod types;
 pub use types::DirectMessage;
 use types::{DirectChatRequest, DirectChatResponse, DirectTool};
@@ -56,7 +56,7 @@ const DEFAULT_MAX_HISTORY_MESSAGES: usize = 100;
 
 /// An agent that can use tools via MCP
 pub struct Agent {
-    ollama_url: String,
+    gateway_url: String,
     http_client: reqwest::Client,
     model: String,
     mcp_pool: McpClientPool,
@@ -78,9 +78,9 @@ pub struct Agent {
 
 impl Agent {
     /// Create a new agent with default stability settings
-    pub fn new(ollama_url: &str, model: &str, mcp_pool: McpClientPool) -> Self {
+    pub fn new(gateway_url: &str, model: &str, mcp_pool: McpClientPool) -> Self {
         Self::with_config(
-            ollama_url,
+            gateway_url,
             model,
             mcp_pool,
             DEFAULT_MAX_ITERATIONS,
@@ -92,13 +92,13 @@ impl Agent {
 
     /// Create a new agent with settings from AgentSectionConfig (.agent.toml)
     pub fn from_agent_config(
-        ollama_url: &str,
+        gateway_url: &str,
         model: &str,
         mcp_pool: McpClientPool,
         config: &crate::config::AgentSectionConfig,
     ) -> Self {
         Self::with_config(
-            ollama_url,
+            gateway_url,
             model,
             mcp_pool,
             config.max_iterations,
@@ -110,7 +110,7 @@ impl Agent {
 
     /// Create a new agent with custom stability configuration
     pub fn with_config(
-        ollama_url: &str,
+        gateway_url: &str,
         model: &str,
         mcp_pool: McpClientPool,
         max_iterations: usize,
@@ -118,13 +118,6 @@ impl Agent {
         tool_timeout_secs: u64,
         max_history_messages: usize,
     ) -> Self {
-        let url = url::Url::parse(ollama_url)
-            .unwrap_or_else(|_| url::Url::parse("http://localhost:11434").unwrap());
-
-        let host = url.host_str().unwrap_or("localhost").to_string();
-        let port = url.port().unwrap_or(11434);
-        let base_url = format!("http://{}:{}", host, port);
-
         let llm_timeout = Duration::from_secs(llm_timeout_secs);
 
         // Create HTTP client with configured LLM timeout
@@ -134,7 +127,7 @@ impl Agent {
             .unwrap_or_else(|_| reqwest::Client::new());
 
         Self {
-            ollama_url: base_url,
+            gateway_url: gateway_url.trim_end_matches('/').to_string(),
             http_client,
             model: model.to_string(),
             mcp_pool,
@@ -222,9 +215,9 @@ impl Agent {
         self.model = model.to_string();
     }
 
-    /// Get the Ollama URL
-    pub fn ollama_url(&self) -> &str {
-        &self.ollama_url
+    /// Get the gateway URL.
+    pub fn gateway_url(&self) -> &str {
+        &self.gateway_url
     }
 
     /// Get the current system prompt
@@ -238,7 +231,7 @@ impl Agent {
     }
 
     /// Run a single message through the agent, handling tool calls
-    /// Uses direct HTTP to Ollama API (bypasses ollama-rs for better tool calling support)
+    /// Uses direct HTTP to the LiteLLM gateway.
     /// NOTE: With many tools (>20), smaller models may not use tool calling reliably.
     /// Use chat_with_servers() to filter to specific MCP servers.
     pub async fn chat(&mut self, user_message: &str) -> Result<String> {
@@ -376,6 +369,7 @@ impl Agent {
                 role: "system".to_string(),
                 content: system.clone(),
                 tool_calls: None,
+                tool_call_id: None,
             });
         }
 
@@ -387,6 +381,7 @@ impl Agent {
             role: "user".to_string(),
             content: user_message.to_string(),
             tool_calls: None,
+            tool_call_id: None,
         });
 
         // Tool-calling loop
@@ -416,12 +411,12 @@ impl Agent {
             };
 
             // Log request info
-            tracing::info!("=== OLLAMA REQUEST (Direct HTTP) ===");
+            tracing::info!("=== GATEWAY REQUEST (Direct HTTP) ===");
             tracing::info!("Model: {}", self.model);
             tracing::info!("Messages count: {}", messages.len());
             tracing::info!("Tools count: {}", effective_tools.len());
 
-            // Verbose feedback before Ollama call
+            // Verbose feedback before gateway call
             if self.verbose {
                 eprint!("[       ...] Waiting for {} ", self.model);
                 if iterations == 1 {
@@ -432,20 +427,20 @@ impl Agent {
             }
 
             // Send direct HTTP request
-            let url = format!("{}/api/chat", self.ollama_url);
-            let ollama_start = Instant::now();
+            let url = format!("{}/v1/chat/completions", self.gateway_url);
+            let gateway_start = Instant::now();
             let response = self
                 .http_client
                 .post(&url)
                 .json(&request)
                 .send()
                 .await
-                .context("Failed to send HTTP request to Ollama")?;
+                .context("Failed to send HTTP request to gateway")?;
 
             if !response.status().is_success() {
                 let status = response.status();
                 let body = response.text().await.unwrap_or_default();
-                return Err(anyhow::anyhow!("Ollama API error {}: {}", status, body));
+                return Err(anyhow::anyhow!("Gateway API error {}: {}", status, body));
             }
 
             let raw_body = response
@@ -453,13 +448,18 @@ impl Agent {
                 .await
                 .context("Failed to get response text")?;
             let response_body: DirectChatResponse =
-                serde_json::from_str(&raw_body).context("Failed to parse Ollama response")?;
-            let ollama_elapsed = ollama_start.elapsed();
+                serde_json::from_str(&raw_body).context("Failed to parse gateway response")?;
+            let gateway_elapsed = gateway_start.elapsed();
 
-            let assistant_msg = response_body.message;
+            let assistant_msg = response_body
+                .choices
+                .into_iter()
+                .next()
+                .map(|choice| choice.message)
+                .ok_or_else(|| anyhow::anyhow!("Gateway returned no choices"))?;
 
             // Log response
-            tracing::info!("=== OLLAMA RESPONSE ===");
+            tracing::info!("=== GATEWAY RESPONSE ===");
             tracing::info!("Content length: {}", assistant_msg.content.len());
             if !assistant_msg.content.is_empty() {
                 tracing::info!(
@@ -477,8 +477,8 @@ impl Agent {
                     format!("{} tool call(s)", assistant_msg.tool_calls.len())
                 };
                 eprintln!(
-                    "[{:>7}ms] Ollama response ({})",
-                    ollama_elapsed.as_millis(),
+                    "[{:>7}ms] Gateway response ({})",
+                    gateway_elapsed.as_millis(),
                     tool_count
                 );
             }
@@ -508,6 +508,17 @@ impl Agent {
             } else {
                 vec![]
             };
+
+            let tool_calls: Vec<_> = tool_calls
+                .into_iter()
+                .enumerate()
+                .map(|(index, mut tool_call)| {
+                    if tool_call.id.is_none() {
+                        tool_call.id = Some(format!("call_{}_{}", iterations, index));
+                    }
+                    tool_call
+                })
+                .collect();
 
             if tool_calls.is_empty() {
                 // No tool calls - we're done
@@ -547,11 +558,13 @@ impl Agent {
                     role: "user".to_string(),
                     content: user_message.to_string(),
                     tool_calls: None,
+                    tool_call_id: None,
                 });
                 self.history.push(DirectMessage {
                     role: "assistant".to_string(),
                     content: final_content.clone(),
                     tool_calls: None,
+                    tool_call_id: None,
                 });
 
                 // Prune history to stay within limits
@@ -568,6 +581,7 @@ impl Agent {
                 role: "assistant".to_string(),
                 content: assistant_msg.content.clone(),
                 tool_calls: Some(tool_calls.clone()),
+                tool_call_id: None,
             });
 
             // Execute each tool call and add results
@@ -656,6 +670,7 @@ impl Agent {
                     role: "tool".to_string(),
                     content: result,
                     tool_calls: None,
+                    tool_call_id: tool_call.id.clone(),
                 });
             }
         }
@@ -764,6 +779,7 @@ mod tests {
                 role: "user".to_string(),
                 content: format!("message {}", i),
                 tool_calls: None,
+                tool_call_id: None,
             });
         }
 
@@ -792,6 +808,7 @@ mod tests {
                 role: "user".to_string(),
                 content: format!("message {}", i),
                 tool_calls: None,
+                tool_call_id: None,
             });
         }
 
@@ -823,6 +840,7 @@ mod tests {
                 role: "user".to_string(),
                 content: format!("message {}", i),
                 tool_calls: None,
+                tool_call_id: None,
             });
         }
 

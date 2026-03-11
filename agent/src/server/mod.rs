@@ -32,7 +32,7 @@ use crate::mcp::McpClientPool;
 /// Configuration for the agent MCP server
 #[derive(Clone)]
 pub struct ServerConfig {
-    pub ollama_url: String,
+    pub gateway_url: String,
     pub model: String,
     pub system_prompt: Option<String>,
     /// Enable run tracking/analysis tools (requires database)
@@ -46,7 +46,7 @@ pub struct ServerConfig {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            ollama_url: "http://localhost:11434".to_string(),
+            gateway_url: "http://localhost:4000".to_string(),
             model: String::new(), // Must be specified in .agent.toml
             system_prompt: None,
             enable_runs: true,
@@ -170,7 +170,7 @@ pub struct ListImprovementsParams {
 #[tool_router]
 impl AgentMcpServer {
     pub fn new(config: ServerConfig) -> Self {
-        let llm = OllamaClient::new(&config.ollama_url, &config.model);
+        let llm = OllamaClient::new(&config.gateway_url, &config.model);
 
         // Initialize database for runs if enabled
         let db = if config.enable_runs {
@@ -207,7 +207,7 @@ impl AgentMcpServer {
 
         // Detect model capabilities
         let capabilities = detect_capabilities(
-            &self.config.ollama_url,
+            &self.config.gateway_url,
             &self.config.model,
             Some(&self.config.model_overrides),
         )
@@ -222,7 +222,7 @@ impl AgentMcpServer {
         );
 
         let mut agent = Agent::from_agent_config(
-            &self.config.ollama_url,
+            &self.config.gateway_url,
             &self.config.model,
             pool,
             &self.config.agent_config,
@@ -285,7 +285,7 @@ impl AgentMcpServer {
 
             // Detect model capabilities
             let capabilities = detect_capabilities(
-                &self.config.ollama_url,
+                &self.config.gateway_url,
                 &self.config.model,
                 Some(&self.config.model_overrides),
             )
@@ -300,7 +300,7 @@ impl AgentMcpServer {
             );
 
             let mut agent = Agent::from_agent_config(
-                &self.config.ollama_url,
+                &self.config.gateway_url,
                 &self.config.model,
                 pool,
                 &self.config.agent_config,
@@ -355,7 +355,7 @@ impl AgentMcpServer {
                 .ok_or_else(|| McpError::internal_error("No .mcp.json found".to_string(), None))?;
 
             let mut agent = Agent::from_agent_config(
-                &self.config.ollama_url,
+                &self.config.gateway_url,
                 model,
                 pool,
                 &self.config.agent_config,

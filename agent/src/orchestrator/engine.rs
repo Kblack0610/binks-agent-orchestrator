@@ -58,7 +58,7 @@ pub struct EngineConfig {
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
-            ollama_url: AgentFileConfig::default_ollama_url(),
+            ollama_url: AgentFileConfig::default_gateway_url(),
             default_model: String::new(), // Must be specified in .agent.toml
             custom_workflows_dir: None,
             non_interactive: false,

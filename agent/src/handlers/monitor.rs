@@ -27,7 +27,7 @@ pub async fn run_monitor(
     }
 
     let config = MonitorConfig {
-        ollama_url: ctx.ollama_url.clone(),
+        ollama_url: ctx.gateway_url.clone(),
         model: ctx.model.clone(),
         repos,
         once,

@@ -15,17 +15,28 @@ use super::workflow_args::WorkflowCommands;
 
 #[derive(Parser)]
 #[command(name = "agent")]
-#[command(about = "Minimal Rust agent with Ollama and MCP support")]
+#[command(about = "Minimal Rust agent with LiteLLM gateway and MCP support")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
 
-    /// Ollama server URL (default: from .agent.toml or http://localhost:11434)
-    #[arg(long, env = "OLLAMA_URL", global = true)]
-    pub ollama_url: Option<String>,
+    /// LiteLLM gateway URL (default: from .agent.toml or http://localhost:4000)
+    #[arg(
+        long,
+        env = "LLM_GATEWAY_URL",
+        global = true,
+        visible_alias = "ollama-url"
+    )]
+    pub gateway_url: Option<String>,
 
     /// Model to use (required: must be specified in .agent.toml or via -m flag)
-    #[arg(short = 'm', long, env = "OLLAMA_MODEL", global = true)]
+    #[arg(
+        short = 'm',
+        long,
+        env = "LLM_MODEL",
+        global = true,
+        visible_alias = "ollama-model"
+    )]
     pub model: Option<String>,
 
     /// Increase verbosity (-v info, -vv debug, -vvv trace). Default is warn.
@@ -45,7 +56,7 @@ pub enum Commands {
     },
     /// Simple chat session (no tools, just LLM conversation)
     Simple,
-    /// List available models from Ollama
+    /// List available models from the LiteLLM gateway
     Models,
 
     // =========================================================================

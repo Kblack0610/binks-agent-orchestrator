@@ -31,7 +31,8 @@ pub struct HealthResponse {
     pub status: String,
     pub database: bool,
     pub mcp_available: bool,
-    pub ollama_url: String,
+    pub gateway_url: String,
+    pub gateway_type: String,
     pub model: String,
 }
 
@@ -41,7 +42,8 @@ pub async fn health_check(State(state): State<AppState>) -> Json<HealthResponse>
         status: "ok".to_string(),
         database: true, // If we got here, DB is working
         mcp_available: state.mcp_pool.is_some(),
-        ollama_url: state.ollama_url.clone(),
+        gateway_url: state.gateway_url.clone(),
+        gateway_type: state.gateway_type.clone(),
         model: state.model.clone(),
     })
 }
@@ -351,11 +353,11 @@ pub struct ModelsResponse {
     pub current: String,
 }
 
-/// List available Ollama models
+/// List available models from the configured gateway.
 pub async fn list_models(
     State(state): State<AppState>,
 ) -> Result<Json<ModelsResponse>, (StatusCode, Json<ErrorResponse>)> {
-    match crate::llm::list_models(&state.ollama_url).await {
+    match crate::llm::list_models(&state.gateway_url, Some(&state.model)).await {
         Ok(models) => Ok(Json(ModelsResponse {
             models,
             current: state.model.clone(),
