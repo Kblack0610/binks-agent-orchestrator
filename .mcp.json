@@ -148,6 +148,14 @@
       },
       "tier": 3
     },
+    "knowledge": {
+      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/knowledge-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      },
+      "tier": 1
+    },
     "playwright": {
       "command": "docker",
       "args": [

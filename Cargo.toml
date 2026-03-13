@@ -24,6 +24,7 @@ members = [
     "mcps/rico-mcp",
     "mcps/adb-mcp",
     "mcps/unity-mcp",
+    "mcps/knowledge-mcp",
     # FFI bindings
     "mcps/binks-ffi",
 ]

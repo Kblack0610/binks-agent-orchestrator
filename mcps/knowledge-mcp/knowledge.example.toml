@@ -1,0 +1,84 @@
+# knowledge-mcp configuration
+# Copy to ~/.binks/knowledge.toml and adjust paths for your environment.
+
+[database]
+path = "~/.binks/knowledge.db"
+
+[defaults]
+max_file_size = 1048576  # 1MB
+
+[[sources]]
+name = "bnb-platform"
+repo = "bnb-platform"
+base_path = "~/dev/bnb/platform"
+patterns = [
+    "CLAUDE.md", "CONTEXT.md", "AGENTS.md", "README.md",
+    "apps/CLAUDE.md", "packages/CLAUDE.md", "infra/CLAUDE.md",
+    "docs/**/*.md",
+]
+exclude_patterns = ["docs/archive/**", "node_modules/**"]
+
+[sources.kind_map]
+"CLAUDE.md" = "instruction"
+"CONTEXT.md" = "architecture"
+"infra/**" = "runbook"
+
+[sources.priority_map]
+"CONTEXT.md" = 10
+"CLAUDE.md" = 10
+"apps/CLAUDE.md" = 7
+"infra/CLAUDE.md" = 7
+"packages/CLAUDE.md" = 7
+
+[[sources]]
+name = "binks-agent"
+repo = "binks-agent"
+base_path = "~/dev/home/binks-agent-orchestrator"
+patterns = [
+    "CLAUDE.md", "README.md", "AGENTS.md",
+    "docs/**/*.md",
+    "mcps/overview.md", "mcps/ROADMAP.md",
+]
+exclude_patterns = ["target/**"]
+
+[sources.kind_map]
+"CLAUDE.md" = "instruction"
+"AGENTS.md" = "instruction"
+"docs/ARCHITECTURE.md" = "architecture"
+"docs/ROADMAP.md" = "architecture"
+
+[sources.priority_map]
+"CLAUDE.md" = 10
+"AGENTS.md" = 10
+"docs/ARCHITECTURE.md" = 7
+"docs/ROADMAP.md" = 7
+
+[[sources]]
+name = "home-config"
+repo = "home-config"
+base_path = "~/dev/home/home-config"
+patterns = [
+    "README.md", "CLAUDE.md", "AGENTS.md",
+    "docs/**/*.md",
+    "apps/**/README.md",
+    "infrastructure/**/README.md",
+]
+exclude_patterns = ["node_modules/**", ".git/**"]
+
+[sources.kind_map]
+"CLAUDE.md" = "instruction"
+"AGENTS.md" = "instruction"
+"infrastructure/**" = "runbook"
+
+[sources.priority_map]
+"CLAUDE.md" = 10
+"AGENTS.md" = 10
+"README.md" = 10
+
+[[sources]]
+name = "agent-lessons"
+repo = "agent-lessons"
+base_path = "~/.agent/lessons"
+patterns = ["*.md"]
+kind = "lesson"
+priority = 3
