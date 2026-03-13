@@ -77,6 +77,7 @@ pub struct SearchResult {
     pub rank: f64,
     pub sync_time: String,
     pub commit_hash: Option<String>,
+    pub source_name: String,
     pub stale: bool,
 }
 
@@ -101,6 +102,7 @@ pub struct DocumentInfo {
     pub sync_time: String,
     pub commit_hash: Option<String>,
     pub chunk_count: i32,
+    pub source_name: String,
     pub stale: bool,
 }
 
@@ -121,6 +123,7 @@ pub struct SyncResponse {
     pub documents_updated: usize,
     pub documents_unchanged: usize,
     pub documents_skipped: usize,
+    pub documents_removed: usize,
     pub duration_ms: u64,
 }
 

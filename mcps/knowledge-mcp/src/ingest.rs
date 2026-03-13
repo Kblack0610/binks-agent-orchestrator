@@ -29,6 +29,7 @@ pub async fn run_sync(
         documents_updated: 0,
         documents_unchanged: 0,
         documents_skipped: 0,
+        documents_removed: 0,
         duration_ms: 0,
     };
 
@@ -54,6 +55,7 @@ pub async fn run_sync(
                 response.documents_updated += stats.updated;
                 response.documents_unchanged += stats.unchanged;
                 response.documents_skipped += stats.skipped;
+                response.documents_removed += stats.removed;
             }
             Err(e) => {
                 tracing::warn!(source = %source.name, error = %e, "Failed to sync source");
@@ -70,6 +72,7 @@ struct SourceStats {
     updated: usize,
     unchanged: usize,
     skipped: usize,
+    removed: usize,
 }
 
 async fn sync_source(
@@ -88,6 +91,7 @@ async fn sync_source(
             updated: 0,
             unchanged: 0,
             skipped: 0,
+            removed: 0,
         });
     }
 
@@ -123,6 +127,7 @@ async fn sync_source(
         updated: 0,
         unchanged: 0,
         skipped: 0,
+        removed: 0,
     };
 
     for file_path in &deduped {
@@ -244,8 +249,9 @@ async fn sync_source(
         .remove_stale_docs(&source_id, &current_file_paths)
         .await?;
     if removed > 0 {
-        tracing::info!(source = %source.name, removed, "Removed stale documents");
+        tracing::info!(source = %source.name, removed, "Removed deleted documents");
     }
+    stats.removed = removed;
 
     Ok(stats)
 }

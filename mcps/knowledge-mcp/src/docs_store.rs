@@ -278,16 +278,19 @@ impl DocStore {
                 snippet(chunks_fts, 0, '>>>', '<<<', '...', 64) AS snippet,
                 d.kind,
                 d.priority,
-                (-bm25(chunks_fts) * (1.0 + d.priority * 0.1)) AS rank,
+                bm25(chunks_fts) AS bm25_score,
+                d.priority,
                 d.sync_time,
                 d.commit_hash,
-                d.file_mtime
+                d.file_mtime,
+                s.name AS source_name
             FROM chunks_fts
             JOIN chunks c ON c.rowid = chunks_fts.rowid
             JOIN documents d ON c.document_id = d.id
+            JOIN sources s ON d.source_id = s.id
             WHERE chunks_fts MATCH ?1
             {where_clause}
-            ORDER BY rank DESC
+            ORDER BY bm25(chunks_fts) ASC, d.priority DESC
             LIMIT ?{param_idx}
             "#
         );
@@ -299,8 +302,9 @@ impl DocStore {
 
         let results: Vec<SearchResult> = stmt
             .query_map(refs.as_slice(), |row| {
-                let sync_time: String = row.get(9)?;
-                let file_mtime: Option<String> = row.get(11)?;
+                let bm25_score: f64 = row.get(8)?;
+                let sync_time: String = row.get(10)?;
+                let file_mtime: Option<String> = row.get(12)?;
 
                 // Check staleness: file_mtime > sync_time
                 let stale = file_mtime
@@ -317,9 +321,10 @@ impl DocStore {
                     snippet: row.get(5)?,
                     kind: row.get(6)?,
                     priority: row.get(7)?,
-                    rank: row.get(8)?,
+                    rank: -bm25_score, // negate for display (higher = better)
                     sync_time,
-                    commit_hash: row.get(10)?,
+                    commit_hash: row.get(11)?,
+                    source_name: row.get(13)?,
                     stale,
                 })
             })?
@@ -343,19 +348,19 @@ impl DocStore {
     ) -> Result<GetDocResponse, KnowledgeError> {
         let conn = self.conn.lock().await;
 
-        let select = "SELECT id, repo, relative_path, kind, priority, title, content_hash, sync_time, commit_hash, chunk_count, file_mtime FROM documents";
+        let select = "SELECT d.id, d.repo, d.relative_path, d.kind, d.priority, d.title, d.content_hash, d.sync_time, d.commit_hash, d.chunk_count, d.file_mtime, s.name AS source_name FROM documents d JOIN sources s ON d.source_id = s.id";
 
         // Find the document
         let document: DocumentInfo = if let Some(id) = doc_id {
             conn.query_row(
-                &format!("{select} WHERE id = ?1"),
+                &format!("{select} WHERE d.id = ?1"),
                 params![id],
                 doc_info_from_row,
             )
             .map_err(|_| KnowledgeError::NotFound("Document not found by ID".into()))?
         } else if let (Some(r), Some(p)) = (repo, path) {
             conn.query_row(
-                &format!("{select} WHERE repo = ?1 AND relative_path = ?2"),
+                &format!("{select} WHERE d.repo = ?1 AND d.relative_path = ?2"),
                 params![r, p],
                 doc_info_from_row,
             )
@@ -476,6 +481,8 @@ impl DocStore {
 }
 
 /// Map a row to DocumentInfo (for get_document queries)
+/// Expected columns: id, repo, relative_path, kind, priority, title,
+///   content_hash, sync_time, commit_hash, chunk_count, file_mtime, source_name
 fn doc_info_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DocumentInfo> {
     let sync_time: String = row.get(7)?;
     let file_mtime: Option<String> = row.get(10)?;
@@ -495,6 +502,7 @@ fn doc_info_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DocumentInfo> 
         sync_time,
         commit_hash: row.get(8)?,
         chunk_count: row.get(9)?,
+        source_name: row.get(11)?,
         stale,
     })
 }
