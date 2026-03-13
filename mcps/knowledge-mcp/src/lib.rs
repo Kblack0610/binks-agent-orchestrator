@@ -14,5 +14,5 @@ pub mod schema;
 pub mod server;
 pub mod types;
 
-pub use server::KnowledgeMcpServer;
 pub use params::*;
+pub use server::KnowledgeMcpServer;

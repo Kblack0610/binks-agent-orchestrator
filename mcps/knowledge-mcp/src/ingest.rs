@@ -197,9 +197,7 @@ async fn sync_source(
         let file_mtime = metadata
             .modified()
             .ok()
-            .map(|t| {
-                chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()
-            });
+            .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
 
         // Chunk the content
         let raw_chunks = chunk_markdown(&content);

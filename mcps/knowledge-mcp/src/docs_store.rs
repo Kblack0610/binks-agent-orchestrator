@@ -99,10 +99,7 @@ impl DocStore {
     // ========================================================================
 
     /// Get a document's content hash by file_path (for change detection)
-    pub async fn get_doc_hash(
-        &self,
-        file_path: &str,
-    ) -> Result<Option<String>, KnowledgeError> {
+    pub async fn get_doc_hash(&self, file_path: &str) -> Result<Option<String>, KnowledgeError> {
         let conn = self.conn.lock().await;
         Ok(conn
             .query_row(
@@ -180,9 +177,7 @@ impl DocStore {
         };
 
         // Insert new chunks
-        for (i, (heading, chunk_content, byte_offset, byte_length)) in
-            chunks.iter().enumerate()
-        {
+        for (i, (heading, chunk_content, byte_offset, byte_length)) in chunks.iter().enumerate() {
             let chunk_id = Uuid::new_v4().to_string();
             conn.execute(
                 "INSERT INTO chunks (id, document_id, chunk_index, heading, content, byte_offset, byte_length) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -202,12 +197,9 @@ impl DocStore {
         let conn = self.conn.lock().await;
 
         // Get all doc file_paths for this source
-        let mut stmt =
-            conn.prepare("SELECT id, file_path FROM documents WHERE source_id = ?1")?;
+        let mut stmt = conn.prepare("SELECT id, file_path FROM documents WHERE source_id = ?1")?;
         let existing: Vec<(String, String)> = stmt
-            .query_map(params![source_id], |row| {
-                Ok((row.get(0)?, row.get(1)?))
-            })?
+            .query_map(params![source_id], |row| Ok((row.get(0)?, row.get(1)?)))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
         let mut removed = 0;
@@ -364,9 +356,7 @@ impl DocStore {
                 params![r, p],
                 doc_info_from_row,
             )
-            .map_err(|_| {
-                KnowledgeError::NotFound(format!("Document not found: {r}/{p}"))
-            })?
+            .map_err(|_| KnowledgeError::NotFound(format!("Document not found: {r}/{p}")))?
         } else {
             return Err(KnowledgeError::Other(
                 "Must provide doc_id or both repo and path".into(),
@@ -395,8 +385,7 @@ impl DocStore {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
-        let truncated =
-            !has_range && document.chunk_count > 20 && chunks.len() as i32 >= 20;
+        let truncated = !has_range && document.chunk_count > 20 && chunks.len() as i32 >= 20;
 
         Ok(GetDocResponse {
             document,
@@ -464,10 +453,7 @@ impl DocStore {
     }
 
     /// Get doc count for a source by name
-    pub async fn get_source_doc_count(
-        &self,
-        source_name: &str,
-    ) -> Result<usize, KnowledgeError> {
+    pub async fn get_source_doc_count(&self, source_name: &str) -> Result<usize, KnowledgeError> {
         let conn = self.conn.lock().await;
         let count: i64 = conn
             .query_row(
@@ -545,14 +531,22 @@ mod tests {
 
         // Insert a document with chunks
         let chunks = vec![
-            (Some("Architecture Overview"), "This document describes the system architecture and deployment strategy.", 0i64, 70i64),
-            (Some("Database Design"), "We use PostgreSQL for the primary data store with Redis for caching.", 71i64, 68i64),
+            (
+                Some("Architecture Overview"),
+                "This document describes the system architecture and deployment strategy.",
+                0i64,
+                70i64,
+            ),
+            (
+                Some("Database Design"),
+                "We use PostgreSQL for the primary data store with Redis for caching.",
+                71i64,
+                68i64,
+            ),
         ];
 
-        let chunk_refs: Vec<(Option<&str>, &str, i64, i64)> = chunks
-            .iter()
-            .map(|(h, c, o, l)| (*h, *c, *o, *l))
-            .collect();
+        let chunk_refs: Vec<(Option<&str>, &str, i64, i64)> =
+            chunks.iter().map(|(h, c, o, l)| (*h, *c, *o, *l)).collect();
 
         store
             .upsert_document(
@@ -656,8 +650,19 @@ mod tests {
         let chunks = vec![(None::<&str>, "content", 0i64, 7i64)];
         let was_update = store
             .upsert_document(
-                &source_id, "repo", "/tmp/repo/f.md", "f.md", "docs", "docs", 0,
-                None, "content", "hash1", None, None, &chunks,
+                &source_id,
+                "repo",
+                "/tmp/repo/f.md",
+                "f.md",
+                "docs",
+                "docs",
+                0,
+                None,
+                "content",
+                "hash1",
+                None,
+                None,
+                &chunks,
             )
             .await
             .unwrap();
@@ -670,8 +675,19 @@ mod tests {
         // Second insert (update)
         let was_update = store
             .upsert_document(
-                &source_id, "repo", "/tmp/repo/f.md", "f.md", "docs", "docs", 0,
-                None, "new content", "hash2", None, None, &chunks,
+                &source_id,
+                "repo",
+                "/tmp/repo/f.md",
+                "f.md",
+                "docs",
+                "docs",
+                0,
+                None,
+                "new content",
+                "hash2",
+                None,
+                None,
+                &chunks,
             )
             .await
             .unwrap();
@@ -709,8 +725,19 @@ mod tests {
 
         store
             .upsert_document(
-                &source_id, "repo", "/tmp/repo/big.md", "big.md", "docs", "docs", 0,
-                None, "big content", "bighash", None, None, &chunks,
+                &source_id,
+                "repo",
+                "/tmp/repo/big.md",
+                "big.md",
+                "docs",
+                "docs",
+                0,
+                None,
+                "big content",
+                "bighash",
+                None,
+                None,
+                &chunks,
             )
             .await
             .unwrap();

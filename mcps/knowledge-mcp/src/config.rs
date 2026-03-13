@@ -88,14 +88,13 @@ impl KnowledgeConfig {
             ))
         })?;
 
-        let mut config: KnowledgeConfig =
-            toml::from_str(&contents).map_err(|e| {
-                KnowledgeError::Config(format!(
-                    "Invalid config at {}: {}",
-                    config_path.display(),
-                    e
-                ))
-            })?;
+        let mut config: KnowledgeConfig = toml::from_str(&contents).map_err(|e| {
+            KnowledgeError::Config(format!(
+                "Invalid config at {}: {}",
+                config_path.display(),
+                e
+            ))
+        })?;
 
         // Expand ~ in all paths
         config.database.path = expand_tilde(&config.database.path);

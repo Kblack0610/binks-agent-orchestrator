@@ -9,13 +9,19 @@ fn default_limit() -> u32 {
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct SearchDocsParams {
-    #[schemars(description = "FTS5 search query. Supports AND, OR, NOT, and \"phrase\" syntax. Example: 'deployment AND kubernetes'")]
+    #[schemars(
+        description = "FTS5 search query. Supports AND, OR, NOT, and \"phrase\" syntax. Example: 'deployment AND kubernetes'"
+    )]
     pub query: String,
 
-    #[schemars(description = "Filter results to a specific repo name (e.g. 'bnb-platform', 'binks-agent')")]
+    #[schemars(
+        description = "Filter results to a specific repo name (e.g. 'bnb-platform', 'binks-agent')"
+    )]
     pub repo: Option<String>,
 
-    #[schemars(description = "Filter by document kind: instruction, architecture, runbook, lesson, plan, docs")]
+    #[schemars(
+        description = "Filter by document kind: instruction, architecture, runbook, lesson, plan, docs"
+    )]
     pub kind: Option<String>,
 
     #[schemars(description = "Maximum results to return (default 10, max 50)")]
@@ -31,7 +37,9 @@ pub struct GetDocParams {
     #[schemars(description = "Repository name. Use with 'path' for repo+path lookup.")]
     pub repo: Option<String>,
 
-    #[schemars(description = "Relative path within the repo (e.g. 'docs/ARCHITECTURE.md'). Use with 'repo'.")]
+    #[schemars(
+        description = "Relative path within the repo (e.g. 'docs/ARCHITECTURE.md'). Use with 'repo'."
+    )]
     pub path: Option<String>,
 
     #[schemars(description = "Optional [start, end] chunk range to limit response size")]

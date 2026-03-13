@@ -33,10 +33,7 @@ pub async fn search_docs(
     json_success(&response)
 }
 
-pub async fn get_doc(
-    store: &DocStore,
-    params: GetDocParams,
-) -> Result<CallToolResult, McpError> {
+pub async fn get_doc(store: &DocStore, params: GetDocParams) -> Result<CallToolResult, McpError> {
     let response = store
         .get_document(
             params.doc_id.as_deref(),
