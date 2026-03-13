@@ -530,7 +530,7 @@ mod tests {
             .unwrap();
 
         // Insert a document with chunks
-        let chunks = vec![
+        let chunks: &[(Option<&str>, &str, i64, i64)] = &[
             (
                 Some("Architecture Overview"),
                 "This document describes the system architecture and deployment strategy.",
@@ -544,9 +544,6 @@ mod tests {
                 68i64,
             ),
         ];
-
-        let chunk_refs: Vec<(Option<&str>, &str, i64, i64)> =
-            chunks.iter().map(|(h, c, o, l)| (*h, *c, *o, *l)).collect();
 
         store
             .upsert_document(
@@ -562,7 +559,7 @@ mod tests {
                 "abc123hash",
                 None,
                 Some("deadbeef"),
-                &chunk_refs,
+                chunks,
             )
             .await
             .unwrap();
