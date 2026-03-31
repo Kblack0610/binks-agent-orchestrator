@@ -1,0 +1,30 @@
+[package]
+name = "agent-registry-mcp"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "agent_registry_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agent-registry-mcp"
+path = "src/main.rs"
+
+[dependencies]
+mcp-common = { path = "../../common/mcp-common" }
+rmcp = { workspace = true }
+
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+dirs = "5"
+
+[dev-dependencies]
+tempfile = "3"
