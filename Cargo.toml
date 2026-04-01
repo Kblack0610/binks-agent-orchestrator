@@ -25,6 +25,7 @@ members = [
     "mcps/adb-mcp",
     "mcps/unity-mcp",
     "mcps/knowledge-mcp",
+    "mcps/agent-registry-mcp",
     # FFI bindings
     "mcps/binks-ffi",
 ]
