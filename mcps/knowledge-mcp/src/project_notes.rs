@@ -3,13 +3,12 @@
 //! Operates on `~/.notes/dev/projects/{project}/` structure:
 //! - `summary.md` — YAML frontmatter + sections (Overview, Status, Active Version, Repo, Notes)
 //! - `v{X.Y.Z}.md` — version checklists with `- [ ]` / `- [x]` tasks
-//! - `changelog.md` — Keep-a-Changelog format
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::config::KnowledgeConfig;
-use crate::types::{ChangelogEntry, KnowledgeError, ProjectSummary};
+use crate::types::{KnowledgeError, ProjectSummary};
 
 // ============================================================================
 // Path Resolution
@@ -48,30 +47,6 @@ pub fn resolve_project_dir(
         )));
     }
     Ok(dir)
-}
-
-/// Resolve a repo's local path by cross-referencing knowledge sources.
-///
-/// `repo_field` is the content of `## Repo` in summary.md, e.g. `kblack0610/dodginballs`
-/// or `BlackNBrownStudios/platform (apps/placemyparents)`.
-/// Extracts the repo name and looks for a matching knowledge source.
-pub fn resolve_repo_path(
-    config: &KnowledgeConfig,
-    repo_field: &str,
-) -> Option<PathBuf> {
-    let trimmed = repo_field.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    // Extract owner/repo, ignoring any parenthetical suffix
-    let owner_repo = trimmed.split_whitespace().next()?;
-    // Extract just the repo name (after /)
-    let repo_name = owner_repo.rsplit('/').next()?;
-
-    config
-        .find_source_by_repo(repo_name)
-        .map(|s| PathBuf::from(&s.base_path))
 }
 
 // ============================================================================
@@ -326,52 +301,6 @@ pub fn add_tasks(content: &str, tasks: &[String]) -> String {
 }
 
 // ============================================================================
-// Changelog
-// ============================================================================
-
-/// Format a changelog entry in Keep-a-Changelog style.
-pub fn format_changelog_entry(version: &str, entries: &[ChangelogEntry]) -> String {
-    let date = chrono::Local::now().format("%Y-%m-%d");
-    let mut result = format!("## [{version}] - {date}\n");
-
-    // Group entries by category
-    let mut by_category: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for entry in entries {
-        by_category
-            .entry(entry.category.clone())
-            .or_default()
-            .push(entry.description.clone());
-    }
-
-    for (category, descriptions) in &by_category {
-        result.push_str(&format!("\n### {category}\n"));
-        for desc in descriptions {
-            result.push_str(&format!("- {desc}\n"));
-        }
-    }
-
-    result
-}
-
-/// Prepend a changelog entry after the `# Changelog` header.
-pub fn prepend_changelog_entry(existing: &str, new_entry: &str) -> String {
-    let trimmed = existing.trim();
-
-    if trimmed.is_empty() {
-        return format!("# Changelog\n\n{new_entry}");
-    }
-
-    // Find the first ## heading (existing entry) and insert before it
-    if let Some(pos) = trimmed.find("\n## ") {
-        let (header, rest) = trimmed.split_at(pos + 1);
-        format!("{header}\n{new_entry}\n{rest}")
-    } else {
-        // No existing entries, just append
-        format!("{trimmed}\n\n{new_entry}")
-    }
-}
-
-// ============================================================================
 // Tests
 // ============================================================================
 
@@ -461,44 +390,6 @@ v0.0.5 demo ready
         let result = add_tasks(content, &["new task 1".into(), "new task 2".into()]);
         assert!(result.contains("- [ ] new task 1"));
         assert!(result.contains("- [ ] new task 2"));
-    }
-
-    #[test]
-    fn test_format_changelog_entry() {
-        let entries = vec![
-            ChangelogEntry {
-                category: "Added".into(),
-                description: "New feature".into(),
-            },
-            ChangelogEntry {
-                category: "Fixed".into(),
-                description: "Bug fix".into(),
-            },
-        ];
-        let result = format_changelog_entry("1.0.0", &entries);
-        assert!(result.contains("## [1.0.0]"));
-        assert!(result.contains("### Added"));
-        assert!(result.contains("- New feature"));
-        assert!(result.contains("### Fixed"));
-        assert!(result.contains("- Bug fix"));
-    }
-
-    #[test]
-    fn test_prepend_changelog_entry() {
-        let existing = "# Changelog\n\n## [0.9.0] - 2025-01-01\n\n### Added\n- Old feature\n";
-        let new_entry = "## [1.0.0] - 2025-06-01\n\n### Added\n- New feature\n";
-        let result = prepend_changelog_entry(existing, new_entry);
-        // New entry should come before old entry
-        let new_pos = result.find("[1.0.0]").unwrap();
-        let old_pos = result.find("[0.9.0]").unwrap();
-        assert!(new_pos < old_pos);
-    }
-
-    #[test]
-    fn test_prepend_changelog_entry_empty() {
-        let result = prepend_changelog_entry("", "## [1.0.0] - 2025-06-01\n");
-        assert!(result.starts_with("# Changelog"));
-        assert!(result.contains("[1.0.0]"));
     }
 
     #[test]

@@ -4,7 +4,6 @@
 
 use mcp_common::{internal_error, json_success, CallToolResult, McpError};
 
-use crate::config;
 use crate::config::KnowledgeConfig;
 use crate::docs_store::DocStore;
 use crate::ingest;
@@ -357,80 +356,3 @@ pub async fn update_version(
     })
 }
 
-pub async fn add_changelog(
-    store: &DocStore,
-    config: &KnowledgeConfig,
-    params: AddChangelogParams,
-) -> Result<CallToolResult, McpError> {
-    let project_dir = project_notes::resolve_project_dir(config, &params.project)
-        .map_err(|e| internal_error(e.to_string()))?;
-
-    let v = params.version.trim_start_matches('v');
-    let entries: Vec<ChangelogEntry> = params.entries.into_iter().map(|e| e.into()).collect();
-    let new_entry = project_notes::format_changelog_entry(v, &entries);
-
-    // Write to notes dir
-    let notes_changelog = project_dir.join("changelog.md");
-    let existing = tokio::fs::read_to_string(&notes_changelog)
-        .await
-        .unwrap_or_default();
-    let updated = project_notes::prepend_changelog_entry(&existing, &new_entry);
-    tokio::fs::write(&notes_changelog, &updated)
-        .await
-        .map_err(|e| internal_error(format!("Failed to write changelog.md: {e}")))?;
-
-    // Optionally sync to repo
-    let mut repo_path_written = None;
-
-    if params.sync_to_repo {
-        let repo_base = if let Some(ref explicit_path) = params.repo_path {
-            Some(std::path::PathBuf::from(config::expand_tilde(explicit_path)))
-        } else {
-            // Read summary.md to get repo field, then cross-reference
-            let summary_path = project_dir.join("summary.md");
-            if let Ok(summary_content) = tokio::fs::read_to_string(&summary_path).await {
-                let summary =
-                    project_notes::parse_summary(&summary_content, &params.project);
-                summary
-                    .repo
-                    .as_deref()
-                    .and_then(|r| project_notes::resolve_repo_path(config, r))
-            } else {
-                None
-            }
-        };
-
-        if let Some(repo_dir) = repo_base {
-            if repo_dir.exists() {
-                let repo_changelog = repo_dir.join("CHANGELOG.md");
-                let repo_existing = tokio::fs::read_to_string(&repo_changelog)
-                    .await
-                    .unwrap_or_default();
-                let repo_updated =
-                    project_notes::prepend_changelog_entry(&repo_existing, &new_entry);
-                if let Ok(()) = tokio::fs::write(&repo_changelog, &repo_updated).await {
-                    repo_path_written =
-                        Some(repo_changelog.to_string_lossy().to_string());
-                }
-            }
-        }
-    }
-
-    // Re-index
-    let _ = ingest::run_sync(
-        store,
-        config,
-        None,
-        Some("project-notes"),
-        Some(&format!("{}/", params.project)),
-        true,
-    )
-    .await;
-
-    json_success(&ChangelogResponse {
-        project: params.project,
-        version: format!("v{v}"),
-        notes_path: notes_changelog.to_string_lossy().to_string(),
-        repo_path: repo_path_written,
-    })
-}

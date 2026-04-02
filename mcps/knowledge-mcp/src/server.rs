@@ -110,15 +110,6 @@ impl KnowledgeMcpServer {
         handlers::update_version(&self.store, &self.config, params).await
     }
 
-    #[tool(
-        description = "Add changelog entries for a project version. Writes changelog.md in project notes. Optionally syncs to the project's actual repo by cross-referencing knowledge sources."
-    )]
-    async fn add_changelog(
-        &self,
-        Parameters(params): Parameters<AddChangelogParams>,
-    ) -> Result<CallToolResult, McpError> {
-        handlers::add_changelog(&self.store, &self.config, params).await
-    }
 }
 
 #[tool_handler]
@@ -129,7 +120,7 @@ impl rmcp::ServerHandler for KnowledgeMcpServer {
                 "Cross-repo knowledge index with FTS5 search and project note management. \
                  Indexes documentation from multiple repositories for unified search. \
                  Usage: list_sources -> search_docs -> get_doc -> get_sync_status. \
-                 Project notes: list_projects -> update_project_summary / update_version / add_changelog. \
+                 Project notes: list_projects -> update_project_summary / update_version. \
                  Run sync_sources to update the index from source files."
                     .into(),
             ),
