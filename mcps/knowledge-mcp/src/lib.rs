@@ -10,6 +10,7 @@ pub mod docs_store;
 pub mod handlers;
 pub mod ingest;
 pub mod params;
+pub mod project_notes;
 pub mod schema;
 pub mod server;
 pub mod types;

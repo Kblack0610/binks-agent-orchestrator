@@ -82,3 +82,14 @@ base_path = "~/.agent/lessons"
 patterns = ["*.md"]
 kind = "lesson"
 priority = 3
+
+# Writable source: project notes (supports list_projects, update_project_summary, etc.)
+[[sources]]
+name = "project-notes"
+repo = "project-notes"
+base_path = "~/.notes/dev/projects"
+patterns = ["*/summary.md", "*/v*.md", "*/changelog.md"]
+exclude_patterns = ["archived/**"]
+kind = "project"
+priority = 5
+writable = true

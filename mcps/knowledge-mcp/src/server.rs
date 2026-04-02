@@ -77,6 +77,48 @@ impl KnowledgeMcpServer {
     async fn list_sources(&self) -> Result<CallToolResult, McpError> {
         handlers::list_sources(&self.store, &self.config).await
     }
+
+    // ── Project Note Tools ──────────────────────────────────────────────
+
+    #[tool(
+        description = "List all projects from project notes (~/.notes/dev/projects/). Returns name, status, active version, repo, and overview for each. Filter by status (active/planning/paused)."
+    )]
+    async fn list_projects(
+        &self,
+        Parameters(params): Parameters<ListProjectsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        handlers::list_projects(&self.config, params).await
+    }
+
+    #[tool(
+        description = "Update a project's summary.md in project notes. Can set status, active_version, overview, repo, or append to notes. Changes are re-indexed automatically."
+    )]
+    async fn update_project_summary(
+        &self,
+        Parameters(params): Parameters<UpdateProjectSummaryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        handlers::update_project_summary(&self.store, &self.config, params).await
+    }
+
+    #[tool(
+        description = "Create or update a version checklist file (vX.Y.Z.md) for a project. Can create new versions, add tasks, or check/uncheck existing tasks. Auto-updates summary.md active version on create."
+    )]
+    async fn update_version(
+        &self,
+        Parameters(params): Parameters<UpdateVersionParams>,
+    ) -> Result<CallToolResult, McpError> {
+        handlers::update_version(&self.store, &self.config, params).await
+    }
+
+    #[tool(
+        description = "Add changelog entries for a project version. Writes changelog.md in project notes. Optionally syncs to the project's actual repo by cross-referencing knowledge sources."
+    )]
+    async fn add_changelog(
+        &self,
+        Parameters(params): Parameters<AddChangelogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        handlers::add_changelog(&self.store, &self.config, params).await
+    }
 }
 
 #[tool_handler]
@@ -84,9 +126,10 @@ impl rmcp::ServerHandler for KnowledgeMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "Cross-repo knowledge index with FTS5 search. \
+                "Cross-repo knowledge index with FTS5 search and project note management. \
                  Indexes documentation from multiple repositories for unified search. \
                  Usage: list_sources -> search_docs -> get_doc -> get_sync_status. \
+                 Project notes: list_projects -> update_project_summary / update_version / add_changelog. \
                  Run sync_sources to update the index from source files."
                     .into(),
             ),

@@ -166,6 +166,72 @@ pub struct SourceInfo {
 }
 
 // ============================================================================
+// Project Note Types
+// ============================================================================
+
+/// Parsed project summary from summary.md
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectSummary {
+    pub name: String,
+    pub overview: String,
+    pub status: String,
+    pub active_version: Option<String>,
+    pub repo: Option<String>,
+    pub notes: String,
+}
+
+/// Response from list_projects
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectListResponse {
+    pub projects: Vec<ProjectListEntry>,
+}
+
+/// A single project in the list
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectListEntry {
+    pub name: String,
+    pub status: String,
+    pub active_version: Option<String>,
+    pub repo: Option<String>,
+    pub overview: String,
+}
+
+/// Response from update_project_summary
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectUpdateResponse {
+    pub project: String,
+    pub updated_fields: Vec<String>,
+    pub file_path: String,
+}
+
+/// Response from update_version
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VersionUpdateResponse {
+    pub project: String,
+    pub version: String,
+    pub created: bool,
+    pub tasks_added: usize,
+    pub tasks_toggled: usize,
+    pub file_path: String,
+}
+
+/// Response from add_changelog
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChangelogResponse {
+    pub project: String,
+    pub version: String,
+    pub notes_path: String,
+    pub repo_path: Option<String>,
+}
+
+/// A single changelog entry with category
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChangelogEntry {
+    pub category: String,
+    pub description: String,
+}
+
+// ============================================================================
 // Error Types
 // ============================================================================
 
