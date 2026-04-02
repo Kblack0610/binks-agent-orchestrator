@@ -4,10 +4,12 @@
 
 use mcp_common::{internal_error, json_success, CallToolResult, McpError};
 
+use crate::config;
 use crate::config::KnowledgeConfig;
 use crate::docs_store::DocStore;
 use crate::ingest;
 use crate::params::*;
+use crate::project_notes;
 use crate::types::*;
 
 pub async fn search_docs(
@@ -103,4 +105,332 @@ pub async fn list_sources(
     let response = ListSourcesResponse { sources };
 
     json_success(&response)
+}
+
+// ============================================================================
+// Project Note Handlers
+// ============================================================================
+
+pub async fn list_projects(
+    config: &KnowledgeConfig,
+    params: ListProjectsParams,
+) -> Result<CallToolResult, McpError> {
+    let base = project_notes::project_notes_base(config)
+        .map_err(|e| internal_error(e.to_string()))?;
+
+    let mut projects = Vec::new();
+
+    // Scan active project directories
+    let mut entries = tokio::fs::read_dir(&base)
+        .await
+        .map_err(|e| internal_error(format!("Failed to read projects dir: {e}")))?;
+
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| internal_error(e.to_string()))?
+    {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let dir_name = entry.file_name().to_string_lossy().to_string();
+        if dir_name == "archived" || dir_name.starts_with('.') || dir_name.starts_with('_') {
+            continue;
+        }
+
+        if let Some(entry) = read_project_entry(&path, &dir_name).await {
+            projects.push(entry);
+        }
+    }
+
+    // Include archived if requested
+    if params.include_archived {
+        let archived_dir = base.join("archived");
+        if archived_dir.exists() {
+            let mut archived_entries = tokio::fs::read_dir(&archived_dir)
+                .await
+                .map_err(|e| internal_error(format!("Failed to read archived dir: {e}")))?;
+
+            while let Some(entry) = archived_entries
+                .next_entry()
+                .await
+                .map_err(|e| internal_error(e.to_string()))?
+            {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                let dir_name = entry.file_name().to_string_lossy().to_string();
+                if let Some(entry) = read_project_entry(&path, &dir_name).await {
+                    projects.push(entry);
+                }
+            }
+        }
+    }
+
+    // Filter by status if requested
+    if let Some(ref status) = params.status {
+        let s = status.to_lowercase();
+        projects.retain(|p| p.status.to_lowercase() == s);
+    }
+
+    projects.sort_by(|a, b| a.name.cmp(&b.name));
+    json_success(&ProjectListResponse { projects })
+}
+
+async fn read_project_entry(
+    dir: &std::path::Path,
+    dir_name: &str,
+) -> Option<ProjectListEntry> {
+    let summary_path = dir.join("summary.md");
+    let content = tokio::fs::read_to_string(&summary_path).await.ok()?;
+    let summary = project_notes::parse_summary(&content, dir_name);
+
+    Some(ProjectListEntry {
+        name: summary.name,
+        status: summary.status,
+        active_version: summary.active_version,
+        repo: summary.repo,
+        overview: summary.overview,
+    })
+}
+
+pub async fn update_project_summary(
+    store: &DocStore,
+    config: &KnowledgeConfig,
+    params: UpdateProjectSummaryParams,
+) -> Result<CallToolResult, McpError> {
+    let project_dir = project_notes::resolve_project_dir(config, &params.project)
+        .map_err(|e| internal_error(e.to_string()))?;
+
+    let summary_path = project_dir.join("summary.md");
+    let mut content = tokio::fs::read_to_string(&summary_path)
+        .await
+        .map_err(|e| internal_error(format!("Failed to read summary.md: {e}")))?;
+
+    let mut updated_fields = Vec::new();
+
+    if let Some(ref status) = params.status {
+        content = project_notes::replace_section(&content, "Status", &format!("{status}\n"));
+        updated_fields.push("status".to_string());
+    }
+
+    if let Some(ref version) = params.active_version {
+        let v = version.trim_start_matches('v');
+        let link = format!("- [v{v}](v{v}.md)\n");
+        content = project_notes::replace_section(&content, "Active Version", &link);
+        updated_fields.push("active_version".to_string());
+    }
+
+    if let Some(ref overview) = params.overview {
+        content = project_notes::replace_section(&content, "Overview", &format!("{overview}\n"));
+        updated_fields.push("overview".to_string());
+    }
+
+    if let Some(ref repo) = params.repo {
+        content = project_notes::replace_section(&content, "Repo", &format!("{repo}\n"));
+        updated_fields.push("repo".to_string());
+    }
+
+    if let Some(ref notes) = params.notes {
+        content = project_notes::append_to_section(&content, "Notes", &format!("- {notes}"));
+        updated_fields.push("notes".to_string());
+    }
+
+    tokio::fs::write(&summary_path, &content)
+        .await
+        .map_err(|e| internal_error(format!("Failed to write summary.md: {e}")))?;
+
+    // Re-index this project's files
+    let _ = ingest::run_sync(
+        store,
+        config,
+        None,
+        Some("project-notes"),
+        Some(&format!("{}/", params.project)),
+        true,
+    )
+    .await;
+
+    json_success(&ProjectUpdateResponse {
+        project: params.project,
+        updated_fields,
+        file_path: summary_path.to_string_lossy().to_string(),
+    })
+}
+
+pub async fn update_version(
+    store: &DocStore,
+    config: &KnowledgeConfig,
+    params: UpdateVersionParams,
+) -> Result<CallToolResult, McpError> {
+    let project_dir = project_notes::resolve_project_dir(config, &params.project)
+        .map_err(|e| internal_error(e.to_string()))?;
+
+    let v = params.version.trim_start_matches('v');
+    let version_filename = format!("v{v}.md");
+    let version_path = project_dir.join(&version_filename);
+
+    let mut tasks_added = 0;
+    let mut tasks_toggled = 0;
+    let created;
+
+    if params.create {
+        if version_path.exists() {
+            return Err(internal_error(format!(
+                "Version file already exists: {version_filename}"
+            )));
+        }
+
+        let content =
+            project_notes::create_version_content(v, params.description.as_deref());
+        tokio::fs::write(&version_path, &content)
+            .await
+            .map_err(|e| internal_error(format!("Failed to create version file: {e}")))?;
+
+        // Update summary.md active version
+        let summary_path = project_dir.join("summary.md");
+        if let Ok(summary_content) = tokio::fs::read_to_string(&summary_path).await {
+            let link = format!("- [v{v}](v{v}.md)\n");
+            let updated =
+                project_notes::replace_section(&summary_content, "Active Version", &link);
+            let _ = tokio::fs::write(&summary_path, &updated).await;
+        }
+
+        created = true;
+    } else {
+        if !version_path.exists() {
+            return Err(internal_error(format!(
+                "Version file not found: {version_filename}. Use create=true to create it."
+            )));
+        }
+
+        let mut content = tokio::fs::read_to_string(&version_path)
+            .await
+            .map_err(|e| internal_error(format!("Failed to read version file: {e}")))?;
+
+        if let Some(ref tasks) = params.add_tasks {
+            content = project_notes::add_tasks(&content, tasks);
+            tasks_added = tasks.len();
+        }
+
+        if let Some(ref check) = params.check_tasks {
+            for task in check {
+                content = project_notes::toggle_task(&content, task, true);
+                tasks_toggled += 1;
+            }
+        }
+
+        if let Some(ref uncheck) = params.uncheck_tasks {
+            for task in uncheck {
+                content = project_notes::toggle_task(&content, task, false);
+                tasks_toggled += 1;
+            }
+        }
+
+        tokio::fs::write(&version_path, &content)
+            .await
+            .map_err(|e| internal_error(format!("Failed to write version file: {e}")))?;
+
+        created = false;
+    }
+
+    // Re-index
+    let _ = ingest::run_sync(
+        store,
+        config,
+        None,
+        Some("project-notes"),
+        Some(&format!("{}/", params.project)),
+        true,
+    )
+    .await;
+
+    json_success(&VersionUpdateResponse {
+        project: params.project,
+        version: format!("v{v}"),
+        created,
+        tasks_added,
+        tasks_toggled,
+        file_path: version_path.to_string_lossy().to_string(),
+    })
+}
+
+pub async fn add_changelog(
+    store: &DocStore,
+    config: &KnowledgeConfig,
+    params: AddChangelogParams,
+) -> Result<CallToolResult, McpError> {
+    let project_dir = project_notes::resolve_project_dir(config, &params.project)
+        .map_err(|e| internal_error(e.to_string()))?;
+
+    let v = params.version.trim_start_matches('v');
+    let entries: Vec<ChangelogEntry> = params.entries.into_iter().map(|e| e.into()).collect();
+    let new_entry = project_notes::format_changelog_entry(v, &entries);
+
+    // Write to notes dir
+    let notes_changelog = project_dir.join("changelog.md");
+    let existing = tokio::fs::read_to_string(&notes_changelog)
+        .await
+        .unwrap_or_default();
+    let updated = project_notes::prepend_changelog_entry(&existing, &new_entry);
+    tokio::fs::write(&notes_changelog, &updated)
+        .await
+        .map_err(|e| internal_error(format!("Failed to write changelog.md: {e}")))?;
+
+    // Optionally sync to repo
+    let mut repo_path_written = None;
+
+    if params.sync_to_repo {
+        let repo_base = if let Some(ref explicit_path) = params.repo_path {
+            Some(std::path::PathBuf::from(config::expand_tilde(explicit_path)))
+        } else {
+            // Read summary.md to get repo field, then cross-reference
+            let summary_path = project_dir.join("summary.md");
+            if let Ok(summary_content) = tokio::fs::read_to_string(&summary_path).await {
+                let summary =
+                    project_notes::parse_summary(&summary_content, &params.project);
+                summary
+                    .repo
+                    .as_deref()
+                    .and_then(|r| project_notes::resolve_repo_path(config, r))
+            } else {
+                None
+            }
+        };
+
+        if let Some(repo_dir) = repo_base {
+            if repo_dir.exists() {
+                let repo_changelog = repo_dir.join("CHANGELOG.md");
+                let repo_existing = tokio::fs::read_to_string(&repo_changelog)
+                    .await
+                    .unwrap_or_default();
+                let repo_updated =
+                    project_notes::prepend_changelog_entry(&repo_existing, &new_entry);
+                if let Ok(()) = tokio::fs::write(&repo_changelog, &repo_updated).await {
+                    repo_path_written =
+                        Some(repo_changelog.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+
+    // Re-index
+    let _ = ingest::run_sync(
+        store,
+        config,
+        None,
+        Some("project-notes"),
+        Some(&format!("{}/", params.project)),
+        true,
+    )
+    .await;
+
+    json_success(&ChangelogResponse {
+        project: params.project,
+        version: format!("v{v}"),
+        notes_path: notes_changelog.to_string_lossy().to_string(),
+        repo_path: repo_path_written,
+    })
 }

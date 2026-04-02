@@ -61,6 +61,9 @@ pub struct SourceConfig {
     pub priority: Option<i32>,
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+    /// Whether this source supports write operations (project notes, changelogs)
+    #[serde(default)]
+    pub writable: bool,
 }
 
 fn default_enabled() -> bool {
@@ -136,6 +139,18 @@ impl KnowledgeConfig {
     /// Get the resolved database path
     pub fn db_path(&self) -> PathBuf {
         PathBuf::from(&self.database.path)
+    }
+
+    /// Find a writable source by name
+    pub fn get_writable_source(&self, name: &str) -> Option<&SourceConfig> {
+        self.sources
+            .iter()
+            .find(|s| s.name == name && s.writable && s.enabled)
+    }
+
+    /// Find any source whose repo field matches (for cross-referencing repo paths)
+    pub fn find_source_by_repo(&self, repo: &str) -> Option<&SourceConfig> {
+        self.sources.iter().find(|s| s.repo == repo && s.enabled)
     }
 }
 
