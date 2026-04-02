@@ -148,10 +148,6 @@ impl KnowledgeConfig {
             .find(|s| s.name == name && s.writable && s.enabled)
     }
 
-    /// Find any source whose repo field matches (for cross-referencing repo paths)
-    pub fn find_source_by_repo(&self, repo: &str) -> Option<&SourceConfig> {
-        self.sources.iter().find(|s| s.repo == repo && s.enabled)
-    }
 }
 
 /// Expand `~` at the start of a path to the user's home directory

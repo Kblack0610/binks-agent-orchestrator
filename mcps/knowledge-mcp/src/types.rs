@@ -215,22 +215,6 @@ pub struct VersionUpdateResponse {
     pub file_path: String,
 }
 
-/// Response from add_changelog
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ChangelogResponse {
-    pub project: String,
-    pub version: String,
-    pub notes_path: String,
-    pub repo_path: Option<String>,
-}
-
-/// A single changelog entry with category
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangelogEntry {
-    pub category: String,
-    pub description: String,
-}
-
 // ============================================================================
 // Error Types
 // ============================================================================
