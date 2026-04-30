@@ -1,36 +1,41 @@
 //! Benchmark runner
 //!
-//! Executes benchmark cases against the Binks agent and collects results.
+//! Dispatches a [`BenchmarkCase`] through a [`HarnessAdapter`], collects the
+//! resulting [`HarnessRun`], and applies the case's [`crate::SuccessCriteria`]
+//! / expected-tool / forbidden-tool policy to produce a [`BenchmarkResult`].
+//!
+//! The runner is harness-agnostic: it knows nothing about Ollama, Claude Code,
+//! opencode, etc. — only the adapter does.
 
-use crate::{
-    collector::{BenchmarkCollector, CollectedMetrics},
-    BenchmarkCase, BenchmarkResult, BenchmarkSummary, Tier, TierSummary,
-};
+use crate::adapters::{BinksAdapter, HarnessAdapter, HarnessRequest, HarnessRun};
+use crate::{BenchmarkCase, BenchmarkResult, BenchmarkSummary, Tier, TierSummary};
 use anyhow::Result;
-use binks_agent::agent::{event_channel, Agent};
-use binks_agent::config::McpConfig;
-use binks_agent::mcp::McpClientPool;
 use chrono::Utc;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
-use tokio::time::timeout;
+use std::sync::Arc;
 
-/// Configuration for the benchmark runner
+/// Configuration for the benchmark runner.
+///
+/// Constructs a default [`BinksAdapter`] for back-compat with the existing
+/// `--gateway-url` / `--model` / `--mcp-config` CLI flags. Phase 3 will allow
+/// callers to inject any adapter via [`BenchmarkRunner::with_adapter`].
 #[derive(Debug, Clone)]
 pub struct RunnerConfig {
-    /// Ollama base URL
-    pub ollama_url: String,
-    /// Default model to use
+    /// LLM gateway URL (LiteLLM, Ollama, …).
+    pub gateway_url: String,
+    /// Default model identifier.
     pub model: String,
-    /// MCP config path (optional, uses default if None)
+    /// MCP config path (uses default if `None`).
     pub mcp_config: Option<String>,
-    /// Whether to print verbose output
+    /// Whether to print verbose output.
     pub verbose: bool,
 }
 
 impl Default for RunnerConfig {
     fn default() -> Self {
         Self {
-            ollama_url: "http://localhost:11434".to_string(),
+            gateway_url: "http://localhost:11434".to_string(),
             model: "llama3.1:8b".to_string(),
             mcp_config: None,
             verbose: false,
@@ -38,183 +43,107 @@ impl Default for RunnerConfig {
     }
 }
 
-/// Benchmark runner
+/// Benchmark runner.
 pub struct BenchmarkRunner {
-    config: RunnerConfig,
+    adapter: Arc<dyn HarnessAdapter>,
+    /// Model label recorded on every result. Defaults to the adapter's
+    /// configured model; `with_adapter` callers can override via
+    /// [`BenchmarkRunner::with_model_label`].
+    model_label: String,
 }
 
 impl BenchmarkRunner {
-    /// Create a new benchmark runner
+    /// Build a runner backed by the default in-process [`BinksAdapter`].
     pub fn new(config: RunnerConfig) -> Self {
-        Self { config }
+        let adapter = BinksAdapter::new(
+            config.gateway_url,
+            config.model.clone(),
+            config.mcp_config.map(PathBuf::from),
+        );
+        Self {
+            adapter: Arc::new(adapter),
+            model_label: config.model,
+        }
     }
 
-    /// Create with just URL and model
-    pub fn with_model(ollama_url: impl Into<String>, model: impl Into<String>) -> Self {
+    /// Build a runner from a URL/model pair (Binks adapter, no MCP override).
+    pub fn with_model(gateway_url: impl Into<String>, model: impl Into<String>) -> Self {
+        let model_str = model.into();
         Self::new(RunnerConfig {
-            ollama_url: ollama_url.into(),
-            model: model.into(),
-            ..Default::default()
+            gateway_url: gateway_url.into(),
+            model: model_str,
+            mcp_config: None,
+            verbose: false,
         })
     }
 
-    /// Run a single benchmark case
-    pub async fn run_case(&self, case: &BenchmarkCase) -> Result<BenchmarkResult> {
-        let start = std::time::Instant::now();
-        let timestamp = Utc::now();
+    /// Build a runner around an arbitrary adapter. The `model_label` is what
+    /// [`BenchmarkResult::model`] gets stamped with.
+    pub fn with_adapter(adapter: Arc<dyn HarnessAdapter>, model_label: impl Into<String>) -> Self {
+        Self {
+            adapter,
+            model_label: model_label.into(),
+        }
+    }
 
+    /// Override the model label recorded on results without changing the adapter.
+    pub fn with_model_label(mut self, label: impl Into<String>) -> Self {
+        self.model_label = label.into();
+        self
+    }
+
+    /// Adapter name (`"binks"`, `"claude-code"`, …) — useful for reporters.
+    pub fn harness_name(&self) -> &str {
+        self.adapter.name()
+    }
+
+    /// Run a single benchmark case.
+    pub async fn run_case(&self, case: &BenchmarkCase) -> Result<BenchmarkResult> {
+        let timestamp = Utc::now();
         tracing::info!(case_id = %case.id, tier = %case.tier, "Running benchmark case");
 
-        // Load MCP config
-        let mcp_config = if let Some(ref path) = self.config.mcp_config {
-            McpConfig::load_from_path(&PathBuf::from(path))?
-        } else {
-            McpConfig::load()?.ok_or_else(|| {
-                anyhow::anyhow!("No MCP config found. Create .mcp.json or specify --mcp-config")
-            })?
+        let request = HarnessRequest {
+            prompt: case.prompt.clone(),
+            workspace: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            model: None,
+            mcp_servers: case.servers.clone(),
+            allowed_tools: None,
+            timeout: case.timeout,
+            env: BTreeMap::new(),
         };
 
-        // Create MCP pool and agent with event channel
-        let mcp_pool = McpClientPool::new(mcp_config);
-        let (tx, rx) = event_channel();
-        let mut agent =
-            Agent::new(&self.config.ollama_url, &self.config.model, mcp_pool).with_event_sender(tx);
+        let run = self.adapter.run(request).await?;
+        let result = self.evaluate(case, run, timestamp);
 
-        // Clone servers for use in async block
-        let servers = case.servers.clone();
-        let prompt = case.prompt.clone();
-
-        // Run the benchmark with timeout
-        let result = timeout(case.timeout, async {
-            // Spawn collector task
-            let collector_handle =
-                tokio::spawn(async move { BenchmarkCollector::collect(rx).await });
-
-            // Run agent (filter by servers if specified)
-            let response = if let Some(ref server_list) = servers {
-                let server_refs: Vec<&str> = server_list.iter().map(|s| s.as_str()).collect();
-                agent.chat_with_servers(&prompt, &server_refs).await
-            } else {
-                agent.chat(&prompt).await
-            };
-
-            // Wait for collector
-            let metrics = collector_handle.await?;
-
-            Ok::<(Result<String, _>, CollectedMetrics), anyhow::Error>((response, metrics))
-        })
-        .await;
-
-        let duration_ms = start.elapsed().as_millis() as u64;
-
-        match result {
-            Ok(Ok((agent_result, metrics))) => {
-                let output = match agent_result {
-                    Ok(response) => response,
-                    Err(e) => {
-                        return Ok(self.create_result(
-                            case,
-                            false,
-                            duration_ms,
-                            metrics.tool_calls,
-                            Some(format!("Agent error: {}", e)),
-                            String::new(),
-                            timestamp,
-                        ));
-                    }
-                };
-
-                // Validate results
-                let tools_called: Vec<&str> =
-                    metrics.tool_calls.iter().map(|t| t.tool.as_str()).collect();
-
-                // Check for missing expected tools
-                let missing_tools: Vec<String> = case
-                    .expected_tools
-                    .iter()
-                    .filter(|t| !tools_called.contains(&t.as_str()))
-                    .cloned()
-                    .collect();
-
-                // Check for forbidden tools that were called
-                let forbidden_called: Vec<String> = case
-                    .forbidden_tools
-                    .iter()
-                    .filter(|t| tools_called.contains(&t.as_str()))
-                    .cloned()
-                    .collect();
-
-                // Check success criteria
-                let mut result = self.create_result(
-                    case,
-                    false, // Will set below
-                    duration_ms,
-                    metrics.tool_calls,
-                    metrics.error,
-                    output,
-                    timestamp,
-                );
-
-                result.missing_tools = missing_tools;
-                result.forbidden_tools_called = forbidden_called;
-
-                // Determine pass/fail
-                result.passed = case.success_criteria.is_satisfied(&result)
-                    && result.missing_tools.is_empty()
-                    && result.forbidden_tools_called.is_empty();
-
-                if result.passed {
-                    tracing::info!(
-                        case_id = %case.id,
-                        duration_ms = duration_ms,
-                        "Benchmark PASSED"
-                    );
-                } else {
-                    tracing::warn!(
-                        case_id = %case.id,
-                        duration_ms = duration_ms,
-                        missing_tools = ?result.missing_tools,
-                        forbidden_called = ?result.forbidden_tools_called,
-                        "Benchmark FAILED"
-                    );
-                }
-
-                Ok(result)
-            }
-            Ok(Err(e)) => Ok(self.create_result(
-                case,
-                false,
-                duration_ms,
-                vec![],
-                Some(format!("Execution error: {}", e)),
-                String::new(),
-                timestamp,
-            )),
-            Err(_) => Ok(self.create_result(
-                case,
-                false,
-                duration_ms,
-                vec![],
-                Some(format!("Timeout after {:?}", case.timeout)),
-                String::new(),
-                timestamp,
-            )),
+        if result.passed {
+            tracing::info!(
+                case_id = %case.id,
+                duration_ms = result.duration_ms,
+                "Benchmark PASSED"
+            );
+        } else {
+            tracing::warn!(
+                case_id = %case.id,
+                duration_ms = result.duration_ms,
+                missing_tools = ?result.missing_tools,
+                forbidden_called = ?result.forbidden_tools_called,
+                "Benchmark FAILED"
+            );
         }
+
+        Ok(result)
     }
 
-    /// Run all benchmark cases
+    /// Run all benchmark cases.
     pub async fn run_all(&self, cases: &[BenchmarkCase]) -> Result<Vec<BenchmarkResult>> {
         let mut results = Vec::with_capacity(cases.len());
-
         for case in cases {
-            let result = self.run_case(case).await?;
-            results.push(result);
+            results.push(self.run_case(case).await?);
         }
-
         Ok(results)
     }
 
-    /// Run benchmark cases for a specific tier
+    /// Run benchmark cases for a specific tier.
     pub async fn run_tier(
         &self,
         cases: &[BenchmarkCase],
@@ -222,43 +151,79 @@ impl BenchmarkRunner {
     ) -> Result<Vec<BenchmarkResult>> {
         let tier_cases: Vec<_> = cases.iter().filter(|c| c.tier == tier).collect();
         let mut results = Vec::with_capacity(tier_cases.len());
-
         for case in tier_cases {
-            let result = self.run_case(case).await?;
-            results.push(result);
+            results.push(self.run_case(case).await?);
         }
-
         Ok(results)
     }
 
-    /// Create a benchmark result
-    #[allow(clippy::too_many_arguments)]
-    fn create_result(
+    /// Apply the case's success / expected-tool / forbidden-tool policy to a
+    /// raw [`HarnessRun`] and produce a scored [`BenchmarkResult`].
+    fn evaluate(
         &self,
         case: &BenchmarkCase,
-        passed: bool,
-        duration_ms: u64,
-        tool_calls: Vec<crate::ToolCallMetric>,
-        error: Option<String>,
-        output: String,
+        run: HarnessRun,
         timestamp: chrono::DateTime<Utc>,
     ) -> BenchmarkResult {
-        BenchmarkResult {
-            case_id: case.id.clone(),
-            model: self.config.model.clone(),
-            passed,
-            duration_ms,
-            tool_calls,
-            iterations: 1,
-            error,
-            output,
-            timestamp,
-            missing_tools: vec![],
-            forbidden_tools_called: vec![],
+        let duration_ms = run.duration.as_millis() as u64;
+
+        // Bail early on adapter-reported terminal errors; nothing to score.
+        if let Some(err) = &run.error {
+            if run.output.is_empty() {
+                return BenchmarkResult {
+                    case_id: case.id.clone(),
+                    model: self.model_label.clone(),
+                    passed: false,
+                    duration_ms,
+                    tool_calls: run.tool_calls,
+                    iterations: run.iterations.max(1),
+                    error: Some(err.clone()),
+                    output: String::new(),
+                    timestamp,
+                    missing_tools: Vec::new(),
+                    forbidden_tools_called: Vec::new(),
+                };
+            }
         }
+
+        let tools_called: Vec<&str> = run.tool_calls.iter().map(|t| t.tool.as_str()).collect();
+
+        let missing_tools: Vec<String> = case
+            .expected_tools
+            .iter()
+            .filter(|t| !tools_called.contains(&t.as_str()))
+            .cloned()
+            .collect();
+
+        let forbidden_called: Vec<String> = case
+            .forbidden_tools
+            .iter()
+            .filter(|t| tools_called.contains(&t.as_str()))
+            .cloned()
+            .collect();
+
+        let mut result = BenchmarkResult {
+            case_id: case.id.clone(),
+            model: self.model_label.clone(),
+            passed: false,
+            duration_ms,
+            tool_calls: run.tool_calls,
+            iterations: run.iterations.max(1),
+            error: run.error,
+            output: run.output,
+            timestamp,
+            missing_tools,
+            forbidden_tools_called: forbidden_called,
+        };
+
+        result.passed = case.success_criteria.is_satisfied(&result)
+            && result.missing_tools.is_empty()
+            && result.forbidden_tools_called.is_empty();
+
+        result
     }
 
-    /// Generate a summary from results
+    /// Generate a summary from results.
     pub fn summarize(
         &self,
         results: &[BenchmarkResult],
@@ -307,7 +272,7 @@ impl BenchmarkRunner {
         let total_cases = results.len();
 
         BenchmarkSummary {
-            model: self.config.model.clone(),
+            model: self.model_label.clone(),
             timestamp: Utc::now(),
             tiers,
             total_cases,
