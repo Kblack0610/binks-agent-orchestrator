@@ -42,12 +42,19 @@ struct Cli {
     #[arg(short, long, default_value = "terminal")]
     output: String,
 
-    /// Ollama server URL
-    #[arg(long, env = "OLLAMA_URL", default_value = "http://localhost:11434")]
-    ollama_url: String,
+    /// LLM gateway URL. Defaults to in-cluster LiteLLM; override with
+    /// `LITELLM_URL` for laptop dev, or point at a raw Ollama
+    /// (`http://localhost:11434/v1`) — both speak OpenAI-compatible.
+    #[arg(
+        long,
+        env = "LITELLM_URL",
+        default_value = "http://litellm.ai-gateway.svc.cluster.local:4000/v1"
+    )]
+    gateway_url: String,
 
-    /// Model to use for benchmarks
-    #[arg(short, long, env = "OLLAMA_MODEL", default_value = "llama3.1:8b")]
+    /// Model identifier. Either a LiteLLM slot (`code`, `reasoning`, `fast`)
+    /// or a full `provider/model` string. Defaults to the `code` slot (agentic).
+    #[arg(short, long, env = "LITELLM_MODEL", default_value = "code")]
     model: String,
 
     /// MCP config path (uses default if not specified)
@@ -100,9 +107,8 @@ async fn run_bench(cli: Cli) -> Result<()> {
     let format: OutputFormat = cli.output.parse().unwrap_or(OutputFormat::Terminal);
     let reporter = Reporter::new(format);
 
-    // Create runner config (Phase 2 will rename --ollama-url to --gateway-url)
     let runner_config = RunnerConfig {
-        gateway_url: cli.ollama_url.clone(),
+        gateway_url: cli.gateway_url.clone(),
         model: cli.model.clone(),
         mcp_config: cli.mcp_config,
         verbose: cli.verbose,
