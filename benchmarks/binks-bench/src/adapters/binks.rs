@@ -93,11 +93,7 @@ impl HarnessAdapter for BinksAdapter {
             Ok(Ok((agent_result, metrics))) => {
                 let (output, error, exit_code) = match agent_result {
                     Ok(text) => (text, metrics.error.clone(), 0),
-                    Err(e) => (
-                        String::new(),
-                        Some(format!("Agent error: {}", e)),
-                        -1,
-                    ),
+                    Err(e) => (String::new(), Some(format!("Agent error: {}", e)), -1),
                 };
                 Ok(HarnessRun {
                     output,

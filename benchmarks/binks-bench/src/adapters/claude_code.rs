@@ -105,9 +105,12 @@ impl HarnessAdapter for ClaudeCodeAdapter {
             cmd.env(k, v);
         }
 
-        let child = cmd
-            .spawn()
-            .with_context(|| format!("failed to spawn `{}` (is Claude Code installed?)", self.binary))?;
+        let child = cmd.spawn().with_context(|| {
+            format!(
+                "failed to spawn `{}` (is Claude Code installed?)",
+                self.binary
+            )
+        })?;
 
         let output_result = timeout(req.timeout, child.wait_with_output()).await;
         let duration = start.elapsed();
