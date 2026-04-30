@@ -100,9 +100,9 @@ async fn run_bench(cli: Cli) -> Result<()> {
     let format: OutputFormat = cli.output.parse().unwrap_or(OutputFormat::Terminal);
     let reporter = Reporter::new(format);
 
-    // Create runner config
+    // Create runner config (Phase 2 will rename --ollama-url to --gateway-url)
     let runner_config = RunnerConfig {
-        ollama_url: cli.ollama_url.clone(),
+        gateway_url: cli.ollama_url.clone(),
         model: cli.model.clone(),
         mcp_config: cli.mcp_config,
         verbose: cli.verbose,

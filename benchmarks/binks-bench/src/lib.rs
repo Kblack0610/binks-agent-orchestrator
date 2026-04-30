@@ -16,10 +16,11 @@
 //! use binks_bench::{BenchmarkCase, BenchmarkRunner, Tier};
 //!
 //! let cases = binks_bench::cases::tier1::all_cases();
-//! let runner = BenchmarkRunner::new("http://localhost:11434", "llama3.1:8b");
+//! let runner = BenchmarkRunner::with_model("http://localhost:11434", "llama3.1:8b");
 //! let results = runner.run_all(&cases).await?;
 //! ```
 
+pub mod adapters;
 pub mod baseline;
 pub mod cases;
 pub mod collector;
@@ -338,6 +339,7 @@ pub struct BenchmarkSummary {
 }
 
 // Re-export important items
+pub use adapters::{BinksAdapter, HarnessAdapter, HarnessRequest, HarnessRun};
 pub use baseline::{Baseline, RegressionReport};
 pub use collector::BenchmarkCollector;
 pub use reporter::{OutputFormat, Reporter};
