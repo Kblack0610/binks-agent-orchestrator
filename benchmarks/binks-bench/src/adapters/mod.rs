@@ -19,8 +19,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 pub mod binks;
+pub mod claude_code;
 
 pub use binks::BinksAdapter;
+pub use claude_code::ClaudeCodeAdapter;
 
 /// One unit of work for a harness.
 #[derive(Debug, Clone)]

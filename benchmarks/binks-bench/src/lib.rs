@@ -339,7 +339,7 @@ pub struct BenchmarkSummary {
 }
 
 // Re-export important items
-pub use adapters::{BinksAdapter, HarnessAdapter, HarnessRequest, HarnessRun};
+pub use adapters::{BinksAdapter, ClaudeCodeAdapter, HarnessAdapter, HarnessRequest, HarnessRun};
 pub use baseline::{Baseline, RegressionReport};
 pub use collector::BenchmarkCollector;
 pub use reporter::{OutputFormat, Reporter};
