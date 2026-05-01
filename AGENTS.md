@@ -1,28 +1,16 @@
-# Binks Agent Repo Instructions
+# binks-agent-orchestrator instructions
 
-## Frontend Worktree Policy
+This repo houses Rust MCP servers and shared crates. The autonomous Binks Agent that used to live here has been extracted to `~/dev/home/binks/` (archived).
 
-- This repository is the source of truth for the Binks backend, agent runtime, MCP integration, and web API.
-- The Binks frontend (`binks-chat`) does not live in this repository.
-- When a task requires frontend changes, make those changes only in the dedicated platform worktree for Binks.
-- Do not edit the main/shared platform checkout for Binks frontend work.
+## Scope
 
-## Canonical Frontend Location
+- All work happens within this repo: MCP servers under `mcps/`, the shared `common/mcp-common/`, scripts, manifests, docs.
+- There is no separate frontend worktree associated with this repo anymore — the previous `binks-chat` frontend was tied to the archived agent.
 
-- Expected Binks frontend worktree: `~/dev/bnb/platform-binks-agent`
-- Expected app path inside that worktree: `~/dev/bnb/platform-binks-agent/apps/binks-chat`
+## Conventions
 
-If the dedicated worktree does not exist yet, stop and ask the user to create or confirm it before making frontend changes.
+- Branches: `feat/`, `fix/`, `chore/`, `refactor/` — never commit to `master` directly.
+- Conventional commits: `type(scope): description`.
+- Verify with `cargo build --workspace` and `cargo clippy --workspace -- -D warnings`.
 
-## Working Rules
-
-- Backend-only tasks: work only in `~/dev/home/binks-agent-orchestrator`
-- Frontend-only tasks: work only in `~/dev/bnb/platform-binks-agent/apps/binks-chat`
-- Full-stack tasks: update backend here first, then update the frontend in the dedicated platform worktree
-- Never use `~/dev/bnb/platform` for Binks frontend changes unless the user explicitly overrides this policy
-
-## Verification
-
-- For backend changes, verify from this repository
-- For frontend changes, verify from the dedicated platform worktree
-- Report which repository or worktree was changed and what was verified in each location
+See [README.md](README.md) for the full layout.

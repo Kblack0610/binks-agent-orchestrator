@@ -30,6 +30,6 @@ cargo build --workspace
 ## Architecture
 
 - Each capability is an MCP server under `mcps/`
-- Shared code lives in `mcps/mcp-common/`
-- Agent core is in `agent/`
+- Shared code lives in `common/mcp-common/`
+- The autonomous Binks Agent that used to live in `agent/` was extracted to `~/dev/home/binks/` (archived) on 2026-04-30
 - See `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` for details

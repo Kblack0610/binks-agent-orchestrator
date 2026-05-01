@@ -1,8 +1,6 @@
 ---
 name: mobile-audit
 description: Audit mobile UI designs using RICO dataset patterns and best practices
-compat:
-  binks_agent: true
 io:
   input: "screenshot path, directory, or Playwright capture"
   output: "design audit report + inbox notification"

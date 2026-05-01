@@ -1,11 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "agent",
     # Common crates
     "common/mcp-common",
-    # Benchmarks
-    "benchmarks/binks-bench",
     # MCP servers
     "mcps/sysinfo-mcp",
     "mcps/github-gh",
@@ -18,16 +15,11 @@ members = [
     "mcps/exec-mcp",
     "mcps/sql-mcp",
     "mcps/task-mcp",
-    "mcps/self-healing-mcp",
-    "mcps/workflow-mcp",
     "mcps/linear-cli-mcp",
     "mcps/rico-mcp",
     "mcps/adb-mcp",
     "mcps/unity-mcp",
     "mcps/knowledge-mcp",
-    "mcps/agent-registry-mcp",
-    # FFI bindings
-    "mcps/binks-ffi",
 ]
 
 [workspace.package]
@@ -58,9 +50,6 @@ anyhow = "1"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-
-# CLI
-clap = { version = "4", features = ["derive", "env"] }
 
 # MCP
 rmcp = { version = "0.13", features = ["server", "client", "macros", "transport-io", "transport-child-process"] }
