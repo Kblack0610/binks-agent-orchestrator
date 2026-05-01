@@ -47,16 +47,6 @@
         "RUST_LOG": "info"
       }
     },
-    "agent": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/agent/target/release/agent",
-      "args": [
-        "serve"
-      ],
-      "env": {
-        "OLLAMA_URL": "http://192.168.1.4:11434",
-        "OLLAMA_MODEL": "llama3.1:8b"
-      }
-    },
     "filesystem": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/mcps/filesystem-mcp/target/release/filesystem-mcp",
       "args": [],

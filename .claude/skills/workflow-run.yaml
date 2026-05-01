@@ -1,7 +1,0 @@
-name: workflow-run
-description: Execute any workflow from TOML definition
-triggers:
-  - /sc:workflow
-  - /workflow
-version: 1.0.0
-author: binks-agent

@@ -53,16 +53,6 @@
       },
       "tier": 2
     },
-    "agent": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/agent",
-      "args": [
-        "serve"
-      ],
-      "env": {
-        "OLLAMA_URL": "http://192.168.1.4:11434"
-      },
-      "tier": 4
-    },
     "filesystem": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/filesystem-mcp",
       "args": [],
@@ -106,27 +96,11 @@
       },
       "tier": 2
     },
-    "self-healing": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/self-healing-mcp",
-      "args": [],
-      "env": {
-        "RUST_LOG": "info"
-      },
-      "tier": 2
-    },
     "task": {
       "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/task-mcp",
       "args": [],
       "env": {
         "DB_PATH": "${HOME}/.binks/conversations.db",
-        "RUST_LOG": "info"
-      },
-      "tier": 2
-    },
-    "workflow": {
-      "command": "/home/kblack0610/dev/home/binks-agent-orchestrator/target/release/workflow-mcp",
-      "args": [],
-      "env": {
         "RUST_LOG": "info"
       },
       "tier": 2
